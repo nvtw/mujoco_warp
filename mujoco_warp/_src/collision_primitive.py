@@ -244,6 +244,7 @@ def plane_box(
 
 _HUGE_VAL = 1e6
 
+
 @wp.func
 def plane_convex(
   plane: Geom,
