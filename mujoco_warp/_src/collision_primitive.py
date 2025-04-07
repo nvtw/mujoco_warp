@@ -15,8 +15,8 @@
 
 import warp as wp
 
-from .math import closest_segment_to_segment_points
 from .math import closest_segment_point
+from .math import closest_segment_to_segment_points
 from .math import make_frame
 from .math import normalize_with_norm
 from .types import Data
