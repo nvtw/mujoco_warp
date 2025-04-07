@@ -242,65 +242,67 @@ def plane_cylinder(
   geom_indices: wp.vec2i,
 ):
   """Calculates contacts between a cylinder and a plane."""
+  # Extract plane normal and cylinder axis
   n = plane.normal
   axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
 
-  # make sure axis points towards plane
+  # Project, make sure axis points toward plane
   prjaxis = wp.dot(n, axis)
-  sign = -wp.sign(prjaxis)
-  axis = axis * sign
-  prjaxis = prjaxis * sign
+  if prjaxis > 0:
+    axis = -axis
+    prjaxis = -prjaxis
 
-  # compute normal distance to cylinder center
+  # Compute normal distance from plane to cylinder center
   dist0 = wp.dot(cylinder.pos - plane.pos, n)
 
-  # remove component of -normal along axis, compute length
+  # Remove component of -normal along cylinder axis
   vec = axis * prjaxis - n
-  len_ = wp.length(vec)
+  len_sqr = wp.dot(vec, vec)
 
-  # disk parallel to plane: pick x-axis of cylinder, scale by radius
-  # general configuration: normalize vector, scale by radius
+  # If vector is nondegenerate, normalize and scale by radius
+  # Otherwise use cylinder's x-axis scaled by radius
   vec = wp.where(
-    len_ < 1.0e-12,
+    len_sqr >= 1e-12,
+    vec * (cylinder.size[0] / wp.sqrt(len_sqr)),
     wp.vec3(cylinder.rot[0, 0], cylinder.rot[1, 0], cylinder.rot[2, 0])
     * cylinder.size[0],
-    vec / len_ * cylinder.size[0],
   )
 
-  # project vector on normal
+  # Project scaled vector on normal
   prjvec = wp.dot(vec, n)
 
-  # scale axis by half-length
+  # Scale cylinder axis by half-length
   axis = axis * cylinder.size[1]
   prjaxis = prjaxis * cylinder.size[1]
 
-  # compute sideways vector: vec1
-  prjvec1 = -prjvec * 0.5
-  vec1 = wp.normalize(wp.cross(vec, axis)) * cylinder.size[0]
-  vec1 = vec1 * wp.sqrt(3.0) * 0.5
-
-  # disk parallel to plane
-  d1 = dist0 + prjaxis + prjvec
-  d2 = dist0 + prjaxis + prjvec1
-
-  dist = wp.vec3(d1, d2, d2)
-  pos0 = cylinder.pos + axis + vec - n * d1 * 0.5
-  pos1 = cylinder.pos + axis + vec1 + vec * -0.5 - n * d2 * 0.5
-  pos2 = cylinder.pos + axis - vec1 + vec * -0.5 - n * d2 * 0.5
-
-  # cylinder parallel to plane
-  cond = wp.abs(prjaxis) < 1e-3
-  d3 = dist0 - prjaxis + prjvec
-
-  if cond:
-    dist.y = d3
-    pos1 = cylinder.pos + vec - axis - n * d3 * 0.5
-
   frame = make_frame(n)
 
-  write_contact(d, dist[0], pos0, frame, margin, geom_indices, worldid)
-  write_contact(d, dist[1], pos1, frame, margin, geom_indices, worldid)
-  write_contact(d, dist[2], pos2, frame, margin, geom_indices, worldid)
+  # First contact point
+  dist1 = dist0 + prjaxis + prjvec
+  if dist1 <= margin:
+    pos1 = cylinder.pos + vec + axis - n * (dist1 * 0.5)
+    write_contact(d, dist1, pos1, frame, margin, geom_indices, worldid)
+
+  # Second contact point
+  dist2 = dist0 - prjaxis + prjvec
+  if dist2 <= margin:
+    pos2 = cylinder.pos + vec - axis - n * (dist2 * 0.5)
+    write_contact(d, dist2, pos2, frame, margin, geom_indices, worldid)
+
+  # Try triangle contact points on side closer to plane
+  prjvec1 = -prjvec * 0.5
+  dist3 = dist0 + prjaxis + prjvec1
+  if dist3 <= margin:
+    # Compute sideways vector scaled by radius*sqrt(3)/2
+    vec1 = wp.normalize(wp.cross(vec, axis)) * (cylinder.size[0] * wp.sqrt(3.0) * 0.5)
+
+    # Add contact point A
+    pos3 = cylinder.pos + vec1 + axis + vec * (-0.5) - n * (dist3 * 0.5)
+    write_contact(d, dist3, pos3, frame, margin, geom_indices, worldid)
+
+    # Add contact point B
+    pos4 = cylinder.pos - vec1 + axis + vec * (-0.5) - n * (dist3 * 0.5)
+    write_contact(d, dist3, pos4, frame, margin, geom_indices, worldid)
 
 
 @wp.kernel
