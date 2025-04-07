@@ -241,33 +241,90 @@ def sphere_cylinder(
   margin: float,
   geom_indices: wp.vec2i,
 ):
-  """Calculates contact between a sphere and a cylinder."""
+  axis = wp.vec3(
+    cylinder.rot[0, 2],
+    cylinder.rot[1, 2],
+    cylinder.rot[2, 2],
+  )
 
-  axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
   delta = sphere.pos - cylinder.pos
+  x = wp.dot(delta, axis)
 
-  # Project and clamp to cylinder length
-  proj = wp.clamp(wp.dot(delta, axis), -cylinder.size[1], cylinder.size[1])
-  closest = cylinder.pos + axis * proj
+  a_proj = axis * x
+  p_proj = delta - a_proj
+  p_proj_sqr = wp.dot(p_proj, p_proj)
 
-  radial = sphere.pos - closest
-  radial_len = wp.length(radial)
+  collide_side = wp.abs(x) < cylinder.size[1]
+  collide_cap = p_proj_sqr < (cylinder.size[0] * cylinder.size[0])
 
-  # Handle degenerate case when sphere center is on cylinder axis
-  if radial_len < 1e-6:
-    if wp.abs(axis[1]) < 0.7:
-      radial = wp.normalize(wp.cross(axis, wp.vec3(0.0, 1.0, 0.0))) * cylinder.size[0]
+  if collide_side and collide_cap:
+    dist_cap = cylinder.size[1] - wp.abs(x)
+    dist_radius = cylinder.size[0] - wp.sqrt(p_proj_sqr)
+
+    if dist_cap < dist_radius:
+      collide_side = False
     else:
-      radial = wp.normalize(wp.cross(axis, wp.vec3(1.0, 0.0, 0.0))) * cylinder.size[0]
-  else:
-    radial = radial / radial_len * cylinder.size[0]
+      collide_cap = False
 
-  pos = closest + radial
-  normal = wp.normalize(sphere.pos - pos)
-  dist = wp.length(sphere.pos - pos) - sphere.size[0]
+  # Side collision
+  if collide_side:
+    pos_target = cylinder.pos + a_proj
+    _sphere_sphere(
+      sphere.pos,
+      sphere.size[0],
+      pos_target,
+      cylinder.size[0],
+      worldid,
+      d,
+      margin,
+      geom_indices,
+    )
+    return
 
-  frame = make_frame(normal)
-  write_contact(d, dist, pos, frame, margin, geom_indices, worldid)
+  # Cap collision
+  if collide_cap:
+    if x > 0.0:
+      # top cap
+      pos_cap = cylinder.pos + axis * cylinder.size[1]
+      plane_normal = axis
+    else:
+      # bottom cap
+      pos_cap = cylinder.pos - axis * cylinder.size[1]
+      plane_normal = -axis
+
+    dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere.pos, sphere.size[0])
+
+    plane_normal = -plane_normal
+
+    write_contact(
+      d,
+      dist,
+      pos_contact,
+      make_frame(plane_normal),
+      margin,
+      geom_indices,
+      worldid,
+    )
+
+    return
+
+  # Corner collision
+  inv_len = 1.0 / wp.sqrt(p_proj_sqr)
+  p_proj = p_proj * (cylinder.size[0] * inv_len)
+
+  cap_offset = axis * (wp.sign(x) * cylinder.size[1])
+  pos_corner = cylinder.pos + cap_offset + p_proj
+
+  _sphere_sphere(
+    sphere.pos,
+    sphere.size[0],
+    pos_corner,
+    0.0,
+    worldid,
+    d,
+    margin,
+    geom_indices,
+  )
 
 
 @wp.kernel
