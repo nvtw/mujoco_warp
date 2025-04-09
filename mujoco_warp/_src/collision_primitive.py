@@ -277,13 +277,16 @@ def plane_cylinder(
 
   frame = make_frame(n)
 
-  # First contact point
+  # First contact point (end cap closer to plane)
   dist1 = dist0 + prjaxis + prjvec
   if dist1 <= margin:
     pos1 = cylinder.pos + vec + axis - n * (dist1 * 0.5)
     write_contact(d, dist1, pos1, frame, margin, geom_indices, worldid)
+  else:
+    # If nearest point is above margin, no contacts
+    return
 
-  # Second contact point
+  # Second contact point (end cap farther from plane)
   dist2 = dist0 - prjaxis + prjvec
   if dist2 <= margin:
     pos2 = cylinder.pos + vec - axis - n * (dist2 * 0.5)
@@ -294,14 +297,15 @@ def plane_cylinder(
   dist3 = dist0 + prjaxis + prjvec1
   if dist3 <= margin:
     # Compute sideways vector scaled by radius*sqrt(3)/2
-    vec1 = wp.normalize(wp.cross(vec, axis)) * (cylinder.size[0] * wp.sqrt(3.0) * 0.5)
+    vec1 = wp.cross(vec, axis)
+    vec1 = wp.normalize(vec1) * (cylinder.size[0] * wp.sqrt(3.0) * 0.5)
 
-    # Add contact point A
-    pos3 = cylinder.pos + vec1 + axis + vec * (-0.5) - n * (dist3 * 0.5)
+    # Add contact point A - adjust to closest side
+    pos3 = cylinder.pos + vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
     write_contact(d, dist3, pos3, frame, margin, geom_indices, worldid)
 
-    # Add contact point B
-    pos4 = cylinder.pos - vec1 + axis + vec * (-0.5) - n * (dist3 * 0.5)
+    # Add contact point B - adjust to closest side
+    pos4 = cylinder.pos - vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
     write_contact(d, dist3, pos4, frame, margin, geom_indices, worldid)
 
 
