@@ -105,14 +105,20 @@ class PrimitiveTest(parameterized.TestCase):
         <mujoco>
           <worldbody>
             <body>
-              <joint type="free"/>
-              <geom pos="0.3 0.2 0.1" size="0.1" type="sphere"/>
+              <joint type="slide" axis="1 0 0"/>
+              <joint type="slide" axis="0 1 0"/>
+              <joint type="slide" axis="0 0 1"/>
+              <geom size="0.1" type="sphere"/>
             </body>
             <body>
-              <joint type="free"/>
-              <geom pos="0 0 0" size="0.15 0.2" type="cylinder" euler="30 45 0"/>
+              <geom size="0.15 0.2" type="cylinder" euler="30 45 0"/>
             </body>
           </worldbody>
+          <keyframe>
+            <key name="corner" qpos=".33 0 0"/>
+            <key name="cap" qpos=".26 -.14 .1"/>
+            <key name="side" qpos="0 -.26 0"/>
+          </keyframe>
         </mujoco>
         """,
   }

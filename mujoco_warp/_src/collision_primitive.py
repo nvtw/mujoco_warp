@@ -117,6 +117,35 @@ def _sphere_sphere(
 
 
 @wp.func
+def _sphere_sphere_ext(
+  pos1: wp.vec3,
+  radius1: float,
+  pos2: wp.vec3,
+  radius2: float,
+  worldid: int,
+  d: Data,
+  margin: float,
+  geom_indices: wp.vec2i,
+  mat1: wp.mat33,
+  mat2: wp.mat33,
+):
+  dir = pos2 - pos1
+  dist = wp.length(dir)
+  if dist == 0.0:
+    # Use cross product of z axes like MuJoCo
+    axis1 = wp.vec3(mat1[0, 2], mat1[1, 2], mat1[2, 2])
+    axis2 = wp.vec3(mat2[0, 2], mat2[1, 2], mat2[2, 2])
+    n = wp.cross(axis1, axis2)
+    n = wp.normalize(n)
+  else:
+    n = dir / dist
+  dist = dist - (radius1 + radius2)
+  pos = pos1 + n * (radius1 + 0.5 * dist)
+
+  write_contact(d, dist, pos, make_frame(n), margin, geom_indices, worldid)
+
+
+@wp.func
 def sphere_sphere(
   sphere1: Geom,
   sphere2: Geom,
@@ -247,11 +276,11 @@ def sphere_cylinder(
     cylinder.rot[2, 2],
   )
 
-  delta = sphere.pos - cylinder.pos
-  x = wp.dot(delta, axis)
+  vec = sphere.pos - cylinder.pos
+  x = wp.dot(vec, axis)
 
   a_proj = axis * x
-  p_proj = delta - a_proj
+  p_proj = vec - a_proj
   p_proj_sqr = wp.dot(p_proj, p_proj)
 
   collide_side = wp.abs(x) < cylinder.size[1]
@@ -269,7 +298,7 @@ def sphere_cylinder(
   # Side collision
   if collide_side:
     pos_target = cylinder.pos + a_proj
-    _sphere_sphere(
+    _sphere_sphere_ext(
       sphere.pos,
       sphere.size[0],
       pos_target,
@@ -278,6 +307,8 @@ def sphere_cylinder(
       d,
       margin,
       geom_indices,
+      sphere.rot,
+      cylinder.rot,
     )
     return
 
@@ -293,8 +324,7 @@ def sphere_cylinder(
       plane_normal = -axis
 
     dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere.pos, sphere.size[0])
-
-    plane_normal = -plane_normal
+    plane_normal = -plane_normal  # Flip normal after position calculation
 
     write_contact(
       d,
@@ -315,7 +345,7 @@ def sphere_cylinder(
   cap_offset = axis * (wp.sign(x) * cylinder.size[1])
   pos_corner = cylinder.pos + cap_offset + p_proj
 
-  _sphere_sphere(
+  _sphere_sphere_ext(
     sphere.pos,
     sphere.size[0],
     pos_corner,
@@ -324,6 +354,8 @@ def sphere_cylinder(
     d,
     margin,
     geom_indices,
+    sphere.rot,
+    cylinder.rot,
   )
 
 
