@@ -123,24 +123,49 @@ class CollisionTest(parameterized.TestCase):
           </worldbody>
         </mujoco>
         """
-  _SPHERE_CYLINDER = """
+  _SPHERE_CYLINDER_CORNER = """
         <mujoco>
           <worldbody>
             <body>
               <joint type="slide" axis="1 0 0"/>
               <joint type="slide" axis="0 1 0"/>
               <joint type="slide" axis="0 0 1"/>
-              <geom size="0.1" type="sphere"/>
+              <geom size="0.1" type="sphere" pos=".33 0 0"/>
             </body>
             <body>
               <geom size="0.15 0.2" type="cylinder" euler="30 45 0"/>
             </body>
           </worldbody>
-          <keyframe>
-            <key name="corner" qpos=".33 0 0"/>
-            <key name="cap" qpos=".26 -.14 .1"/>
-            <key name="side" qpos="0 -.26 0"/>
-          </keyframe>
+        </mujoco>
+        """
+  _SPHERE_CYLINDER_CAP = """
+        <mujoco>
+          <worldbody>
+            <body>
+              <joint type="slide" axis="1 0 0"/>
+              <joint type="slide" axis="0 1 0"/>
+              <joint type="slide" axis="0 0 1"/>
+              <geom size="0.1" type="sphere" pos=".26 -.14 .1"/>
+            </body>
+            <body>
+              <geom size="0.15 0.2" type="cylinder" euler="30 45 0"/>
+            </body>
+          </worldbody>
+        </mujoco>
+        """
+  _SPHERE_CYLINDER_SIDE = """
+        <mujoco>
+          <worldbody>
+            <body>
+              <joint type="slide" axis="1 0 0"/>
+              <joint type="slide" axis="0 1 0"/>
+              <joint type="slide" axis="0 0 1"/>
+              <geom size="0.1" type="sphere" pos="0 -.26 0"/>
+            </body>
+            <body>
+              <geom size="0.15 0.2" type="cylinder" euler="30 45 0"/>
+            </body>
+          </worldbody>
         </mujoco>
         """
 
@@ -152,7 +177,9 @@ class CollisionTest(parameterized.TestCase):
     (_SPHERE_SPHERE),
     (_SPHERE_CAPSULE),
     (_CAPSULE_CAPSULE),
-    (_SPHERE_CYLINDER),
+    (_SPHERE_CYLINDER_CORNER),
+    (_SPHERE_CYLINDER_CAP),
+    (_SPHERE_CYLINDER_SIDE),
   )
   def test_collision(self, xml_string):
     """Tests convex collision with different geometries."""
