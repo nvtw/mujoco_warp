@@ -90,6 +90,7 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
   m.nsensordata = mjm.nsensordata
   m.nlsp = mjm.opt.ls_iterations  # TODO(team): how to set nlsp?
   m.nexclude = mjm.nexclude
+  m.neq = mjm.neq
   m.opt.timestep = mjm.opt.timestep
   m.opt.tolerance = mjm.opt.tolerance
   m.opt.ls_tolerance = mjm.opt.ls_tolerance
@@ -365,6 +366,14 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
   m.mesh_vertadr = wp.array(mjm.mesh_vertadr, dtype=wp.int32, ndim=1)
   m.mesh_vertnum = wp.array(mjm.mesh_vertnum, dtype=wp.int32, ndim=1)
   m.mesh_vert = wp.array(mjm.mesh_vert, dtype=wp.vec3, ndim=1)
+  m.eq_type = wp.array(mjm.eq_type, dtype=wp.int32, ndim=1)
+  m.eq_obj1id = wp.array(mjm.eq_obj1id, dtype=wp.int32, ndim=1)
+  m.eq_obj2id = wp.array(mjm.eq_obj2id, dtype=wp.int32, ndim=1)
+  m.eq_objtype = wp.array(mjm.eq_objtype, dtype=wp.int32, ndim=1)
+  m.eq_active0 = wp.array(mjm.eq_active0, dtype=wp.bool, ndim=1)
+  m.eq_solref = wp.array(mjm.eq_solref, dtype=wp.vec2, ndim=1)
+  m.eq_solimp = wp.array(mjm.eq_solimp, dtype=types.vec5, ndim=1)
+  m.eq_data = wp.array(mjm.eq_data, dtype=types.vec11, ndim=1)
   m.site_pos = wp.array(mjm.site_pos, dtype=wp.vec3, ndim=1)
   m.site_quat = wp.array(mjm.site_quat, dtype=wp.quat, ndim=1)
   m.site_bodyid = wp.array(mjm.site_bodyid, dtype=wp.int32, ndim=1)
@@ -411,11 +420,18 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
   m.actuator_dynprm = wp.array(mjm.actuator_dynprm, dtype=types.vec10f, ndim=1)
   m.exclude_signature = wp.array(mjm.exclude_signature, dtype=wp.int32, ndim=1)
 
+  # pre-compute indices of joint equalities
+  m.eq_jnt_adr = wp.array(
+    np.nonzero(mjm.eq_type == types.EqType.JOINT.value)[0], dtype=wp.int32, ndim=1
+  )
+
   # short-circuiting here allows us to skip a lot of code in implicit integration
   m.actuator_affine_bias_gain = bool(
     np.any(mjm.actuator_biastype == types.BiasType.AFFINE.value)
     or np.any(mjm.actuator_gaintype == types.GainType.AFFINE.value)
   )
+
+  m.condim_max = np.max(mjm.geom_condim)  # TODO(team): get max after filtering
 
   # tendon
   m.tendon_adr = wp.array(mjm.tendon_adr, dtype=wp.int32, ndim=1)
@@ -541,6 +557,7 @@ def make_data(
   d.njmax = njmax
 
   d.ncon = wp.zeros(1, dtype=wp.int32)
+  d.ne = wp.zeros(1, dtype=wp.int32, ndim=1)
   d.nefc = wp.zeros(1, dtype=wp.int32, ndim=1)
   d.nl = 0
   d.time = 0.0
@@ -572,6 +589,7 @@ def make_data(
   d.cinert = wp.zeros((nworld, mjm.nbody), dtype=types.vec10)
   d.cdof = wp.zeros((nworld, mjm.nv), dtype=wp.spatial_vector)
   d.ctrl = wp.zeros((nworld, mjm.nu), dtype=wp.float32)
+  d.ten_velocity = wp.zeros((nworld, mjm.ntendon), dtype=wp.float32)
   d.actuator_velocity = wp.zeros((nworld, mjm.nu), dtype=wp.float32)
   d.actuator_force = wp.zeros((nworld, mjm.nu), dtype=wp.float32)
   d.actuator_length = wp.zeros((nworld, mjm.nu), dtype=wp.float32)
@@ -610,11 +628,8 @@ def make_data(
   d.qfrc_smooth = wp.zeros((nworld, mjm.nv), dtype=wp.float32)
   d.qfrc_constraint = wp.zeros((nworld, mjm.nv), dtype=wp.float32)
   d.qacc_smooth = wp.zeros((nworld, mjm.nv), dtype=wp.float32)
-
-  d.rne_cacc = wp.zeros(shape=(d.nworld, mjm.nbody), dtype=wp.spatial_vector)
-  d.rne_cfrc = wp.zeros(shape=(d.nworld, mjm.nbody), dtype=wp.spatial_vector)
-
   d.xfrc_applied = wp.zeros((nworld, mjm.nbody), dtype=wp.spatial_vector)
+  d.eq_active = wp.array(np.tile(mjm.eq_active0, (nworld, 1)), dtype=wp.bool, ndim=2)
 
   # internal tmp arrays
   d.qfrc_integration = wp.zeros((nworld, mjm.nv), dtype=wp.float32)
@@ -644,6 +659,11 @@ def make_data(
   d.collision_pair = wp.empty(nconmax, dtype=wp.vec2i, ndim=1)
   d.collision_worldid = wp.empty(nconmax, dtype=wp.int32, ndim=1)
   d.ncollision = wp.zeros(1, dtype=wp.int32, ndim=1)
+
+  # rne_postconstraint
+  d.cacc = wp.zeros((nworld, mjm.nbody), dtype=wp.spatial_vector, ndim=2)
+  d.cfrc_int = wp.zeros((nworld, mjm.nbody), dtype=wp.spatial_vector, ndim=2)
+  d.cfrc_ext = wp.zeros((nworld, mjm.nbody), dtype=wp.spatial_vector, ndim=2)
 
   # tendon
   d.ten_length = wp.zeros((nworld, mjm.ntendon), dtype=wp.float32, ndim=2)
@@ -691,6 +711,7 @@ def put_data(
   d.njmax = njmax
 
   d.ncon = wp.array([mjd.ncon * nworld], dtype=wp.int32, ndim=1)
+  d.ne = wp.array([mjd.ne * nworld], dtype=wp.int32, ndim=1)
   d.nl = mjd.nl
   d.nefc = wp.array([mjd.nefc * nworld], dtype=wp.int32, ndim=1)
   d.time = mjd.time
@@ -752,6 +773,7 @@ def put_data(
   d.qLD = wp.array(tile(qLD), dtype=wp.float32, ndim=3)
   d.qLDiagInv = wp.array(tile(mjd.qLDiagInv), dtype=wp.float32, ndim=2)
   d.ctrl = wp.array(tile(mjd.ctrl), dtype=wp.float32, ndim=2)
+  d.ten_velocity = wp.array(tile(mjd.ten_velocity), dtype=wp.float32, ndim=2)
   d.actuator_velocity = wp.array(tile(mjd.actuator_velocity), dtype=wp.float32, ndim=2)
   d.actuator_force = wp.array(tile(mjd.actuator_force), dtype=wp.float32, ndim=2)
   d.actuator_length = wp.array(tile(mjd.actuator_length), dtype=wp.float32, ndim=2)
@@ -856,9 +878,6 @@ def put_data(
   d.contact.efc_address = wp.array(con_efc_address_fill, dtype=wp.int32, ndim=2)
   d.contact.worldid = wp.array(con_worldid, dtype=wp.int32, ndim=1)
 
-  d.rne_cacc = wp.zeros(shape=(d.nworld, mjm.nbody), dtype=wp.spatial_vector)
-  d.rne_cfrc = wp.zeros(shape=(d.nworld, mjm.nbody), dtype=wp.spatial_vector)
-
   d.efc = _constraint(mjm, d.nworld, d.njmax)
   d.efc.J = wp.array(efc_J_fill, dtype=wp.float32, ndim=2)
   d.efc.D = wp.array(efc_D_fill, dtype=wp.float32, ndim=1)
@@ -869,6 +888,7 @@ def put_data(
   d.efc.worldid = wp.from_numpy(efc_worldid, dtype=wp.int32)
 
   d.xfrc_applied = wp.array(tile(mjd.xfrc_applied), dtype=wp.spatial_vector, ndim=2)
+  d.eq_active = wp.array(tile(mjm.eq_active0), dtype=wp.bool, ndim=2)
 
   # internal tmp arrays
   d.qfrc_integration = wp.zeros((nworld, mjm.nv), dtype=wp.float32)
@@ -898,6 +918,11 @@ def put_data(
   d.collision_pair = wp.empty(nconmax, dtype=wp.vec2i, ndim=1)
   d.collision_worldid = wp.empty(nconmax, dtype=wp.int32, ndim=1)
   d.ncollision = wp.zeros(1, dtype=wp.int32, ndim=1)
+
+  # rne_postconstraint
+  d.cacc = wp.array(tile(mjd.cacc), dtype=wp.spatial_vector, ndim=2)
+  d.cfrc_int = wp.array(tile(mjd.cfrc_int), dtype=wp.spatial_vector, ndim=2)
+  d.cfrc_ext = wp.array(tile(mjd.cfrc_ext), dtype=wp.spatial_vector, ndim=2)
 
   # tendon
   d.ten_length = wp.array(tile(mjd.ten_length), dtype=wp.float32, ndim=2)
@@ -934,7 +959,7 @@ def get_data_into(
     mujoco._functions._realloc_con_efc(result, ncon=ncon, nefc=nefc)
 
   result.time = d.time
-
+  result.ne = d.ne.numpy()[0]
   result.qpos[:] = d.qpos.numpy()[0]
   result.qvel[:] = d.qvel.numpy()[0]
   result.qacc_warmstart = d.qacc_warmstart.numpy()[0]
@@ -963,6 +988,7 @@ def get_data_into(
   result.crb = d.crb.numpy()[0]
   result.qLDiagInv = d.qLDiagInv.numpy()[0]
   result.ctrl = d.ctrl.numpy()[0]
+  result.ten_velocity = d.ten_velocity.numpy()[0]
   result.actuator_velocity = d.actuator_velocity.numpy()[0]
   result.actuator_force = d.actuator_force.numpy()[0]
   result.actuator_length = d.actuator_length.numpy()[0]
@@ -1018,11 +1044,18 @@ def get_data_into(
     # TODO(team): set efc_J after fix to _realloc_con_efc lands
     # if nefc > 0:
     #   result.efc_J[:nefc * mjm.nv] = d.efc_J.numpy()[:nefc].flatten()
+  result.xfrc_applied[:] = d.xfrc_applied.numpy()[0]
+  result.eq_active[:] = d.eq_active.numpy()[0]
+
   result.efc_D[:] = d.efc.D.numpy()[:nefc]
   result.efc_pos[:] = d.efc.pos.numpy()[:nefc]
   result.efc_aref[:] = d.efc.aref.numpy()[:nefc]
   result.efc_force[:] = d.efc.force.numpy()[:nefc]
   result.efc_margin[:] = d.efc.margin.numpy()[:nefc]
+
+  result.cacc[:] = d.cacc.numpy()[0]
+  result.cfrc_int[:] = d.cfrc_int.numpy()[0]
+  result.cfrc_ext[:] = d.cfrc_ext.numpy()[0]
 
   # TODO: other efc_ fields, anything else missing
 
