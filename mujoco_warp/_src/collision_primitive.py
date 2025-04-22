@@ -491,7 +491,13 @@ def plane_convex(
   worldid: int,
   d: Data,
   margin: float,
-  geom_indices: wp.vec2i,
+  gap: float,
+  condim: int,
+  friction: vec5,
+  solref: wp.vec2f,
+  solreffriction: wp.vec2f,
+  solimp: vec5,
+  geoms: wp.vec2i,
 ):
   """Calculates contacts between a plane and a convex object."""
 
@@ -576,7 +582,21 @@ def plane_convex(
       support = wp.dot(plane_pos - convex.vert[convex.vertadr + idx], n)
       dist = -support
       pos = pos - 0.5 * dist * plane.normal
-      write_contact(d, dist, pos, frame, margin, geom_indices, worldid)
+      write_contact(
+        d,
+        dist,
+        pos,
+        frame,
+        margin,
+        gap,
+        condim,
+        friction,
+        solref,
+        solreffriction,
+        solimp,
+        geoms,
+        worldid,
+      )
 
 
 @wp.func
@@ -1063,8 +1083,7 @@ def _primitive_narrowphase(
       geoms,
     )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.MESH.value):
-    plane_convex(geom1, geom2, worldid, d, margin, geoms)
-    capsule_capsule(
+    plane_convex(
       geom1,
       geom2,
       worldid,
