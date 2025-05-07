@@ -209,6 +209,8 @@ def euler(m: Model, d: Data):
       d.qLDiagInv_integration,
       d.qacc_integration,
       d.qfrc_integration,
+      d.qM_integration_cholesky_matrix_tmp,
+      d.qM_integration_cholesky_tmp,
     )
 
   def eulerdamp_fused_dense(m: Model, d: Data):

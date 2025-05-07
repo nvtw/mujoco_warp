@@ -20,6 +20,7 @@ from . import support
 from . import types
 from .warp_util import event_scope
 from .warp_util import kernel
+from .block_cholesky import create_blocked_cholesky_func, create_blocked_cholesky_solve_func
 
 
 def _create_context(m: types.Model, d: types.Data, grad: bool = True):
@@ -604,6 +605,32 @@ def _update_gradient(m: types.Model, d: types.Data):
     output_tile = wp.tile_cholesky_solve(fact_tile, input_tile)
     wp.tile_store(d.efc.Mgrad[worldid], output_tile)
 
+  @kernel
+  def _cholesky_blocked(d: types.Data, matrix_size: int):
+    worldid, tid_block = wp.tid()
+
+    if wp.static(m.opt.iterations) > 1:
+      if d.efc.done[worldid]:
+        return
+
+    # mat_tile = wp.tile_load(d.efc.h[worldid], shape=(TILE, TILE))
+    # fact_tile = wp.tile_cholesky(mat_tile)
+    # input_tile = wp.tile_load(d.efc.grad[worldid], shape=TILE)
+    # output_tile = wp.tile_cholesky_solve(fact_tile, input_tile)
+    # wp.tile_store(d.efc.Mgrad[worldid], output_tile)
+
+    wp.static(create_blocked_cholesky_func(32))(
+        tid_block, d.efc.h[worldid], d.efc.h_block_cholesky[worldid], matrix_size, 0, 0
+      )
+    
+    wp.static(create_blocked_cholesky_solve_func(32))(
+        tid_block, d.efc.h_block_cholesky[worldid], d.efc.grad[worldid], 
+        d.efc.Mgrad[worldid], d.efc.h_block_cholesky_tmp[worldid], matrix_size, 0, 0
+      )
+
+
+
+
   # grad = Ma - qfrc_smooth - qfrc_constraint
   wp.launch(_zero_grad_dot, dim=(d.nworld), inputs=[d])
 
@@ -636,7 +663,12 @@ def _update_gradient(m: types.Model, d: types.Data):
         inputs=[m, d, int((d.nconmax + dim_y - 1) / dim_y), dim_y, m.opt.impratio],
       )
 
-    wp.launch_tiled(_cholesky, dim=(d.nworld,), inputs=[d], block_dim=32)
+    matrix_size = m.nv
+    if tile_size > 5:  # TODO(team): Find a good threshold, maybe 32 is a good default
+      wp.launch_tiled(_cholesky_blocked, dim=(d.nworld,), inputs=[d, matrix_size], block_dim=32)
+    else:
+      wp.launch_tiled(_cholesky, dim=(d.nworld,), inputs=[d], block_dim=32)
+    
 
 
 @wp.func

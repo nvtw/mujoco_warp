@@ -682,6 +682,8 @@ def _constraint(
   efc.quad = wp.empty(shape=(njmax,), dtype=wp.vec3f)
   efc.quad_gauss = wp.empty(shape=(nworld,), dtype=wp.vec3f)
   efc.h = wp.empty(shape=(nworld, mjm.nv, mjm.nv), dtype=wp.float32)
+  efc.h_block_cholesky = wp.empty(shape=(nworld, mjm.nv, mjm.nv), dtype=wp.float32)
+  efc.h_block_cholesky_tmp = wp.empty(shape=(nworld, mjm.nv, 1), dtype=wp.float32)
   efc.alpha = wp.empty(shape=(nworld,), dtype=wp.float32)
   efc.prev_grad = wp.empty(shape=(nworld, mjm.nv), dtype=wp.float32)
   efc.prev_Mgrad = wp.empty(shape=(nworld, mjm.nv), dtype=wp.float32)
@@ -783,9 +785,12 @@ def make_data(
   if support.is_sparse(mjm):
     d.qM = wp.zeros((nworld, 1, mjm.nM), dtype=wp.float32)
     d.qLD = wp.zeros((nworld, 1, mjm.nM), dtype=wp.float32)
+    d.qLD_cholesky_tmp = None
   else:
     d.qM = wp.zeros((nworld, mjm.nv, mjm.nv), dtype=wp.float32)
     d.qLD = wp.zeros((nworld, mjm.nv, mjm.nv), dtype=wp.float32)
+    d.qLD_cholesky_tmp = wp.zeros((nworld, mjm.nv, 1), dtype=wp.float32)
+
   d.act_dot = wp.zeros((nworld, mjm.na), dtype=wp.float32)
   d.act = wp.zeros((nworld, mjm.na), dtype=wp.float32)
   d.qLDiagInv = wp.zeros((nworld, mjm.nv), dtype=wp.float32)
@@ -824,6 +829,8 @@ def make_data(
   d.qfrc_integration = wp.zeros((nworld, mjm.nv), dtype=wp.float32)
   d.qacc_integration = wp.zeros((nworld, mjm.nv), dtype=wp.float32)
   d.qM_integration = wp.zeros_like(d.qM)
+  d.qM_integration_cholesky_matrix_tmp = wp.zeros((nworld, mjm.nv, mjm.nv), dtype=wp.float32)
+  d.qM_integration_cholesky_tmp = wp.zeros((nworld, mjm.nv, 1), dtype=wp.float32)
   d.qLD_integration = wp.zeros_like(d.qLD)
   d.qLDiagInv_integration = wp.zeros_like(d.qLDiagInv)
   d.act_vel_integration = wp.zeros_like(d.ctrl)
