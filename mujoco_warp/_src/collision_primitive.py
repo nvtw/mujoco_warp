@@ -36,7 +36,7 @@ class Geom:
   size: wp.vec3
   vertadr: int
   vertnum: int
-  vert: wp.array(dtype=wp.vec3, ndim=1)
+  vert: wp.array(dtype=wp.vec3)
 
 
 @wp.func
@@ -46,6 +46,8 @@ def _geom(
   geom_size: wp.array(dtype=wp.vec3),
   mesh_vertadr: wp.array(dtype=int),
   mesh_vertnum: wp.array(dtype=int),
+  mesh_vert: wp.array(dtype=wp.vec3),
+  geom_type: wp.array(dtype=int),
   # Data in:
   geom_xpos_in: wp.array2d(dtype=wp.vec3),
   geom_xmat_in: wp.array2d(dtype=wp.mat33),
@@ -68,8 +70,8 @@ def _geom(
     geom.vertadr = -1
     geom.vertnum = -1
 
-  if m.geom_type[gid] == int(GeomType.MESH.value):
-    geom.vert = m.mesh_vert
+  if geom_type[gid] == int(GeomType.MESH.value):
+    geom.vert = mesh_vert
 
   return geom
 
@@ -1884,6 +1886,7 @@ def _primitive_narrowphase(
   geom_gap: wp.array(dtype=float),
   mesh_vertadr: wp.array(dtype=int),
   mesh_vertnum: wp.array(dtype=int),
+  mesh_vert: wp.array(dtype=wp.vec3),
   pair_dim: wp.array(dtype=int),
   pair_solref: wp.array(dtype=wp.vec2),
   pair_solreffriction: wp.array(dtype=wp.vec2),
@@ -1948,6 +1951,8 @@ def _primitive_narrowphase(
     geom_size,
     mesh_vertadr,
     mesh_vertnum,
+    mesh_vert,
+    geom_type,
     geom_xpos_in,
     geom_xmat_in,
     worldid,
@@ -1958,6 +1963,8 @@ def _primitive_narrowphase(
     geom_size,
     mesh_vertadr,
     mesh_vertnum,
+    mesh_vert,
+    geom_type,
     geom_xpos_in,
     geom_xmat_in,
     worldid,
@@ -2287,6 +2294,7 @@ def primitive_narrowphase(m: Model, d: Data):
       m.geom_gap,
       m.mesh_vertadr,
       m.mesh_vertnum,
+      m.mesh_vert,
       m.pair_dim,
       m.pair_solref,
       m.pair_solreffriction,
