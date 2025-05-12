@@ -779,6 +779,7 @@ def plane_convex(
   # Store indices in vec4
   indices = wp.vec4i(-1, -1, -1, -1)
 
+  # TODO(team): Explore faster methods like tile_min or even fast pass kernels if the upper bound of vertices in all convexes is small enough such that all vertices fit into shared memory
   # Find point a (first support point)
   a_dist = wp.float32(-_HUGE_VAL)
   for i in range(convex.vertnum):
