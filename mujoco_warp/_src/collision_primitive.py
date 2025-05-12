@@ -733,10 +733,12 @@ _HUGE_VAL = 1e6
 
 @wp.func
 def plane_convex(
+  # Data in:
+  nconmax_in: int,
+  # In:
   plane: Geom,
   convex: Geom,
   worldid: int,
-  d: Data,
   margin: float,
   gap: float,
   condim: int,
@@ -745,6 +747,19 @@ def plane_convex(
   solreffriction: wp.vec2f,
   solimp: vec5,
   geoms: wp.vec2i,
+  # Data out:
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_frame_out: wp.array(dtype=wp.mat33),
+  contact_includemargin_out: wp.array(dtype=float),
+  contact_friction_out: wp.array(dtype=vec5),
+  contact_solref_out: wp.array(dtype=wp.vec2),
+  contact_solreffriction_out: wp.array(dtype=wp.vec2),
+  contact_solimp_out: wp.array(dtype=vec5),
+  contact_dim_out: wp.array(dtype=int),
+  contact_geom_out: wp.array(dtype=wp.vec2i),
+  contact_worldid_out: wp.array(dtype=int),
 ):
   """Calculates contacts between a plane and a convex object."""
 
@@ -830,7 +845,7 @@ def plane_convex(
       dist = -support
       pos = pos - 0.5 * dist * plane.normal
       write_contact(
-        d,
+        nconmax_in,
         dist,
         pos,
         frame,
@@ -843,6 +858,18 @@ def plane_convex(
         solimp,
         geoms,
         worldid,
+        ncon_out,
+        contact_dist_out,
+        contact_pos_out,
+        contact_frame_out,
+        contact_includemargin_out,
+        contact_friction_out,
+        contact_solref_out,
+        contact_solreffriction_out,
+        contact_solimp_out,
+        contact_dim_out,
+        contact_geom_out,
+        contact_worldid_out,
       )
 
 
@@ -2077,10 +2104,10 @@ def _primitive_narrowphase(
     )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.MESH.value):
     plane_convex(
+      nconmax_in,
       geom1,
       geom2,
       worldid,
-      d,
       margin,
       gap,
       condim,
@@ -2089,6 +2116,18 @@ def _primitive_narrowphase(
       solreffriction,
       solimp,
       geoms,
+      ncon_out,
+      contact_dist_out,
+      contact_pos_out,
+      contact_frame_out,
+      contact_includemargin_out,
+      contact_friction_out,
+      contact_solref_out,
+      contact_solreffriction_out,
+      contact_solimp_out,
+      contact_dim_out,
+      contact_geom_out,
+      contact_worldid_out,
     )
   elif type1 == int(GeomType.SPHERE.value) and type2 == int(GeomType.CAPSULE.value):
     sphere_capsule(
