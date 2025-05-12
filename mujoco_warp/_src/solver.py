@@ -19,11 +19,10 @@ from . import math
 from . import smooth
 from . import support
 from . import types
-from .warp_util import event_scope
-from .warp_util import kernel as nested_kernel
-
 from .block_cholesky import create_blocked_cholesky_func
 from .block_cholesky import create_blocked_cholesky_solve_func
+from .warp_util import event_scope
+from .warp_util import kernel as nested_kernel
 
 
 @wp.func
