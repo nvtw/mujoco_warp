@@ -2217,12 +2217,6 @@ def update_gradient_cholesky_blocked(tile_size: int):
       cholesky_L_tmp[worldid], efc_grad_in[worldid], cholesky_y_tmp[worldid], matrix_size, 0, 0, efc_Mgrad_out[worldid]
     )
 
-    # mat_tile = wp.tile_load(efc_h_in[worldid], shape=(TILE_SIZE, TILE_SIZE))
-    # fact_tile = wp.tile_cholesky(mat_tile)
-    # input_tile = wp.tile_load(efc_grad_in[worldid], shape=TILE_SIZE)
-    # output_tile = wp.tile_cholesky_solve(fact_tile, input_tile)
-    # wp.tile_store(efc_Mgrad_out[worldid], output_tile)
-
   return kernel
 
 
@@ -2330,6 +2324,7 @@ def _update_gradient(m: types.Model, d: types.Data):
         outputs=[d.efc.h],
       )
 
+    # TODO(team): Define good threshold for blocked vs non-blocked cholesky
     if m.nv < 1:
       wp.launch_tiled(
         update_gradient_cholesky(m.nv),
