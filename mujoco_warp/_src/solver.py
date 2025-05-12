@@ -2212,9 +2212,9 @@ def update_gradient_cholesky_blocked(tile_size: int):
     if efc_done_in[worldid]:
       return
 
-    wp.static(create_blocked_cholesky_func(TILE_SIZE))(tid_block, efc_h_in[worldid], cholesky_L_tmp[worldid], matrix_size, 0, 0)
+    wp.static(create_blocked_cholesky_func(TILE_SIZE))(tid_block, efc_h_in[worldid], matrix_size, 0, 0, cholesky_L_tmp[worldid])
     wp.static(create_blocked_cholesky_solve_func(TILE_SIZE))(
-      cholesky_L_tmp[worldid], efc_grad_in[worldid], efc_Mgrad_out[worldid], cholesky_y_tmp[worldid], matrix_size, 0, 0
+      cholesky_L_tmp[worldid], efc_grad_in[worldid], cholesky_y_tmp[worldid], matrix_size, 0, 0, efc_Mgrad_out[worldid]
     )
 
     # mat_tile = wp.tile_load(efc_h_in[worldid], shape=(TILE_SIZE, TILE_SIZE))
@@ -2330,8 +2330,7 @@ def _update_gradient(m: types.Model, d: types.Data):
         outputs=[d.efc.h],
       )
 
-    # TODO(team): support cholesky on larger nv, using tiles here limits the max matrix size
-    if m.nv < 32:
+    if m.nv < 1:
       wp.launch_tiled(
         update_gradient_cholesky(m.nv),
         dim=(d.nworld,),
@@ -2343,7 +2342,7 @@ def _update_gradient(m: types.Model, d: types.Data):
       wp.launch_tiled(
         update_gradient_cholesky_blocked(32),
         dim=(d.nworld,),
-        inputs=[d.efc.grad, d.efc.h, m.nv, d.efc.cholesky_L_tmp, d.efc.cholesky_y_tmp, d.efc.done],
+        inputs=[d.efc.grad, d.efc.h, d.efc.done, m.nv, d.efc.cholesky_L_tmp, d.efc.cholesky_y_tmp],
         outputs=[d.efc.Mgrad],
         block_dim=32,
       )
