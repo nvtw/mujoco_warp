@@ -42,12 +42,12 @@ class Geom:
 @wp.func
 def _geom(
   # Model:
+  geom_type: wp.array(dtype=int),
   geom_dataid: wp.array(dtype=int),
   geom_size: wp.array(dtype=wp.vec3),
   mesh_vertadr: wp.array(dtype=int),
   mesh_vertnum: wp.array(dtype=int),
   mesh_vert: wp.array(dtype=wp.vec3),
-  geom_type: wp.array(dtype=int),
   # Data in:
   geom_xpos_in: wp.array2d(dtype=wp.vec3),
   geom_xmat_in: wp.array2d(dtype=wp.mat33),
@@ -1947,24 +1947,24 @@ def _primitive_narrowphase(
   worldid = collision_worldid_in[tid]
 
   geom1 = _geom(
+    geom_type,
     geom_dataid,
     geom_size,
     mesh_vertadr,
     mesh_vertnum,
     mesh_vert,
-    geom_type,
     geom_xpos_in,
     geom_xmat_in,
     worldid,
     g1,
   )
   geom2 = _geom(
+    geom_type,
     geom_dataid,
     geom_size,
     mesh_vertadr,
     mesh_vertnum,
     mesh_vert,
-    geom_type,
     geom_xpos_in,
     geom_xmat_in,
     worldid,

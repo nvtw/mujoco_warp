@@ -781,12 +781,12 @@ def _gjk_epa_pipeline(
       return
 
     geom1 = _geom(
+      geom_type,
       geom_dataid,
       geom_size,
       mesh_vertadr,
       mesh_vertnum,
       mesh_vert,
-      geom_type,
       geom_xpos_in,
       geom_xmat_in,
       worldid,
@@ -794,12 +794,12 @@ def _gjk_epa_pipeline(
     )
 
     geom2 = _geom(
+      geom_type,
       geom_dataid,
       geom_size,
       mesh_vertadr,
       mesh_vertnum,
       mesh_vert,
-      geom_type,
       geom_xpos_in,
       geom_xmat_in,
       worldid,
