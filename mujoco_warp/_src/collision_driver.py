@@ -260,21 +260,22 @@ def _sap_broadphase(
 def create_segmented_sort_kernel(tile_size: int):
   @wp.kernel
   def segmented_sort_kernel(
-    sap_projection_lower: wp.array2d(dtype=float),
-    sap_sort_index: wp.array2d(dtype=int),
+    # Data in:
+    sap_projection_lower_in: wp.array2d(dtype=float),
+    sap_sort_index_in: wp.array2d(dtype=int),
   ):
     worldid = wp.tid()
 
     # Load input into shared memory
-    keys = wp.tile_load(sap_projection_lower[worldid], shape=tile_size, storage="shared")
-    values = wp.tile_load(sap_sort_index[worldid], shape=tile_size, storage="shared")
+    keys = wp.tile_load(sap_projection_lower_in[worldid], shape=tile_size, storage="shared")
+    values = wp.tile_load(sap_sort_index_in[worldid], shape=tile_size, storage="shared")
 
     # Perform in-place sorting
     wp.tile_sort(keys, values)
 
     # Store sorted shared memory into output arrays
-    wp.tile_store(sap_projection_lower[worldid], keys)
-    wp.tile_store(sap_sort_index[worldid], values)
+    wp.tile_store(sap_projection_lower_in[worldid], keys)
+    wp.tile_store(sap_sort_index_in[worldid], values)
 
   return segmented_sort_kernel
 
