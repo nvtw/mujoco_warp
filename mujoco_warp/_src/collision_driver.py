@@ -308,7 +308,7 @@ def sap_broadphase(m: Model, d: Data):
   )
 
   # TODO(team): Find the right threshold for tile sort - tile sort required that all nworldgeom values to sort can fit into shared memory
-  if nworldgeom > 1000:
+  if m.ngeom > 1000:
     wp.utils.segmented_sort_pairs(
       d.sap_projection_lower,
       d.sap_sort_index,
@@ -316,7 +316,7 @@ def sap_broadphase(m: Model, d: Data):
       d.sap_segment_index,
     )
   else:
-    segmented_sort_kernel = create_segmented_sort_kernel(nworldgeom)
+    segmented_sort_kernel = create_segmented_sort_kernel(m.ngeom)
     wp.launch_tiled(
       kernel=segmented_sort_kernel, dim=(d.nworld), inputs=[d.sap_projection_lower, d.sap_sort_index], block_dim=128
     )
