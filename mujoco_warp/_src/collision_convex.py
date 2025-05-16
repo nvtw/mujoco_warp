@@ -31,40 +31,12 @@ from .types import Model
 from .types import vec5
 
 from .convex_collision_newton import *
-wp.clear_kernel_cache()
 
+wp.clear_kernel_cache()
 
 
 # TODO(team): improve compile time to enable backward pass
 wp.config.enable_backward = False
-
-# FLOAT_MIN = -1e30
-# FLOAT_MAX = 1e30
-# EPS_BEST_COUNT = 12
-# MULTI_CONTACT_COUNT = 4
-# MULTI_POLYGON_COUNT = 8
-# MULTI_TILT_ANGLE = 1.0
-
-# matc3 = wp.types.matrix(shape=(EPS_BEST_COUNT, 3), dtype=float)
-# vecc3 = wp.types.vector(EPS_BEST_COUNT * 3, dtype=float)
-
-# # Matrix definition for the `tris` scratch space which is used to store the
-# # triangles of the polytope. Note that the first dimension is 2, as we need
-# # to store the previous and current polytope. But since Warp doesn't support
-# # 3D matrices yet, we use 2 * 3 * EPS_BEST_COUNT as the first dimension.
-# TRIS_DIM = 3 * EPS_BEST_COUNT
-# mat2c3 = wp.types.matrix(shape=(2 * TRIS_DIM, 3), dtype=float)
-# mat3p = wp.types.matrix(shape=(MULTI_POLYGON_COUNT, 3), dtype=float)
-# mat3c = wp.types.matrix(shape=(MULTI_CONTACT_COUNT, 3), dtype=float)
-# mat43 = wp.types.matrix(shape=(4, 3), dtype=float)
-
-# vec6 = wp.types.vector(6, dtype=int)
-# VECI1 = vec6(0, 0, 0, 1, 1, 2)
-# VECI2 = vec6(1, 2, 3, 2, 3, 3)
-
-
-
-
 
 
 _CONVEX_COLLISION_FUNC = {
@@ -84,8 +56,10 @@ _CONVEX_COLLISION_FUNC = {
   (GeomType.MESH.value, GeomType.MESH.value),
 }
 
+
 class geoMap(wp.types.vector(11, dtype=wp.int32)):
   pass
+
 
 def build_geo_map():
   # Start with identity map
@@ -98,10 +72,10 @@ def build_geo_map():
   map[GeomType.ELLIPSOID.value] = GEO_ELLIPSOID
   return map
 
+
 # Map from mujoco_warp to newton geo types
 geo_map_host = build_geo_map()
 geo_map = wp.constant(geoMap(geo_map_host))
-
 
 
 def _gjk_epa_pipeline(
@@ -112,7 +86,6 @@ def _gjk_epa_pipeline(
   epa_exact_neg_distance: bool,
   depth_extension: float,
 ):
-  
   _gjk = get_gjk(geo_map_host[geomtype1], geo_map_host[geomtype2], gjk_iterations)
   _epa = get_epa(geo_map_host[geomtype1], geo_map_host[geomtype2], epa_iterations, epa_exact_neg_distance, depth_extension)
   _multiple_contacts = get_multiple_contacts(geo_map_host[geomtype1], geo_map_host[geomtype2], depth_extension)

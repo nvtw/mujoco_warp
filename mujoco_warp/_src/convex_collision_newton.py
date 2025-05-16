@@ -1,11 +1,7 @@
 import warp as wp
 
 
-
 wp.config.enable_backward = False
-
-
-
 
 
 from .collision_primitive import Geom
@@ -33,7 +29,6 @@ GEO_CONVEX = wp.constant(9)
 GEO_ELLIPSOID = wp.constant(10)
 
 
-
 FLOAT_MIN = -1e30
 FLOAT_MAX = 1e30
 EPS_BEST_COUNT = 12
@@ -57,8 +52,6 @@ mat43 = wp.types.matrix(shape=(4, 3), dtype=float)
 vec6 = wp.types.vector(6, dtype=int)
 VECI1 = vec6(0, 0, 0, 1, 1, 2)
 VECI2 = vec6(1, 2, 3, 2, 3, 3)
-
-
 
 
 @wp.func
@@ -106,7 +99,6 @@ def gjk_support_geom(geom: Geom, geomtype: int, dir: wp.vec3, verts: wp.array(dt
   return wp.dot(support_pt, dir), support_pt
 
 
-
 @wp.func
 def gjk_support(
   # In:
@@ -126,7 +118,6 @@ def gjk_support(
 
   support_pt = s1 - s2
   return dist1 + dist2, support_pt
-
 
 
 @wp.func
@@ -157,8 +148,6 @@ def expand_polytope(count: int, prev_count: int, dists: vecc3, tris: mat2c3, p: 
     tris[r] = swap
 
   return dists, tris
-
-
 
 
 def get_gjk(
@@ -274,8 +263,9 @@ def get_gjk(
         break  # objects are likely non-intersecting
 
     return simplex, normal
-  
+
   return _gjk
+
 
 def get_epa(
   geomtype1: int,
@@ -426,7 +416,7 @@ def get_epa(
         i += 1
 
     return depth, normal
-  
+
   return _epa
 
 
@@ -703,80 +693,69 @@ def get_multiple_contacts(
       contact_count = 1
 
     return contact_count, contact_points
-  
+
   return _multiple_contacts
 
 
+@wp.struct
+class ShapeGeometry:  # Renamed from ModelShapeGeometry in model.py
+  """
+  Represents the geometry of a set of shapes
+  """
 
-
-
-
-
-
-
-
-
+  type: wp.array(dtype=wp.int32)
+  is_solid: wp.array(dtype=bool)
+  thickness: wp.array(dtype=float)
+  source: wp.array(dtype=wp.uint64)  # ID for wp.Mesh or wp.Volume
+  scale: wp.array(dtype=wp.vec3)
+  filter: wp.array(dtype=int)
 
 
 @wp.struct
-class ShapeGeometry: # Renamed from ModelShapeGeometry in model.py
-    """
-    Represents the geometry of a set of shapes
-    """
-    type: wp.array(dtype=wp.int32)
-    is_solid: wp.array(dtype=bool)
-    thickness: wp.array(dtype=float)
-    source: wp.array(dtype=wp.uint64) # ID for wp.Mesh or wp.Volume 
-    scale: wp.array(dtype=wp.vec3)
-    filter: wp.array(dtype=int)
+class ContactGeometry:  # This remains the output data structure
+  # Soft contacts
+  soft_contact_count: wp.array(dtype=int)
+  soft_contact_particle: wp.array(dtype=int)
+  soft_contact_shape: wp.array(dtype=int)
 
-@wp.struct
-class ContactGeometry: # This remains the output data structure
-    # Soft contacts
-    soft_contact_count: wp.array(dtype=int)
-    soft_contact_particle: wp.array(dtype=int)
-    soft_contact_shape: wp.array(dtype=int)
-   
-    # Rigid contacts
-    rigid_contact_count: wp.array(dtype=int)
-    rigid_contact_point0_world: wp.array(dtype=wp.vec3)
-    rigid_contact_point1_world: wp.array(dtype=wp.vec3)
-    rigid_contact_normal_world: wp.array(dtype=wp.vec3) 
-    rigid_contact_thickness: wp.array(dtype=float) 
-    rigid_contact_shape0_idx: wp.array(dtype=int)
-    rigid_contact_shape1_idx: wp.array(dtype=int)
+  # Rigid contacts
+  rigid_contact_count: wp.array(dtype=int)
+  rigid_contact_point0_world: wp.array(dtype=wp.vec3)
+  rigid_contact_point1_world: wp.array(dtype=wp.vec3)
+  rigid_contact_normal_world: wp.array(dtype=wp.vec3)
+  rigid_contact_thickness: wp.array(dtype=float)
+  rigid_contact_shape0_idx: wp.array(dtype=int)
+  rigid_contact_shape1_idx: wp.array(dtype=int)
+
 
 @wp.func
 def write_contact_newton(
-    # In:
-    nconmax_in: int,
-    pos0_in: wp.vec3,
-    pos1_in: wp.vec3,
-    normal_in: wp.vec3,
-    thickness_in: float,
-    shape0_idx: int,
-    shape1_idx: int,
-    # Out:
-    contact_geometry: ContactGeometry,
+  # In:
+  nconmax_in: int,
+  pos0_in: wp.vec3,
+  pos1_in: wp.vec3,
+  normal_in: wp.vec3,
+  thickness_in: float,
+  shape0_idx: int,
+  shape1_idx: int,
+  # Out:
+  contact_geometry: ContactGeometry,
 ):
-    cid = wp.atomic_add(contact_geometry.rigid_contact_count, 0, 1)
-    if cid < nconmax_in:
-        # Set contact points - for now just using pos_in for both points
-        contact_geometry.rigid_contact_point0_world[cid] = pos0_in
-        contact_geometry.rigid_contact_point1_world[cid] = pos1_in
-        
-        # Set normal
-        contact_geometry.rigid_contact_normal_world[cid] = normal_in
-        
-        # Set thickness
-        contact_geometry.rigid_contact_thickness[cid] = thickness_in
-        
-        # Set shape indices
-        contact_geometry.rigid_contact_shape0_idx[cid] = shape0_idx
-        contact_geometry.rigid_contact_shape1_idx[cid] = shape1_idx
+  cid = wp.atomic_add(contact_geometry.rigid_contact_count, 0, 1)
+  if cid < nconmax_in:
+    # Set contact points - for now just using pos_in for both points
+    contact_geometry.rigid_contact_point0_world[cid] = pos0_in
+    contact_geometry.rigid_contact_point1_world[cid] = pos1_in
 
+    # Set normal
+    contact_geometry.rigid_contact_normal_world[cid] = normal_in
 
+    # Set thickness
+    contact_geometry.rigid_contact_thickness[cid] = thickness_in
 
+    # Set shape indices
+    contact_geometry.rigid_contact_shape0_idx[cid] = shape0_idx
+    contact_geometry.rigid_contact_shape1_idx[cid] = shape1_idx
 
 
 def gjk_epa_pipeline_newton(
@@ -787,7 +766,6 @@ def gjk_epa_pipeline_newton(
   epa_exact_neg_distance: bool,
   depth_extension: float,
 ):
-  
   _gjk = get_gjk(geomtype1, geomtype2, gjk_iterations)
   _epa = get_epa(geomtype1, geomtype2, epa_iterations, epa_exact_neg_distance, depth_extension)
   _multiple_contacts = get_multiple_contacts(geomtype1, geomtype2, depth_extension)
@@ -797,7 +775,7 @@ def gjk_epa_pipeline_newton(
   def gjk_epa_sparse(
     # Model:
     shape_geometry: ShapeGeometry,
-    convex_vert: wp.array(dtype=wp.vec3), # Global vertex buffer of convex hulls
+    convex_vert: wp.array(dtype=wp.vec3),  # Global vertex buffer of convex hulls
     # Data in:
     nconmax_in: int,
     shape_transform: wp.array(dtype=wp.transform),
@@ -823,15 +801,11 @@ def gjk_epa_pipeline_newton(
       rot=shape_transform[g1].q.rotate(),
       size=shape_geometry.scale[g1],
       vertadr=0,  # For convex meshes, would need to track vertex data
-      vertnum=0
+      vertnum=0,
     )
 
     geom2 = Geom(
-      pos=shape_transform[g2].p,
-      rot=shape_transform[g2].q.rotate(),
-      size=shape_geometry.scale[g2],
-      vertadr=0,
-      vertnum=0
+      pos=shape_transform[g2].p, rot=shape_transform[g2].q.rotate(), size=shape_geometry.scale[g2], vertadr=0, vertnum=0
     )
 
     simplex, normal = _gjk(convex_vert, geom1, geom2)
@@ -841,17 +815,72 @@ def gjk_epa_pipeline_newton(
       return
 
     count, points = _multiple_contacts(convex_vert, geom1, geom2, depth, normal)
-    
+
     for i in range(count):
       write_contact_newton(
-        nconmax_in=nconmax_in, 
+        nconmax_in=nconmax_in,
         pos0_in=points[i] + normal * (depth * 0.5),
         pos1_in=points[i] - normal * (depth * 0.5),
         normal_in=normal,
         thickness_in=shape_geometry.thickness[g1] + shape_geometry.thickness[g2],
         shape0_idx=g1,
         shape1_idx=g2,
-        contact_geometry=contact_geometry
+        contact_geometry=contact_geometry,
       )
 
   return gjk_epa_sparse
+
+
+_CONVEX_COLLISION_FUNC = {
+  (GEO_SPHERE, GEO_ELLIPSOID),
+  (GEO_SPHERE, GEO_CONVEX),
+  (GEO_CAPSULE, GEO_CYLINDER),
+  (GEO_CAPSULE, GEO_ELLIPSOID),
+  (GEO_CAPSULE, GEO_CONVEX),
+  (GEO_ELLIPSOID, GEO_ELLIPSOID),
+  (GEO_ELLIPSOID, GEO_CYLINDER),
+  (GEO_ELLIPSOID, GEO_BOX),
+  (GEO_ELLIPSOID, GEO_CONVEX),
+  (GEO_CYLINDER, GEO_CYLINDER),
+  (GEO_CYLINDER, GEO_BOX),
+  (GEO_CYLINDER, GEO_CONVEX),
+  (GEO_BOX, GEO_CONVEX),
+  (GEO_CONVEX, GEO_CONVEX),
+}
+
+
+_collision_kernels = {}
+
+
+def gjk_narrowphase_newton(
+  # Model:
+  shape_geometry: ShapeGeometry,
+  convex_vert: wp.array(dtype=wp.vec3),  # Global vertex buffer of convex hulls
+  # Data in:
+  nconmax_in: int,
+  shape_transform: wp.array(dtype=wp.transform),
+  collision_pair_in: wp.array(dtype=wp.vec2i),
+  ncollision_in: wp.array(dtype=int),
+  # Data out:
+  contact_geometry: ContactGeometry,
+  # Algorithm parameters:
+  gjk_iterations: int = 20,
+  epa_iterations: int = 20,
+  epa_exact_neg_distance: bool = True,
+  depth_extension: float = 0.001,
+):
+  if len(_collision_kernels) == 0:
+    for types in _CONVEX_COLLISION_FUNC:
+      t1 = types[0]
+      t2 = types[1]
+      _collision_kernels[(t1, t2)] = gjk_epa_pipeline_newton(
+        t1, t2, gjk_iterations, epa_iterations, epa_exact_neg_distance, depth_extension
+      )
+
+  for collision_kernel in _collision_kernels.values():
+    wp.launch(
+      collision_kernel,
+      dim=nconmax_in,
+      inputs=[shape_geometry, convex_vert, nconmax_in, shape_transform, collision_pair_in, ncollision_in],
+      outputs=[contact_geometry],
+    )
