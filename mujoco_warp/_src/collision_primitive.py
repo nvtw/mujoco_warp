@@ -879,72 +879,58 @@ def _primitive_narrowphase(
     )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.CAPSULE.value):
     contact1, contact2 = plane_capsule(geom1, geom2)
-    write_contact(
-      nconmax_in,
-      contact1.dist,
-      contact1.pos,
-      contact1.frame,
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
-    write_contact(
-      nconmax_in,
-      contact2.dist,
-      contact2.pos,
-      contact2.frame,
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
+    for i in range(2):
+      if i == 0:
+        contact = contact1
+      else:
+        contact = contact2
+      write_contact(
+        nconmax_in,
+        contact.dist,
+        contact.pos,
+        contact.frame,
+        margin,
+        gap,
+        condim,
+        friction,
+        solref,
+        solreffriction,
+        solimp,
+        geoms,
+        worldid,
+        ncon_out,
+        contact_dist_out,
+        contact_pos_out,
+        contact_frame_out,
+        contact_includemargin_out,
+        contact_friction_out,
+        contact_solref_out,
+        contact_solreffriction_out,
+        contact_solimp_out,
+        contact_dim_out,
+        contact_geom_out,
+        contact_worldid_out,
+      )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.BOX.value):
     contact1, contact2, contact3, contact4, count = plane_box(
       geom1,
       geom2,
       margin,
     )
-    if count > 0:
+    for i in range(count):
+      if i == 0:
+        contact = contact1
+      elif i == 1:
+        contact = contact2
+      elif i == 2:
+        contact = contact3
+      else:
+        contact = contact4
       write_contact(
         nconmax_in,
-        contact1.dist,
-        contact1.pos,
-        contact1.frame,
+        contact.dist,
+        contact.pos,
+        contact.frame,
         margin,
         gap,
         condim,
@@ -967,91 +953,6 @@ def _primitive_narrowphase(
         contact_geom_out,
         contact_worldid_out,
       )
-    if count > 1:
-      write_contact(
-        nconmax_in,
-        contact2.dist,
-        contact2.pos,
-        contact2.frame,
-        margin,
-        gap,
-        condim,
-        friction,
-        solref,
-        solreffriction,
-        solimp,
-        geoms,
-        worldid,
-        ncon_out,
-        contact_dist_out,
-        contact_pos_out,
-        contact_frame_out,
-        contact_includemargin_out,
-        contact_friction_out,
-        contact_solref_out,
-        contact_solreffriction_out,
-        contact_solimp_out,
-        contact_dim_out,
-        contact_geom_out,
-        contact_worldid_out,
-      )
-    if count > 2:
-      write_contact(
-        nconmax_in,
-        contact3.dist,
-        contact3.pos,
-        contact3.frame,
-        margin,
-        gap,
-        condim,
-        friction,
-        solref,
-        solreffriction,
-        solimp,
-        geoms,
-        worldid,
-        ncon_out,
-        contact_dist_out,
-        contact_pos_out,
-        contact_frame_out,
-        contact_includemargin_out,
-        contact_friction_out,
-        contact_solref_out,
-        contact_solreffriction_out,
-        contact_solimp_out,
-        contact_dim_out,
-        contact_geom_out,
-        contact_worldid_out,
-      )
-    if count > 3:
-      write_contact(
-        nconmax_in,
-        contact4.dist,
-        contact4.pos,
-        contact4.frame,
-        margin,
-        gap,
-        condim,
-        friction,
-        solref,
-        solreffriction,
-        solimp,
-        geoms,
-        worldid,
-        ncon_out,
-        contact_dist_out,
-        contact_pos_out,
-        contact_frame_out,
-        contact_includemargin_out,
-        contact_friction_out,
-        contact_solref_out,
-        contact_solreffriction_out,
-        contact_solimp_out,
-        contact_dim_out,
-        contact_geom_out,
-        contact_worldid_out,
-      )
-
   elif type1 == int(GeomType.CAPSULE.value) and type2 == int(GeomType.CAPSULE.value):
     contact = capsule_capsule(geom1, geom2)
     write_contact(
@@ -1086,96 +987,20 @@ def _primitive_narrowphase(
       geom1,
       geom2,
     )
-    if count > 0:
+    for i in range(count):
+      if i == 0:
+        contact = contact1
+      elif i == 1:
+        contact = contact2
+      elif i == 2:
+        contact = contact3
+      else:
+        contact = contact4
       write_contact(
         nconmax_in,
-        contact1.dist,
-        contact1.pos,
-        contact1.frame,
-        margin,
-        gap,
-        condim,
-        friction,
-        solref,
-        solreffriction,
-        solimp,
-        geoms,
-        worldid,
-        ncon_out,
-        contact_dist_out,
-        contact_pos_out,
-        contact_frame_out,
-        contact_includemargin_out,
-        contact_friction_out,
-        contact_solref_out,
-        contact_solreffriction_out,
-        contact_solimp_out,
-        contact_dim_out,
-        contact_geom_out,
-        contact_worldid_out,
-      )
-    if count > 1:
-      write_contact(
-        nconmax_in,
-        contact2.dist,
-        contact2.pos,
-        contact2.frame,
-        margin,
-        gap,
-        condim,
-        friction,
-        solref,
-        solreffriction,
-        solimp,
-        geoms,
-        worldid,
-        ncon_out,
-        contact_dist_out,
-        contact_pos_out,
-        contact_frame_out,
-        contact_includemargin_out,
-        contact_friction_out,
-        contact_solref_out,
-        contact_solreffriction_out,
-        contact_solimp_out,
-        contact_dim_out,
-        contact_geom_out,
-        contact_worldid_out,
-      )
-    if count > 2:
-      write_contact(
-        nconmax_in,
-        contact3.dist,
-        contact3.pos,
-        contact3.frame,
-        margin,
-        gap,
-        condim,
-        friction,
-        solref,
-        solreffriction,
-        solimp,
-        geoms,
-        worldid,
-        ncon_out,
-        contact_dist_out,
-        contact_pos_out,
-        contact_frame_out,
-        contact_includemargin_out,
-        contact_friction_out,
-        contact_solref_out,
-        contact_solreffriction_out,
-        contact_solimp_out,
-        contact_dim_out,
-        contact_geom_out,
-        contact_worldid_out,
-      )
-    if count > 3:
-      write_contact(
-        nconmax_in,
-        contact4.dist,
-        contact4.pos,
-        contact4.frame,
+        contact.dist,
+        contact.pos,
+        contact.frame,
         margin,
         gap,
         condim,
@@ -1352,40 +1177,16 @@ def _primitive_narrowphase(
     )
   elif type1 == int(GeomType.CAPSULE.value) and type2 == int(GeomType.BOX.value):
     contact1, contact2, num_contacts = capsule_box(geom1, geom2, margin)
-    if num_contacts > 0:
+    for i in range(num_contacts):
+      if i == 0:
+        contact = contact1
+      else:
+        contact = contact2
       write_contact(
         nconmax_in,
-        contact1.dist,
-        contact1.pos,
-        contact1.frame,
-        margin,
-        gap,
-        condim,
-        friction,
-        solref,
-        solreffriction,
-        solimp,
-        geoms,
-        worldid,
-        ncon_out,
-        contact_dist_out,
-        contact_pos_out,
-        contact_frame_out,
-        contact_includemargin_out,
-        contact_friction_out,
-        contact_solref_out,
-        contact_solreffriction_out,
-        contact_solimp_out,
-        contact_dim_out,
-        contact_geom_out,
-        contact_worldid_out,
-      )
-    if num_contacts > 1:
-      write_contact(
-        nconmax_in,
-        contact2.dist,
-        contact2.pos,
-        contact2.frame,
+        contact.dist,
+        contact.pos,
+        contact.frame,
         margin,
         gap,
         condim,
