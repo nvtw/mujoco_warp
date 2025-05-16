@@ -9,8 +9,6 @@ wp.config.enable_backward = False
 
 
 from .collision_primitive import Geom
-from .types import MJ_MINVAL
-from .types import GeomType
 from .math import orthonormal
 from .math import gjk_normalize
 from .support import all_same
@@ -86,7 +84,7 @@ def gjk_support_geom(geom: Geom, geomtype: int, dir: wp.vec3, verts: wp.array(dt
     res = wp.vec3(0.0, 0.0, 0.0)
     # set result in XY plane: support on circle
     d = wp.sqrt(wp.dot(local_dir, local_dir))
-    if d > MJ_MINVAL:
+    if d > float(1e-8):
       scl = geom.size[0] / d
       res[0] = local_dir[0] * scl
       res[1] = local_dir[1] * scl
@@ -707,3 +705,196 @@ def get_multiple_contacts(
     return contact_count, contact_points
   
   return _multiple_contacts
+
+
+
+
+
+
+
+
+
+
+
+
+
+# @wp.struct
+# class ShapeGeometry: # Renamed from ModelShapeGeometry in model.py
+#     """
+#     Represents the geometry of a set of shapes
+#     """
+#     type: wp.array(dtype=wp.int32)
+#     is_solid: wp.array(dtype=bool)
+#     thickness: wp.array(dtype=float)
+#     source: wp.array(dtype=wp.uint64) # ID for wp.Mesh or wp.Volume 
+#     scale: wp.array(dtype=wp.vec3)
+#     filter: wp.array(dtype=int)
+
+# @wp.struct
+# class ContactGeometry: # This remains the output data structure
+#     # Soft contacts
+#     soft_contact_count: wp.array(dtype=int)
+#     soft_contact_particle: wp.array(dtype=int)
+#     soft_contact_shape: wp.array(dtype=int)
+   
+#     # Rigid contacts
+#     rigid_contact_count: wp.array(dtype=int)
+#     rigid_contact_point0_world: wp.array(dtype=wp.vec3)
+#     rigid_contact_point1_world: wp.array(dtype=wp.vec3)
+#     rigid_contact_normal_world: wp.array(dtype=wp.vec3) 
+#     rigid_contact_thickness: wp.array(dtype=float) 
+#     rigid_contact_shape0_idx: wp.array(dtype=int)
+#     rigid_contact_shape1_idx: wp.array(dtype=int)
+
+# @wp.func
+# def write_contact(
+#     # In:
+#     nconmax_in: int,
+#     pos0_in: wp.vec3,
+#     pos1_in: wp.vec3,
+#     normal_in: wp.vec3,
+#     thickness_in: float,
+#     shape0_idx: int,
+#     shape1_idx: int,
+#     # Out:
+#     contact_geometry: ContactGeometry,
+# ):
+#     cid = wp.atomic_add(contact_geometry.rigid_contact_count, 0, 1)
+#     if cid < nconmax_in:
+#         # Set contact points - for now just using pos_in for both points
+#         contact_geometry.rigid_contact_point0_world[cid] = pos0_in
+#         contact_geometry.rigid_contact_point1_world[cid] = pos1_in
+        
+#         # Set normal
+#         contact_geometry.rigid_contact_normal_world[cid] = normal_in
+        
+#         # Set thickness
+#         contact_geometry.rigid_contact_thickness[cid] = thickness_in
+        
+#         # Set shape indices
+#         contact_geometry.rigid_contact_shape0_idx[cid] = shape0_idx
+#         contact_geometry.rigid_contact_shape1_idx[cid] = shape1_idx
+
+
+
+
+
+# def _gjk_epa_pipeline(
+#   geomtype1: int,
+#   geomtype2: int,
+#   gjk_iterations: int,
+#   epa_iterations: int,
+#   epa_exact_neg_distance: bool,
+#   depth_extension: float,
+# ):
+  
+#   _gjk = get_gjk(geomtype1, geomtype2, gjk_iterations)
+#   _epa = get_epa(geomtype1, geomtype2, epa_iterations, epa_exact_neg_distance, depth_extension)
+#   _multiple_contacts = get_multiple_contacts(geomtype1, geomtype2, depth_extension)
+
+#   # runs GJK and EPA on a set of sparse geom pairs per env
+#   @wp.kernel
+#   def gjk_epa_sparse(
+#     # Model:
+#     shape_geometry: ShapeGeometry,
+#     # Data in:
+#     shape_transform: wp.array(dtype=wp.transform),
+#     collision_pair_in: wp.array(dtype=wp.vec2i),
+#     ncollision_in: wp.array(dtype=int),
+#     # Data out:
+#     contact_geometry: ContactGeometry,
+#   ):
+#     tid = wp.tid()
+#     if tid >= ncollision_in[0]:
+#       return
+
+#     worldid = collision_worldid_in[tid]
+#     geoms, margin, gap, condim, friction, solref, solreffriction, solimp = contact_params(
+#       geom_condim,
+#       geom_priority,
+#       geom_solmix,
+#       geom_solref,
+#       geom_solimp,
+#       geom_friction,
+#       geom_margin,
+#       geom_gap,
+#       pair_dim,
+#       pair_solref,
+#       pair_solreffriction,
+#       pair_solimp,
+#       pair_margin,
+#       pair_gap,
+#       pair_friction,
+#       collision_pair_in,
+#       collision_pairid_in,
+#       tid,
+#       worldid,
+#     )
+
+#     g1 = geoms[0]
+#     g2 = geoms[1]
+
+#     if geom_type[g1] != geomtype1 or geom_type[g2] != geomtype2:
+#       return
+
+#     geom1 = _geom(
+#       geom_type,
+#       geom_dataid,
+#       geom_size[worldid],
+#       mesh_vertadr,
+#       mesh_vertnum,
+#       mesh_vert,
+#       geom_xpos_in,
+#       geom_xmat_in,
+#       worldid,
+#       g1,
+#     )
+
+#     geom2 = _geom(
+#       geom_type,
+#       geom_dataid,
+#       geom_size[worldid],
+#       mesh_vertadr,
+#       mesh_vertnum,
+#       mesh_vert,
+#       geom_xpos_in,
+#       geom_xmat_in,
+#       worldid,
+#       g2,
+#     )
+
+#     margin = wp.max(geom_margin[worldid, g1], geom_margin[worldid, g2])
+
+#     simplex, normal = _gjk(mesh_vert, geom1, geom2)
+
+#     # TODO(btaba): get depth from GJK, conditionally run EPA.
+#     depth, normal = _epa(mesh_vert, geom1, geom2, simplex, normal)
+#     dist = -depth
+
+#     if (dist - margin) >= 0.0 or depth != depth:
+#       return
+
+#     # TODO(btaba): split get_multiple_contacts into a separate kernel.
+#     # TODO(team): multiccd enablebit
+#     count, points = _multiple_contacts(mesh_vert, geom1, geom2, depth, normal)
+
+#     frame = make_frame(normal)
+#     for i in range(count):
+#       write_contact(
+#         nconmax_in,
+#         dist,
+#         points[i],
+#         frame,
+#         margin,
+#         gap,
+#         condim,
+#         friction,
+#         solref,
+#         solreffriction,
+#         solimp,
+#         geoms,
+#         worldid,
+#         contact_geometry,
+#       )
+
+#   return gjk_epa_sparse

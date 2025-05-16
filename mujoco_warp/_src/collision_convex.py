@@ -104,24 +104,6 @@ geo_map = wp.constant(geoMap(geo_map_host))
 
 
 
-@wp.func
-def gjk_support_geom_forward(geom: Geom, geomtype: int, dir: wp.vec3, verts: wp.array(dtype=wp.vec3)):
-  return gjk_support_geom(geom, geo_map[geomtype], dir, verts)
-
-@wp.func
-def gjk_support_forward(
-  # In:
-  geom1: Geom,
-  geom2: Geom,
-  geomtype1: int,
-  geomtype2: int,
-  dir: wp.vec3,
-  verts: wp.array(dtype=wp.vec3),
-):
-  return gjk_support(geom1, geom2, geo_map[geomtype1], geo_map[geomtype2], dir, verts)
-
-
-
 def _gjk_epa_pipeline(
   geomtype1: int,
   geomtype2: int,
