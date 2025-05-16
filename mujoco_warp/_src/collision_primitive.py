@@ -50,6 +50,11 @@ class Geom:
   vertnum: int
   vert: wp.array(dtype=wp.vec3)
 
+@wp.struct
+class ContactFrame:
+  pos: wp.vec3
+  frame: wp.mat33 # The first row of the frame is the normal
+  dist: float
 
 @wp.func
 def _geom(
@@ -118,7 +123,7 @@ def write_contact(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
+) -> int:
   active = (dist_in - margin_in) < 0
   if active:
     cid = wp.atomic_add(ncon_out, 0, 1)
@@ -134,6 +139,10 @@ def write_contact(
       contact_solref_out[cid] = solref_in
       contact_solreffriction_out[cid] = solreffriction_in
       contact_solimp_out[cid] = solimp_in
+      return cid
+    
+  return -1
+    
 
 
 @wp.func
@@ -142,66 +151,22 @@ def _plane_sphere(plane_normal: wp.vec3, plane_pos: wp.vec3, sphere_pos: wp.vec3
   pos = sphere_pos - plane_normal * (sphere_radius + 0.5 * dist)
   return dist, pos
 
-
 @wp.func
 def plane_sphere(
-  # Data in:
-  nconmax_in: int,
   # In:
   plane: Geom,
   sphere: Geom,
-  worldid: int,
-  margin: float,
-  gap: float,
-  condim: int,
-  friction: vec5,
-  solref: wp.vec2f,
-  solreffriction: wp.vec2f,
-  solimp: vec5,
-  geoms: wp.vec2i,
-  # Data out:
-  ncon_out: wp.array(dtype=int),
-  contact_dist_out: wp.array(dtype=float),
-  contact_pos_out: wp.array(dtype=wp.vec3),
-  contact_frame_out: wp.array(dtype=wp.mat33),
-  contact_includemargin_out: wp.array(dtype=float),
-  contact_friction_out: wp.array(dtype=vec5),
-  contact_solref_out: wp.array(dtype=wp.vec2),
-  contact_solreffriction_out: wp.array(dtype=wp.vec2),
-  contact_solimp_out: wp.array(dtype=vec5),
-  contact_dim_out: wp.array(dtype=int),
-  contact_geom_out: wp.array(dtype=wp.vec2i),
-  contact_worldid_out: wp.array(dtype=int),
-):
+) -> ContactFrame:
   dist, pos = _plane_sphere(plane.normal, plane.pos, sphere.pos, sphere.size[0])
 
-  write_contact(
-    nconmax_in,
-    dist,
-    pos,
-    make_frame(plane.normal),
-    margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    worldid,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
+  # Return contact frame using make_frame helper
+  return ContactFrame(
+    pos=pos,
+    frame=make_frame(plane.normal), 
+    dist=dist
   )
+
+
 
 
 @wp.func
@@ -2481,11 +2446,16 @@ def _primitive_narrowphase(
 
   # TODO(team): static loop unrolling to remove unnecessary branching
   if type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.SPHERE.value):
-    plane_sphere(
-      nconmax_in,
+    contact = plane_sphere(
       geom1,
       geom2,
-      worldid,
+    )
+
+    write_contact(
+      nconmax_in,
+      contact.dist,
+      contact.pos,
+      contact.frame,
       margin,
       gap,
       condim,
@@ -2494,6 +2464,7 @@ def _primitive_narrowphase(
       solreffriction,
       solimp,
       geoms,
+      worldid,
       ncon_out,
       contact_dist_out,
       contact_pos_out,
@@ -2507,6 +2478,7 @@ def _primitive_narrowphase(
       contact_geom_out,
       contact_worldid_out,
     )
+
   elif type1 == int(GeomType.SPHERE.value) and type2 == int(GeomType.SPHERE.value):
     sphere_sphere(
       nconmax_in,
