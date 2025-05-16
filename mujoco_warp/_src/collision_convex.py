@@ -65,25 +65,6 @@ wp.config.enable_backward = False
 
 
 
-@wp.func
-def _gjk_support(
-  # In:
-  geom1: Geom,
-  geom2: Geom,
-  geomtype1: int,
-  geomtype2: int,
-  dir: wp.vec3,
-  verts: wp.array(dtype=wp.vec3),
-):
-  # Returns the distance between support points on two geoms, and the support point.
-  # Negative distance means objects are not intersecting along direction `dir`.
-  # Positive distance means objects are intersecting along the given direction `dir`.
-
-  dist1, s1 = gjk_support_geom(geom1, geomtype1, dir, verts)
-  dist2, s2 = gjk_support_geom(geom2, geomtype2, -dir, verts)
-
-  support_pt = s1 - s2
-  return dist1 + dist2, support_pt
 
 
 _CONVEX_COLLISION_FUNC = {
@@ -102,6 +83,27 @@ _CONVEX_COLLISION_FUNC = {
   (GeomType.BOX.value, GeomType.MESH.value),
   (GeomType.MESH.value, GeomType.MESH.value),
 }
+
+class map10i(wp.types.vector(10, dtype=wp.int32)):
+  pass
+
+def build_geo_map():
+  # Start with identity map
+  map = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  map[GeomType.SPHERE.value] = GEO_SPHERE
+  map[GeomType.BOX.value] = GEO_BOX
+  map[GeomType.CAPSULE.value] = GEO_CAPSULE
+  map[GeomType.CYLINDER.value] = GEO_CYLINDER
+  map[GeomType.MESH.value] = GEO_CONVEX
+  return map
+
+# Map from mujoco_warp to newton geo types
+geo_map = wp.constant(map10i(build_geo_map()))
+
+
+@wp.func
+def gjk_support_geom_forward(geom: Geom, geomtype: int, dir: wp.vec3, verts: wp.array(dtype=wp.vec3)):
+  return gjk_support_geom(geom, geo_map[geomtype], dir, verts)
 
 
 @wp.func
@@ -155,8 +157,8 @@ def _gjk_epa_pipeline(
     dir_n = -dir
     depth = float(FLOAT_MAX)
 
-    dist_max, simplex0 = _gjk_support(geom1, geom2, geomtype1, geomtype2, dir, mesh_vert)
-    dist_min, simplex1 = _gjk_support(geom1, geom2, geomtype1, geomtype2, dir_n, mesh_vert)
+    dist_max, simplex0 = gjk_support(geom1, geom2, geomtype1, geomtype2, dir, mesh_vert)
+    dist_min, simplex1 = gjk_support(geom1, geom2, geomtype1, geomtype2, dir_n, mesh_vert)
 
     if dist_max < dist_min:
       depth = dist_max
@@ -168,7 +170,7 @@ def _gjk_epa_pipeline(
     sd = simplex0 - simplex1
     dir = orthonormal(sd)
 
-    dist_max, simplex3 = _gjk_support(geom1, geom2, geomtype1, geomtype2, dir, mesh_vert)
+    dist_max, simplex3 = gjk_support(geom1, geom2, geomtype1, geomtype2, dir, mesh_vert)
 
     # Initialize a 2-simplex with simplex[2]==simplex[1]. This ensures the
     # correct winding order for face normals defined below. Face 0 and face 3
@@ -232,7 +234,7 @@ def _gjk_epa_pipeline(
         break
 
       # add new support point to the simplex
-      dist, simplex_i = _gjk_support(geom1, geom2, geomtype1, geomtype2, plane[index], mesh_vert)
+      dist, simplex_i = gjk_support(geom1, geom2, geomtype1, geomtype2, plane[index], mesh_vert)
       simplex[index] = simplex_i
 
       if dist < depth:
@@ -263,7 +265,7 @@ def _gjk_epa_pipeline(
     normal: wp.vec3,
   ):
     # get the support, if depth < 0: objects do not intersect
-    depth, _ = _gjk_support(geom1, geom2, geomtype1, geomtype2, normal, mesh_vert)
+    depth, _ = gjk_support(geom1, geom2, geomtype1, geomtype2, normal, mesh_vert)
 
     if depth < -depth_extension:
       # Objects are not intersecting, and we do not obtain the closest points as
@@ -290,7 +292,7 @@ def _gjk_epa_pipeline(
           p0, pf = gjk_normalize(p0)
 
           if pf:
-            depth2, _ = _gjk_support(geom1, geom2, geomtype1, geomtype2, p0, mesh_vert)
+            depth2, _ = gjk_support(geom1, geom2, geomtype1, geomtype2, p0, mesh_vert)
 
             if depth2 < depth:
               depth = depth2
@@ -341,7 +343,7 @@ def _gjk_epa_pipeline(
           dists[i * 3 + j] = wp.static(float(2 * FLOAT_MAX))
         continue
 
-      dist, pi = _gjk_support(geom1, geom2, geomtype1, geomtype2, n, mesh_vert)
+      dist, pi = gjk_support(geom1, geom2, geomtype1, geomtype2, n, mesh_vert)
       p[i] = pi
 
       if dist < depth:
@@ -361,7 +363,7 @@ def _gjk_epa_pipeline(
             p0, pf = gjk_normalize(p0)
 
             if pf:
-              dist2, v = _gjk_support(geom1, geom2, geomtype1, geomtype2, p0, mesh_vert)
+              dist2, v = gjk_support(geom1, geom2, geomtype1, geomtype2, p0, mesh_vert)
 
               if dist2 < depth:
                 depth = dist2

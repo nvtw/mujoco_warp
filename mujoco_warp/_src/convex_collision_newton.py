@@ -16,8 +16,19 @@ from .types import GeomType
 
 
 
+# newton/geometry/types.py (or within geometry/__init__.py)
 
-
+# Shape geometry types
+GEO_SPHERE = wp.constant(0)
+GEO_BOX = wp.constant(1)
+GEO_CAPSULE = wp.constant(2)
+GEO_CYLINDER = wp.constant(3)
+GEO_CONE = wp.constant(4)
+GEO_MESH = wp.constant(5)
+GEO_SDF = wp.constant(6)
+GEO_PLANE = wp.constant(7)
+GEO_NONE = wp.constant(8)
+GEO_CONVEX = wp.constant(9)
 
 
 
@@ -92,3 +103,25 @@ def gjk_support_geom(geom: Geom, geomtype: int, dir: wp.vec3, verts: wp.array(dt
     support_pt = geom.rot @ support_pt + geom.pos
 
   return wp.dot(support_pt, dir), support_pt
+
+
+
+@wp.func
+def gjk_support(
+  # In:
+  geom1: Geom,
+  geom2: Geom,
+  geomtype1: int,
+  geomtype2: int,
+  dir: wp.vec3,
+  verts: wp.array(dtype=wp.vec3),
+):
+  # Returns the distance between support points on two geoms, and the support point.
+  # Negative distance means objects are not intersecting along direction `dir`.
+  # Positive distance means objects are intersecting along the given direction `dir`.
+
+  dist1, s1 = gjk_support_geom(geom1, geomtype1, dir, verts)
+  dist2, s2 = gjk_support_geom(geom2, geomtype2, -dir, verts)
+
+  support_pt = s1 - s2
+  return dist1 + dist2, support_pt
