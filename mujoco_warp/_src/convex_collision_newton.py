@@ -29,7 +29,7 @@ GEO_SDF = wp.constant(6)
 GEO_PLANE = wp.constant(7)
 GEO_NONE = wp.constant(8)
 GEO_CONVEX = wp.constant(9)
-
+GEO_ELLIPSOID = wp.constant(10)
 
 
 
@@ -63,23 +63,23 @@ VECI2 = vec6(1, 2, 3, 2, 3, 3)
 @wp.func
 def gjk_support_geom(geom: Geom, geomtype: int, dir: wp.vec3, verts: wp.array(dtype=wp.vec3)):
   local_dir = wp.transpose(geom.rot) @ dir
-  if geomtype == int(GeomType.SPHERE.value):
+  if geomtype == GEO_SPHERE:
     support_pt = geom.pos + geom.size[0] * dir
-  elif geomtype == int(GeomType.BOX.value):
+  elif geomtype == GEO_BOX:
     res = wp.cw_mul(wp.sign(local_dir), geom.size)
     support_pt = geom.rot @ res + geom.pos
-  elif geomtype == int(GeomType.CAPSULE.value):
+  elif geomtype == GEO_CAPSULE:
     res = local_dir * geom.size[0]
     # add cylinder contribution
     res[2] += wp.sign(local_dir[2]) * geom.size[1]
     support_pt = geom.rot @ res + geom.pos
-  elif geomtype == int(GeomType.ELLIPSOID.value):
+  elif geomtype == GEO_ELLIPSOID:
     res = wp.cw_mul(local_dir, geom.size)
     res = wp.normalize(res)
     # transform to ellipsoid
     res = wp.cw_mul(res, geom.size)
     support_pt = geom.rot @ res + geom.pos
-  elif geomtype == int(GeomType.CYLINDER.value):
+  elif geomtype == GEO_CYLINDER:
     res = wp.vec3(0.0, 0.0, 0.0)
     # set result in XY plane: support on circle
     d = wp.sqrt(wp.dot(local_dir, local_dir))
@@ -90,7 +90,7 @@ def gjk_support_geom(geom: Geom, geomtype: int, dir: wp.vec3, verts: wp.array(dt
     # set result in Z direction
     res[2] = wp.sign(local_dir[2]) * geom.size[1]
     support_pt = geom.rot @ res + geom.pos
-  elif geomtype == int(GeomType.MESH.value):
+  elif geomtype == GEO_CONVEX:
     max_dist = float(FLOAT_MIN)
     # exhaustive search over all vertices
     # TODO(team): consider hill-climb over graph data
