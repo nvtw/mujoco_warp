@@ -669,3 +669,116 @@ def plane_box(
       break
 
   return contact1, contact2, contact3, contact4, count
+
+
+_HUGE_VAL = 1e6
+
+
+@wp.func
+def plane_convex(
+  # In:
+  plane: Geom,
+  convex: Geom,
+):
+  """Calculates contacts between a plane and a convex object."""
+
+  # get points in the convex frame
+  plane_pos = wp.transpose(convex.rot) @ (plane.pos - convex.pos)
+  n = wp.transpose(convex.rot) @ plane.normal
+
+  # Find support points
+  max_support = wp.float32(-_HUGE_VAL)
+  for i in range(convex.vertnum):
+    support = wp.dot(plane_pos - convex.vert[convex.vertadr + i], n)
+
+    max_support = wp.max(support, max_support)
+
+  threshold = wp.max(0.0, max_support - 1e-3)
+
+  # Store indices in vec4
+  indices = wp.vec4i(-1, -1, -1, -1)
+
+  # TODO(team): Explore faster methods like tile_min or even fast pass kernels if the upper bound of vertices in all convexes is small enough such that all vertices fit into shared memory
+  # Find point a (first support point)
+  a_dist = wp.float32(-_HUGE_VAL)
+  for i in range(convex.vertnum):
+    support = wp.dot(plane_pos - convex.vert[convex.vertadr + i], n)
+    dist = wp.where(support > threshold, 0.0, -_HUGE_VAL)
+    if dist > a_dist:
+      indices[0] = i
+      a_dist = dist
+  a = convex.vert[convex.vertadr + indices[0]]
+
+  # Find point b (furthest from a)
+  b_dist = wp.float32(-_HUGE_VAL)
+  for i in range(convex.vertnum):
+    support = wp.dot(plane_pos - convex.vert[convex.vertadr + i], n)
+    dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
+    dist = wp.length_sq(a - convex.vert[convex.vertadr + i]) + dist_mask
+    if dist > b_dist:
+      indices[1] = i
+      b_dist = dist
+  b = convex.vert[convex.vertadr + indices[1]]
+
+  # Find point c (furthest along axis orthogonal to a-b)
+  ab = wp.cross(n, a - b)
+  c_dist = wp.float32(-_HUGE_VAL)
+  for i in range(convex.vertnum):
+    support = wp.dot(plane_pos - convex.vert[convex.vertadr + i], n)
+    dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
+    ap = a - convex.vert[convex.vertadr + i]
+    dist = wp.abs(wp.dot(ap, ab)) + dist_mask
+    if dist > c_dist:
+      indices[2] = i
+      c_dist = dist
+  c = convex.vert[convex.vertadr + indices[2]]
+
+  # Find point d (furthest from other triangle edges)
+  ac = wp.cross(n, a - c)
+  bc = wp.cross(n, b - c)
+  d_dist = wp.float32(-_HUGE_VAL)
+  for i in range(convex.vertnum):
+    support = wp.dot(plane_pos - convex.vert[convex.vertadr + i], n)
+    dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
+    ap = a - convex.vert[convex.vertadr + i]
+    bp = b - convex.vert[convex.vertadr + i]
+    dist_ap = wp.abs(wp.dot(ap, ac)) + dist_mask
+    dist_bp = wp.abs(wp.dot(bp, bc)) + dist_mask
+    if dist_ap + dist_bp > d_dist:
+      indices[3] = i
+      d_dist = dist_ap + dist_bp
+
+  # Prepare contacts
+  frame = make_frame(plane.normal)
+  contact1 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
+  contact2 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
+  contact3 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
+  contact4 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
+  count = int(0)
+
+  for i in range(3, -1, -1):
+    idx = indices[i]
+    unique_count = int(0)
+    for j in range(i + 1):
+      if indices[j] == idx:
+        unique_count = unique_count + 1
+
+    # Check if the index is unique (appears exactly once)
+    if unique_count == 1:
+      pos = convex.vert[convex.vertadr + idx]
+      pos = convex.pos + convex.rot @ pos
+      support = wp.dot(plane_pos - convex.vert[convex.vertadr + idx], n)
+      dist = -support
+      pos = pos - 0.5 * dist * plane.normal
+
+      if count == 0:
+        contact1 = ContactFrame(pos=pos, frame=frame, dist=dist)
+      elif count == 1:
+        contact2 = ContactFrame(pos=pos, frame=frame, dist=dist)
+      elif count == 2:
+        contact3 = ContactFrame(pos=pos, frame=frame, dist=dist)
+      elif count == 3:
+        contact4 = ContactFrame(pos=pos, frame=frame, dist=dist)
+      count += 1
+
+  return contact1, contact2, contact3, contact4, count
