@@ -1380,3 +1380,384 @@ def box_box(
       contact8 = contact
 
   return contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8, min(8, n)
+
+
+
+
+
+
+
+
+
+# newton/geometry/types.py (or within geometry/__init__.py)
+
+# Shape geometry types
+GEO_SPHERE = wp.constant(0)
+GEO_BOX = wp.constant(1)
+GEO_CAPSULE = wp.constant(2)
+GEO_CYLINDER = wp.constant(3)
+GEO_CONE = wp.constant(4)
+GEO_MESH = wp.constant(5)
+GEO_SDF = wp.constant(6)
+GEO_PLANE = wp.constant(7)
+GEO_NONE = wp.constant(8)
+GEO_CONVEX = wp.constant(9)
+GEO_ELLIPSOID = wp.constant(10)
+
+
+@wp.struct
+class ShapeGeometry:  # Renamed from ModelShapeGeometry in model.py
+  """
+  Represents the geometry of a set of shapes
+  """
+
+  type: wp.array(dtype=wp.int32)
+  is_solid: wp.array(dtype=bool)
+  thickness: wp.array(dtype=float)
+  source: wp.array(dtype=wp.uint64)  # ID for wp.Mesh or wp.Volume
+  scale: wp.array(dtype=wp.vec3)
+  filter: wp.array(dtype=int)
+
+
+@wp.struct
+class ContactGeometry:  # This remains the output data structure
+  # Soft contacts
+  soft_contact_count: wp.array(dtype=int)
+  soft_contact_particle: wp.array(dtype=int)
+  soft_contact_shape: wp.array(dtype=int)
+
+  # Rigid contacts
+  rigid_contact_count: wp.array(dtype=int)
+  rigid_contact_point0_world: wp.array(dtype=wp.vec3)
+  rigid_contact_point1_world: wp.array(dtype=wp.vec3)
+  rigid_contact_normal_world: wp.array(dtype=wp.vec3)
+  rigid_contact_thickness: wp.array(dtype=float)
+  rigid_contact_shape0_idx: wp.array(dtype=int)
+  rigid_contact_shape1_idx: wp.array(dtype=int)
+
+  
+
+
+
+@wp.func
+def write_contact_newton(
+  # In:
+  nconmax_in: int,
+  pos0_in: wp.vec3,
+  pos1_in: wp.vec3,
+  normal_in: wp.vec3,
+  thickness_in: float,
+  shape0_idx: int,
+  shape1_idx: int,
+  # Out:
+  contact_geometry: ContactGeometry,
+):
+  cid = wp.atomic_add(contact_geometry.rigid_contact_count, 0, 1)
+  if cid < nconmax_in:
+    # Set contact points - for now just using pos_in for both points
+    contact_geometry.rigid_contact_point0_world[cid] = pos0_in
+    contact_geometry.rigid_contact_point1_world[cid] = pos1_in
+
+    # Set normal
+    contact_geometry.rigid_contact_normal_world[cid] = normal_in
+
+    # Set thickness
+    contact_geometry.rigid_contact_thickness[cid] = thickness_in
+
+    # Set shape indices
+    contact_geometry.rigid_contact_shape0_idx[cid] = shape0_idx
+    contact_geometry.rigid_contact_shape1_idx[cid] = shape1_idx
+
+
+@wp.kernel
+def _primitive_narrowphase_newton(
+  # Model:
+  geom_type: wp.array(dtype=int),
+  geom_size: wp.array2d(dtype=wp.vec3),
+  mesh_vertadr: wp.array(dtype=int),
+  mesh_vertnum: wp.array(dtype=int),
+  # Data in:
+  nconmax_in: int,
+  geom_xpos_in: wp.array2d(dtype=wp.vec3),
+  geom_xmat_in: wp.array2d(dtype=wp.mat33),
+  collision_pair_in: wp.array(dtype=wp.vec2i),
+  ncollision_in: wp.array(dtype=int),
+  # Data out:
+  contact_geometry: ContactGeometry,
+):
+  tid = wp.tid()
+
+  if tid >= ncollision_in[0]:
+    return
+
+  geoms = collision_pair_in[tid]
+  g1 = geoms[0]
+  g2 = geoms[1]
+
+  # Get geometry objects for both shapes
+  geom1 = Geom(
+    pos=geom_xpos_in[g1],
+    rot=geom_xmat_in[g1],
+    size=geom_size[g1],
+    vertadr=mesh_vertadr[g1],
+    vertnum=mesh_vertnum[g1],
+  )
+
+  geom2 = Geom(
+    pos=geom_xpos_in[g2],
+    rot=geom_xmat_in[g2],
+    size=geom_size[g2],
+    vertadr=mesh_vertadr[g2],
+    vertnum=mesh_vertnum[g2],
+  )
+
+  type1 = geom_type[g1]
+  type2 = geom_type[g2]
+
+  # Handle different collision type pairs
+  if type1 == GEO_PLANE and type2 == GEO_SPHERE:
+    contact = plane_sphere(geom1, geom2)
+    write_contact_newton(
+      nconmax_in,
+      contact.pos,
+      contact.pos,  # For plane-sphere, both contact points are the same
+      contact.frame[0],  # Normal is first row of frame
+      contact.dist,
+      g1,
+      g2,
+      contact_geometry,
+    )
+
+  elif type1 == GEO_SPHERE and type2 == GEO_SPHERE:
+    contact = sphere_sphere(geom1, geom2)
+    write_contact_newton(
+      nconmax_in,
+      contact.pos,
+      contact.pos,  # For sphere-sphere, both contact points are the same
+      contact.frame[0],  # Normal is first row of frame
+      contact.dist,
+      g1,
+      g2,
+      contact_geometry,
+    )
+
+  elif type1 == GEO_PLANE and type2 == GEO_CAPSULE:
+    contact1, contact2 = plane_capsule(geom1, geom2)
+    # Write both contacts for plane-capsule
+    write_contact_newton(
+      nconmax_in,
+      contact1.pos,
+      contact1.pos,
+      contact1.frame[0],
+      contact1.dist,
+      g1,
+      g2,
+      contact_geometry,
+    )
+    write_contact_newton(
+      nconmax_in,
+      contact2.pos,
+      contact2.pos,
+      contact2.frame[0],
+      contact2.dist,
+      g1,
+      g2,
+      contact_geometry,
+    )
+
+  elif type1 == GEO_SPHERE and type2 == GEO_CAPSULE:
+    contact = sphere_capsule(geom1, geom2)
+    write_contact_newton(
+      nconmax_in,
+      contact.pos,
+      contact.pos,
+      contact.frame[0],
+      contact.dist,
+      g1,
+      g2,
+      contact_geometry,
+    )
+
+  elif type1 == GEO_SPHERE and type2 == GEO_BOX:
+    contact = sphere_box(geom1, geom2, 0.0)  # No margin for Newton contacts
+    write_contact_newton(
+      nconmax_in,
+      contact.pos,
+      contact.pos,
+      contact.frame[0],
+      contact.dist,
+      g1,
+      g2,
+      contact_geometry,
+    )
+
+  elif type1 == GEO_CAPSULE and type2 == GEO_CAPSULE:
+    contact = capsule_capsule(geom1, geom2)
+    write_contact_newton(
+      nconmax_in,
+      contact.pos,
+      contact.pos,
+      contact.frame[0],
+      contact.dist,
+      g1,
+      g2,
+      contact_geometry,
+    )
+
+  elif type1 == GEO_PLANE and type2 == GEO_BOX:
+    contact1, contact2, contact3, contact4, count = plane_box(geom1, geom2, 0.0)  # No margin for Newton
+    for i in range(count):
+      contact = contact1
+      if i == 1:
+        contact = contact2
+      elif i == 2:
+        contact = contact3
+      elif i == 3:
+        contact = contact4
+      write_contact_newton(
+        nconmax_in,
+        contact.pos,
+        contact.pos,
+        contact.frame[0],
+        contact.dist,
+        g1,
+        g2,
+        contact_geometry,
+      )
+
+  elif type1 == GEO_PLANE and type2 == GEO_MESH:
+    contact1, contact2, contact3, contact4, count = plane_convex(geom1, geom2)
+    for i in range(count):
+      contact = contact1
+      if i == 1:
+        contact = contact2
+      elif i == 2:
+        contact = contact3
+      elif i == 3:
+        contact = contact4
+      write_contact_newton(
+        nconmax_in,
+        contact.pos,
+        contact.pos,
+        contact.frame[0],
+        contact.dist,
+        g1,
+        g2,
+        contact_geometry,
+      )
+
+  elif type1 == GEO_SPHERE and type2 == GEO_CYLINDER:
+    contact = sphere_cylinder(geom1, geom2)
+    write_contact_newton(
+      nconmax_in,
+      contact.pos,
+      contact.pos,
+      contact.frame[0],
+      contact.dist,
+      g1,
+      g2,
+      contact_geometry,
+    )
+
+  elif type1 == GEO_PLANE and type2 == GEO_CYLINDER:
+    contact1, contact2, contact3, contact4, count = plane_cylinder(geom1, geom2, 0.0)  # No margin for Newton
+    for i in range(count):
+      contact = contact1
+      if i == 1:
+        contact = contact2
+      elif i == 2:
+        contact = contact3
+      elif i == 3:
+        contact = contact4
+      write_contact_newton(
+        nconmax_in,
+        contact.pos,
+        contact.pos,
+        contact.frame[0],
+        contact.dist,
+        g1,
+        g2,
+        contact_geometry,
+      )
+
+  elif type1 == GEO_BOX and type2 == GEO_BOX:
+    contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8, count = box_box(geom1, geom2, 0.0)  # No margin for Newton
+    for i in range(count):
+      contact = contact1
+      if i == 1:
+        contact = contact2
+      elif i == 2:
+        contact = contact3
+      elif i == 3:
+        contact = contact4
+      elif i == 4:
+        contact = contact5
+      elif i == 5:
+        contact = contact6
+      elif i == 6:
+        contact = contact7
+      elif i == 7:
+        contact = contact8
+      write_contact_newton(
+        nconmax_in,
+        contact.pos,
+        contact.pos,
+        contact.frame[0],
+        contact.dist,
+        g1,
+        g2,
+        contact_geometry,
+      )
+
+  elif type1 == GEO_CAPSULE and type2 == GEO_BOX:
+    contact1, contact2, count = capsule_box(geom1, geom2, 0.0)  # No margin for Newton
+    for i in range(count):
+      contact = contact1 if i == 0 else contact2
+      write_contact_newton(
+        nconmax_in,
+        contact.pos,
+        contact.pos,
+        contact.frame[0],
+        contact.dist,
+        g1,
+        g2,
+        contact_geometry,
+      )
+
+def primitive_narrowphase_newton(
+  # Model:
+  shape_geometry: ShapeGeometry,
+  convex_vert: wp.array(dtype=wp.vec3),  # Global vertex buffer of convex hulls
+  # Data in:
+  nconmax_in: int,
+  shape_transform: wp.array(dtype=wp.transform),
+  collision_pair_in: wp.array(dtype=wp.vec2i),
+  ncollision_in: wp.array(dtype=int),
+  # Data out:
+  contact_geometry: ContactGeometry,
+):
+  """Launch the Newton collision detection kernel.
+  
+  This function handles primitive collision detection for Newton physics.
+  It's a simplified version compared to MuJoCo's collision detection,
+  focusing only on the core geometric contact computation without 
+  additional parameters like friction, margins etc.
+  """
+  wp.launch(
+    _primitive_narrowphase_newton,
+    dim=nconmax_in,
+    inputs=[
+      shape_geometry.geom_type,
+      shape_geometry.geom_dataid,
+      shape_geometry.geom_size,
+      shape_geometry.mesh_vertadr,
+      shape_geometry.mesh_vertnum,
+      convex_vert,
+      nconmax_in,
+      shape_transform.pos,
+      shape_transform.rot,
+      collision_pair_in,
+      ncollision_in,
+    ],
+    outputs=[contact_geometry],
+  )
