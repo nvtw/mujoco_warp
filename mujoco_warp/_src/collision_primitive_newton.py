@@ -782,3 +782,104 @@ def plane_convex(
       count += 1
 
   return contact1, contact2, contact3, contact4, count
+
+
+@wp.func
+def plane_cylinder(
+  # In:
+  plane: Geom,
+  cylinder: Geom,
+  margin: float,
+):
+  """Calculates contacts between a cylinder and a plane."""
+  # Extract plane normal and cylinder axis
+  n = plane.normal
+  axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
+
+  # Project, make sure axis points toward plane
+  prjaxis = wp.dot(n, axis)
+  if prjaxis > 0:
+    axis = -axis
+    prjaxis = -prjaxis
+
+  # Compute normal distance from plane to cylinder center
+  dist0 = wp.dot(cylinder.pos - plane.pos, n)
+
+  # Remove component of -normal along cylinder axis
+  vec = axis * prjaxis - n
+  len_sqr = wp.dot(vec, vec)
+
+  # If vector is nondegenerate, normalize and scale by radius
+  # Otherwise use cylinder's x-axis scaled by radius
+  vec = wp.where(
+    len_sqr >= 1e-12,
+    vec * (cylinder.size[0] / wp.sqrt(len_sqr)),
+    wp.vec3(cylinder.rot[0, 0], cylinder.rot[1, 0], cylinder.rot[2, 0]) * cylinder.size[0],
+  )
+
+  # Project scaled vector on normal
+  prjvec = wp.dot(vec, n)
+
+  # Scale cylinder axis by half-length
+  axis = axis * cylinder.size[1]
+  prjaxis = prjaxis * cylinder.size[1]
+
+  frame = make_frame(n)
+  count = int(0)
+
+  contact1 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
+  contact2 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
+  contact3 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
+  contact4 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
+
+  # First contact point (end cap closer to plane)
+  dist1 = dist0 + prjaxis + prjvec
+  if dist1 <= margin:
+    pos1 = cylinder.pos + vec + axis - n * (dist1 * 0.5)
+    contact1 = ContactFrame(pos=pos1, frame=frame, dist=dist1)
+    count = 1
+  else:
+    # If nearest point is above margin, no contacts
+    return contact1, contact2, contact3, contact4, count
+
+  # Second contact point (end cap farther from plane)
+  dist2 = dist0 - prjaxis + prjvec
+  if dist2 <= margin:
+    pos2 = cylinder.pos + vec - axis - n * (dist2 * 0.5)
+    if count == 0:
+      contact1 = ContactFrame(pos=pos2, frame=frame, dist=dist2)
+    else:
+      contact2 = ContactFrame(pos=pos2, frame=frame, dist=dist2)
+    count = count + 1
+
+  # Try triangle contact points on side closer to plane
+  prjvec1 = -prjvec * 0.5
+  dist3 = dist0 + prjaxis + prjvec1
+  if dist3 <= margin:
+    # Compute sideways vector scaled by radius*sqrt(3)/2
+    vec1 = wp.cross(vec, axis)
+    vec1 = wp.normalize(vec1) * (cylinder.size[0] * wp.sqrt(3.0) * 0.5)
+
+    # Add contact point A - adjust to closest side
+    pos3 = cylinder.pos + vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
+    if count == 0:
+      contact1 = ContactFrame(pos=pos3, frame=frame, dist=dist3)
+    elif count == 1:
+      contact2 = ContactFrame(pos=pos3, frame=frame, dist=dist3)
+    elif count:
+      contact3 = ContactFrame(pos=pos3, frame=frame, dist=dist3)
+    count = count + 1
+
+    # Add contact point B - adjust to closest side
+    pos4 = cylinder.pos - vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
+    if count == 0:
+      contact1 = ContactFrame(pos=pos4, frame=frame, dist=dist3)
+    elif count == 1:
+      contact2 = ContactFrame(pos=pos4, frame=frame, dist=dist3)
+    elif count == 2:
+      contact3 = ContactFrame(pos=pos4, frame=frame, dist=dist3)
+    else:
+      contact4 = ContactFrame(pos=pos4, frame=frame, dist=dist3)
+    count = count + 1
+
+  return contact1, contact2, contact3, contact4, count

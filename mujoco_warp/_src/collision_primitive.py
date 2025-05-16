@@ -134,207 +134,6 @@ def write_contact(
 
 
 @wp.func
-def plane_cylinder(
-  # Data in:
-  nconmax_in: int,
-  # In:
-  plane: Geom,
-  cylinder: Geom,
-  worldid: int,
-  margin: float,
-  gap: float,
-  condim: int,
-  friction: vec5,
-  solref: wp.vec2f,
-  solreffriction: wp.vec2f,
-  solimp: vec5,
-  geoms: wp.vec2i,
-  # Data out:
-  ncon_out: wp.array(dtype=int),
-  contact_dist_out: wp.array(dtype=float),
-  contact_pos_out: wp.array(dtype=wp.vec3),
-  contact_frame_out: wp.array(dtype=wp.mat33),
-  contact_includemargin_out: wp.array(dtype=float),
-  contact_friction_out: wp.array(dtype=vec5),
-  contact_solref_out: wp.array(dtype=wp.vec2),
-  contact_solreffriction_out: wp.array(dtype=wp.vec2),
-  contact_solimp_out: wp.array(dtype=vec5),
-  contact_dim_out: wp.array(dtype=int),
-  contact_geom_out: wp.array(dtype=wp.vec2i),
-  contact_worldid_out: wp.array(dtype=int),
-):
-  """Calculates contacts between a cylinder and a plane."""
-  # Extract plane normal and cylinder axis
-  n = plane.normal
-  axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
-
-  # Project, make sure axis points toward plane
-  prjaxis = wp.dot(n, axis)
-  if prjaxis > 0:
-    axis = -axis
-    prjaxis = -prjaxis
-
-  # Compute normal distance from plane to cylinder center
-  dist0 = wp.dot(cylinder.pos - plane.pos, n)
-
-  # Remove component of -normal along cylinder axis
-  vec = axis * prjaxis - n
-  len_sqr = wp.dot(vec, vec)
-
-  # If vector is nondegenerate, normalize and scale by radius
-  # Otherwise use cylinder's x-axis scaled by radius
-  vec = wp.where(
-    len_sqr >= 1e-12,
-    vec * (cylinder.size[0] / wp.sqrt(len_sqr)),
-    wp.vec3(cylinder.rot[0, 0], cylinder.rot[1, 0], cylinder.rot[2, 0]) * cylinder.size[0],
-  )
-
-  # Project scaled vector on normal
-  prjvec = wp.dot(vec, n)
-
-  # Scale cylinder axis by half-length
-  axis = axis * cylinder.size[1]
-  prjaxis = prjaxis * cylinder.size[1]
-
-  frame = make_frame(n)
-
-  # First contact point (end cap closer to plane)
-  dist1 = dist0 + prjaxis + prjvec
-  if dist1 <= margin:
-    pos1 = cylinder.pos + vec + axis - n * (dist1 * 0.5)
-    write_contact(
-      nconmax_in,
-      dist1,
-      pos1,
-      frame,
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
-  else:
-    # If nearest point is above margin, no contacts
-    return
-
-  # Second contact point (end cap farther from plane)
-  dist2 = dist0 - prjaxis + prjvec
-  if dist2 <= margin:
-    pos2 = cylinder.pos + vec - axis - n * (dist2 * 0.5)
-    write_contact(
-      nconmax_in,
-      dist2,
-      pos2,
-      make_frame(plane.normal),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
-
-  # Try triangle contact points on side closer to plane
-  prjvec1 = -prjvec * 0.5
-  dist3 = dist0 + prjaxis + prjvec1
-  if dist3 <= margin:
-    # Compute sideways vector scaled by radius*sqrt(3)/2
-    vec1 = wp.cross(vec, axis)
-    vec1 = wp.normalize(vec1) * (cylinder.size[0] * wp.sqrt(3.0) * 0.5)
-
-    # Add contact point A - adjust to closest side
-    pos3 = cylinder.pos + vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
-    write_contact(
-      nconmax_in,
-      dist3,
-      pos3,
-      frame,
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
-
-    # Add contact point B - adjust to closest side
-    pos4 = cylinder.pos - vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
-    write_contact(
-      nconmax_in,
-      dist3,
-      pos4,
-      frame,
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
-
-
-@wp.func
 def contact_params(
   # Model:
   geom_condim: wp.array(dtype=int),
@@ -1487,32 +1286,43 @@ def _primitive_narrowphase(
       contact_worldid_out,
     )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.CYLINDER.value):
-    plane_cylinder(
-      nconmax_in,
-      geom1,
-      geom2,
-      worldid,
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
+    contact1, contact2, contact3, contact4, count = plane_cylinder(geom1, geom2, margin)
+    for i in range(count):
+      if i == 0:
+        contact = contact1
+      elif i == 1:
+        contact = contact2
+      elif i == 2:
+        contact = contact3
+      else:
+        contact = contact4
+      write_contact(
+        nconmax_in,
+        contact.dist,
+        contact.pos,
+        contact.frame,
+        margin,
+        gap,
+        condim,
+        friction,
+        solref,
+        solreffriction,
+        solimp,
+        geoms,
+        worldid,
+        ncon_out,
+        contact_dist_out,
+        contact_pos_out,
+        contact_frame_out,
+        contact_includemargin_out,
+        contact_friction_out,
+        contact_solref_out,
+        contact_solreffriction_out,
+        contact_solimp_out,
+        contact_dim_out,
+        contact_geom_out,
+        contact_worldid_out,
+      )
   elif type1 == int(GeomType.BOX.value) and type2 == int(GeomType.BOX.value):
     box_box(
       nconmax_in,
