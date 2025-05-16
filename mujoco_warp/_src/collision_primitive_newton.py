@@ -616,3 +616,56 @@ def capsule_box(
     return contact, contact2, 2
 
   return contact, ContactFrame(), 1
+
+
+@wp.func
+def plane_box(
+  # In:
+  plane: Geom,
+  box: Geom,
+  margin: float,
+):
+  count = int(0)
+  corner = wp.vec3()
+  dist = wp.dot(box.pos - plane.pos, plane.normal)
+
+  # Initialize contact frames
+  contact1 = ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
+  contact2 = ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
+  contact3 = ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
+  contact4 = ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
+  count = int(0)
+
+  # test all corners, pick bottom 4
+  for i in range(8):
+    # get corner in local coordinates
+    corner.x = wp.where(i & 1, box.size.x, -box.size.x)
+    corner.y = wp.where(i & 2, box.size.y, -box.size.y)
+    corner.z = wp.where(i & 4, box.size.z, -box.size.z)
+
+    # get corner in global coordinates relative to box center
+    corner = box.rot * corner
+
+    # compute distance to plane, skip if too far or pointing up
+    ldist = wp.dot(plane.normal, corner)
+    if dist + ldist > margin or ldist > 0:
+      continue
+
+    cdist = dist + ldist
+    frame = make_frame(plane.normal)
+    pos = corner + box.pos + (plane.normal * cdist / -2.0)
+
+    if count == 0:
+      contact1 = ContactFrame(pos=pos, frame=frame, dist=cdist)
+    elif count == 1:
+      contact2 = ContactFrame(pos=pos, frame=frame, dist=cdist)
+    elif count == 2:
+      contact3 = ContactFrame(pos=pos, frame=frame, dist=cdist)
+    elif count == 3:
+      contact4 = ContactFrame(pos=pos, frame=frame, dist=cdist)
+
+    count += 1
+    if count >= 4:
+      break
+
+  return contact1, contact2, contact3, contact4, count

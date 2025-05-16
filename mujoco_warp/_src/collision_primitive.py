@@ -133,90 +133,6 @@ def write_contact(
   return -1
 
 
-@wp.func
-def plane_box(
-  # Data in:
-  nconmax_in: int,
-  # In:
-  plane: Geom,
-  box: Geom,
-  worldid: int,
-  margin: float,
-  gap: float,
-  condim: int,
-  friction: vec5,
-  solref: wp.vec2f,
-  solreffriction: wp.vec2f,
-  solimp: vec5,
-  geoms: wp.vec2i,
-  # Data out:
-  ncon_out: wp.array(dtype=int),
-  contact_dist_out: wp.array(dtype=float),
-  contact_pos_out: wp.array(dtype=wp.vec3),
-  contact_frame_out: wp.array(dtype=wp.mat33),
-  contact_includemargin_out: wp.array(dtype=float),
-  contact_friction_out: wp.array(dtype=vec5),
-  contact_solref_out: wp.array(dtype=wp.vec2),
-  contact_solreffriction_out: wp.array(dtype=wp.vec2),
-  contact_solimp_out: wp.array(dtype=vec5),
-  contact_dim_out: wp.array(dtype=int),
-  contact_geom_out: wp.array(dtype=wp.vec2i),
-  contact_worldid_out: wp.array(dtype=int),
-):
-  count = int(0)
-  corner = wp.vec3()
-  dist = wp.dot(box.pos - plane.pos, plane.normal)
-
-  # test all corners, pick bottom 4
-  for i in range(8):
-    # get corner in local coordinates
-    corner.x = wp.where(i & 1, box.size.x, -box.size.x)
-    corner.y = wp.where(i & 2, box.size.y, -box.size.y)
-    corner.z = wp.where(i & 4, box.size.z, -box.size.z)
-
-    # get corner in global coordinates relative to box center
-    corner = box.rot * corner
-
-    # compute distance to plane, skip if too far or pointing up
-    ldist = wp.dot(plane.normal, corner)
-    if dist + ldist > margin or ldist > 0:
-      continue
-
-    cdist = dist + ldist
-    frame = make_frame(plane.normal)
-    pos = corner + box.pos + (plane.normal * cdist / -2.0)
-    write_contact(
-      nconmax_in,
-      cdist,
-      pos,
-      frame,
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
-    count += 1
-    if count >= 4:
-      break
-
-
 _HUGE_VAL = 1e6
 
 
@@ -1365,32 +1281,124 @@ def _primitive_narrowphase(
       contact_worldid_out,
     )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.BOX.value):
-    plane_box(
-      nconmax_in,
+    contact1, contact2, contact3, contact4, count = plane_box(
       geom1,
       geom2,
-      worldid,
       margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
     )
+    if count > 0:
+      write_contact(
+        nconmax_in,
+        contact1.dist,
+        contact1.pos,
+        contact1.frame,
+        margin,
+        gap,
+        condim,
+        friction,
+        solref,
+        solreffriction,
+        solimp,
+        geoms,
+        worldid,
+        ncon_out,
+        contact_dist_out,
+        contact_pos_out,
+        contact_frame_out,
+        contact_includemargin_out,
+        contact_friction_out,
+        contact_solref_out,
+        contact_solreffriction_out,
+        contact_solimp_out,
+        contact_dim_out,
+        contact_geom_out,
+        contact_worldid_out,
+      )
+    if count > 1:
+      write_contact(
+        nconmax_in,
+        contact2.dist,
+        contact2.pos,
+        contact2.frame,
+        margin,
+        gap,
+        condim,
+        friction,
+        solref,
+        solreffriction,
+        solimp,
+        geoms,
+        worldid,
+        ncon_out,
+        contact_dist_out,
+        contact_pos_out,
+        contact_frame_out,
+        contact_includemargin_out,
+        contact_friction_out,
+        contact_solref_out,
+        contact_solreffriction_out,
+        contact_solimp_out,
+        contact_dim_out,
+        contact_geom_out,
+        contact_worldid_out,
+      )
+    if count > 2:
+      write_contact(
+        nconmax_in,
+        contact3.dist,
+        contact3.pos,
+        contact3.frame,
+        margin,
+        gap,
+        condim,
+        friction,
+        solref,
+        solreffriction,
+        solimp,
+        geoms,
+        worldid,
+        ncon_out,
+        contact_dist_out,
+        contact_pos_out,
+        contact_frame_out,
+        contact_includemargin_out,
+        contact_friction_out,
+        contact_solref_out,
+        contact_solreffriction_out,
+        contact_solimp_out,
+        contact_dim_out,
+        contact_geom_out,
+        contact_worldid_out,
+      )
+    if count > 3:
+      write_contact(
+        nconmax_in,
+        contact4.dist,
+        contact4.pos,
+        contact4.frame,
+        margin,
+        gap,
+        condim,
+        friction,
+        solref,
+        solreffriction,
+        solimp,
+        geoms,
+        worldid,
+        ncon_out,
+        contact_dist_out,
+        contact_pos_out,
+        contact_frame_out,
+        contact_includemargin_out,
+        contact_friction_out,
+        contact_solref_out,
+        contact_solreffriction_out,
+        contact_solimp_out,
+        contact_dim_out,
+        contact_geom_out,
+        contact_worldid_out,
+      )
+
   elif type1 == int(GeomType.CAPSULE.value) and type2 == int(GeomType.CAPSULE.value):
     contact = capsule_capsule(geom1, geom2)
     write_contact(
