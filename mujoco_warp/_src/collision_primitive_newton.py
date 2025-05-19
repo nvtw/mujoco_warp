@@ -1382,13 +1382,6 @@ def box_box(
   return contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8, min(8, n)
 
 
-
-
-
-
-
-
-
 # newton/geometry/types.py (or within geometry/__init__.py)
 
 # Shape geometry types
@@ -1434,9 +1427,6 @@ class ContactGeometry:  # This remains the output data structure
   rigid_contact_thickness: wp.array(dtype=float)
   rigid_contact_shape0_idx: wp.array(dtype=int)
   rigid_contact_shape1_idx: wp.array(dtype=int)
-
-  
-
 
 
 @wp.func
@@ -1681,7 +1671,9 @@ def _primitive_narrowphase_newton(
       )
 
   elif type1 == GEO_BOX and type2 == GEO_BOX:
-    contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8, count = box_box(geom1, geom2, 0.0)  # No margin for Newton
+    contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8, count = box_box(
+      geom1, geom2, 0.0
+    )  # No margin for Newton
     for i in range(count):
       contact = contact1
       if i == 1:
@@ -1724,6 +1716,7 @@ def _primitive_narrowphase_newton(
         contact_geometry,
       )
 
+
 def primitive_narrowphase_newton(
   # Model:
   shape_geometry: ShapeGeometry,
@@ -1737,10 +1730,10 @@ def primitive_narrowphase_newton(
   contact_geometry: ContactGeometry,
 ):
   """Launch the Newton collision detection kernel.
-  
+
   This function handles primitive collision detection for Newton physics.
   It's a simplified version compared to MuJoCo's collision detection,
-  focusing only on the core geometric contact computation without 
+  focusing only on the core geometric contact computation without
   additional parameters like friction, margins etc.
   """
   wp.launch(
