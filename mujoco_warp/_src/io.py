@@ -38,14 +38,14 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
     if unsupported.any():
       raise NotImplementedError(f"{field_str} {field[unsupported]} not supported.")
 
+  if np.isin(mjm.wrap_type, [types.WrapType.SPHERE, types.WrapType.CYLINDER]).any():
+    raise NotImplementedError("Tendon geom wrapping not supported.")
+
   if mjm.nplugin > 0:
     raise NotImplementedError("Plugins are unsupported.")
 
-  if mjm.nflex > 0:
-    raise NotImplementedError("Flex is unsupported.")
-
-  if mjm.tendon_frictionloss.any():
-    raise NotImplementedError("Tendon frictionloss is unsupported.")
+  if mjm.nflex > 1:
+    raise NotImplementedError("Only one flex is unsupported.")
 
   if mjm.geom_fluid.any():
     raise NotImplementedError("Ellipsoid fluid model not implemented.")
@@ -266,6 +266,11 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
     nsite=mjm.nsite,
     ncam=mjm.ncam,
     nlight=mjm.nlight,
+    nflex=mjm.nflex,
+    nflexvert=mjm.nflexvert,
+    nflexedge=mjm.nflexedge,
+    nflexelem=mjm.nflexelem,
+    nflexelemdata=mjm.nflexelemdata,
     nexclude=mjm.nexclude,
     neq=mjm.nM,
     nmocap=mjm.nmocap,
@@ -400,7 +405,9 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
     geom_margin=create_nmodel_batched_array(mjm.geom_margin, dtype=float),
     geom_gap=create_nmodel_batched_array(mjm.geom_gap, dtype=float),
     geom_rgba=create_nmodel_batched_array(mjm.geom_rgba, dtype=wp.vec4),
+    site_type=wp.array(mjm.site_type, dtype=int),
     site_bodyid=wp.array(mjm.site_bodyid, dtype=int),
+    site_size=wp.array(mjm.site_size, dtype=wp.vec3),
     site_pos=create_nmodel_batched_array(mjm.site_pos, dtype=wp.vec3),
     site_quat=create_nmodel_batched_array(mjm.site_quat, dtype=wp.quat),
     cam_mode=wp.array(mjm.cam_mode, dtype=int),
@@ -423,6 +430,18 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
     light_poscom0=create_nmodel_batched_array(mjm.light_poscom0, dtype=wp.vec3),
     light_pos0=create_nmodel_batched_array(mjm.light_pos0, dtype=wp.vec3),
     light_dir0=create_nmodel_batched_array(mjm.light_dir0, dtype=wp.vec3),
+    flex_dim=wp.array(mjm.flex_dim, dtype=int),
+    flex_vertadr=wp.array(mjm.flex_vertadr, dtype=int),
+    flex_vertnum=wp.array(mjm.flex_vertnum, dtype=int),
+    flex_edgeadr=wp.array(mjm.flex_edgeadr, dtype=int),
+    flex_elemedgeadr=wp.array(mjm.flex_elemedgeadr, dtype=int),
+    flex_vertbodyid=wp.array(mjm.flex_vertbodyid, dtype=int),
+    flex_edge=wp.array(mjm.flex_edge, dtype=wp.vec2i),
+    flex_elem=wp.array(mjm.flex_elem, dtype=int),
+    flex_elemedge=wp.array(mjm.flex_elemedge, dtype=int),
+    flexedge_length0=wp.array(mjm.flexedge_length0, dtype=float),
+    flex_stiffness=wp.array(mjm.flex_stiffness.flatten(), dtype=float),
+    flex_damping=wp.array(mjm.flex_damping, dtype=float),
     mesh_vertadr=wp.array(mjm.mesh_vertadr, dtype=int),
     mesh_vertnum=wp.array(mjm.mesh_vertnum, dtype=int),
     mesh_vert=wp.array(mjm.mesh_vert, dtype=wp.vec3),
@@ -484,8 +503,14 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
     tendon_limited_adr=wp.array(np.nonzero(mjm.tendon_limited)[0], dtype=wp.int32, ndim=1),
     tendon_solref_lim=create_nmodel_batched_array(mjm.tendon_solref_lim, dtype=wp.vec2f),
     tendon_solimp_lim=create_nmodel_batched_array(mjm.tendon_solimp_lim, dtype=types.vec5),
+    tendon_solref_fri=create_nmodel_batched_array(mjm.tendon_solref_fri, dtype=wp.vec2f),
+    tendon_solimp_fri=create_nmodel_batched_array(mjm.tendon_solimp_fri, dtype=types.vec5),
     tendon_range=create_nmodel_batched_array(mjm.tendon_range, dtype=wp.vec2f),
     tendon_margin=create_nmodel_batched_array(mjm.tendon_margin, dtype=float),
+    tendon_stiffness=create_nmodel_batched_array(mjm.tendon_stiffness, dtype=float),
+    tendon_damping=create_nmodel_batched_array(mjm.tendon_damping, dtype=float),
+    tendon_frictionloss=create_nmodel_batched_array(mjm.tendon_frictionloss, dtype=float),
+    tendon_lengthspring=create_nmodel_batched_array(mjm.tendon_lengthspring, dtype=wp.vec2),
     tendon_length0=create_nmodel_batched_array(mjm.tendon_length0, dtype=float),
     tendon_invweight0=create_nmodel_batched_array(mjm.tendon_invweight0, dtype=float),
     wrap_objid=wp.array(mjm.wrap_objid, dtype=int),
@@ -517,7 +542,11 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
       dtype=int,
     ),
     sensor_acc_adr=wp.array(
-      np.nonzero(mjm.sensor_needstage == mujoco.mjtStage.mjSTAGE_ACC)[0],
+      np.nonzero((mjm.sensor_needstage == mujoco.mjtStage.mjSTAGE_ACC) & (mjm.sensor_type != mujoco.mjtSensor.mjSENS_TOUCH))[0],
+      dtype=int,
+    ),
+    sensor_touch_adr=wp.array(
+      np.nonzero(mjm.sensor_type == mujoco.mjtSensor.mjSENS_TOUCH)[0],
       dtype=int,
     ),
     sensor_subtree_vel=np.isin(
@@ -570,6 +599,7 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
     nl=wp.zeros(1, dtype=int),
     nefc=wp.zeros(1, dtype=int),
     time=wp.zeros(nworld, dtype=float),
+    energy=wp.zeros(nworld, dtype=wp.vec2),
     qpos=wp.zeros((nworld, mjm.nq), dtype=float),
     qvel=wp.zeros((nworld, mjm.nv), dtype=float),
     act=wp.zeros((nworld, mjm.na), dtype=float),
@@ -601,6 +631,9 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
     subtree_com=wp.zeros((nworld, mjm.nbody), dtype=wp.vec3),
     cdof=wp.zeros((nworld, mjm.nv), dtype=wp.spatial_vector),
     cinert=wp.zeros((nworld, mjm.nbody), dtype=types.vec10),
+    flexvert_xpos=wp.zeros((nworld, mjm.nflexvert), dtype=wp.vec3),
+    flexedge_length=wp.zeros((nworld, mjm.nflexedge), dtype=wp.float32),
+    flexedge_velocity=wp.zeros((nworld, mjm.nflexedge), dtype=wp.float32),
     actuator_length=wp.zeros((nworld, mjm.nu), dtype=float),
     actuator_moment=wp.zeros((nworld, mjm.nu, mjm.nv), dtype=float),
     crb=wp.zeros((nworld, mjm.nbody), dtype=types.vec10),
@@ -695,10 +728,10 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
       cost_candidate=wp.zeros((nworld,), dtype=float),
       quad_total_candidate=wp.zeros((nworld,), dtype=wp.vec3f),
       # elliptic cone
-      u=wp.zeros((nworld,), dtype=float),
-      uu=wp.zeros((nworld,), dtype=float),
-      uv=wp.zeros((nworld,), dtype=float),
-      vv=wp.zeros((nworld,), dtype=float),
+      u=wp.zeros((nconmax,), dtype=types.vec6),
+      uu=wp.zeros((nconmax,), dtype=float),
+      uv=wp.zeros((nconmax,), dtype=float),
+      vv=wp.zeros((nconmax,), dtype=float),
       condim=wp.zeros((njmax,), dtype=int),
     ),
     # RK4
@@ -863,6 +896,7 @@ def put_data(
     nl=arr([mjd.nl * nworld]),
     nefc=arr([mjd.nefc * nworld]),
     time=arr(mjd.time * np.ones(nworld)),
+    energy=tile(mjd.energy, dtype=wp.vec2),
     qpos=tile(mjd.qpos),
     qvel=tile(mjd.qvel),
     act=tile(mjd.act),
@@ -894,6 +928,9 @@ def put_data(
     subtree_com=tile(mjd.subtree_com, dtype=wp.vec3),
     cdof=tile(mjd.cdof, dtype=wp.spatial_vector),
     cinert=tile(mjd.cinert, dtype=types.vec10),
+    flexvert_xpos=tile(mjd.flexvert_xpos, dtype=wp.vec3),
+    flexedge_length=tile(mjd.flexedge_length),
+    flexedge_velocity=tile(mjd.flexedge_velocity),
     actuator_length=tile(mjd.actuator_length),
     actuator_moment=tile(actuator_moment),
     crb=tile(mjd.crb, dtype=types.vec10),
@@ -984,7 +1021,7 @@ def put_data(
       cost_candidate=wp.empty(shape=(nworld, mjm.opt.ls_iterations), dtype=float),
       quad_total_candidate=wp.empty(shape=(nworld, mjm.opt.ls_iterations), dtype=wp.vec3f),
       # TODO(team): skip allocation if not ellpitic
-      u=wp.empty((nconmax, 6), dtype=float),
+      u=wp.empty((nconmax,), dtype=types.vec6),
       uu=wp.empty((nconmax,), dtype=float),
       uv=wp.empty((nconmax,), dtype=float),
       vv=wp.empty((nconmax,), dtype=float),
@@ -1048,6 +1085,7 @@ def get_data_into(
     mujoco._functions._realloc_con_efc(result, ncon=ncon, nefc=nefc)
 
   result.time = d.time.numpy()[0]
+  result.energy = d.energy.numpy()[0]
   result.ne = d.ne.numpy()[0]
   result.qpos[:] = d.qpos.numpy()[0]
   result.qvel[:] = d.qvel.numpy()[0]
@@ -1073,6 +1111,9 @@ def get_data_into(
   result.light_xpos = d.light_xpos.numpy()[0]
   result.light_xdir = d.light_xdir.numpy()[0]
   result.cinert = d.cinert.numpy()[0]
+  result.flexvert_xpos = d.flexvert_xpos.numpy()[0]
+  result.flexedge_length = d.flexedge_length.numpy()[0]
+  result.flexedge_velocity = d.flexedge_velocity.numpy()[0]
   result.cdof = d.cdof.numpy()[0]
   result.crb = d.crb.numpy()[0]
   result.qLDiagInv = d.qLDiagInv.numpy()[0]
