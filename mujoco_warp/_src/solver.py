@@ -2346,7 +2346,7 @@ def _update_gradient(m: types.Model, d: types.Data):
       )
 
     # TODO(team): Define good threshold for blocked vs non-blocked cholesky
-    if m.nv < 1:
+    if m.nv < 32:
       wp.launch_tiled(
         update_gradient_cholesky(m.nv),
         dim=(d.nworld,),
