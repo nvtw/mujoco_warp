@@ -317,8 +317,7 @@ def sap_broadphase(m: Model, d: Data):
     ],
   )
 
-  # TODO(team): Find the right threshold for tile sort - tile sort required that all nworldgeom values to sort can fit into shared memory
-  if m.ngeom > 1000:
+  if m.ngeom > m.opt.broad_phase_tile_sort_threshold:
     wp.utils.segmented_sort_pairs(
       d.sap_projection_lower,
       d.sap_sort_index,

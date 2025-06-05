@@ -303,6 +303,7 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
       tolerance=mjm.opt.tolerance,
       ls_tolerance=mjm.opt.ls_tolerance,
       gravity=wp.vec3(mjm.opt.gravity),
+      magnetic=wp.vec3(mjm.opt.magnetic),
       wind=wp.vec3(mjm.opt.wind[0], mjm.opt.wind[1], mjm.opt.wind[2]),
       density=mjm.opt.density,
       viscosity=mjm.opt.viscosity,
@@ -312,6 +313,7 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
       ls_iterations=mjm.opt.ls_iterations,
       integrator=mjm.opt.integrator,
       disableflags=mjm.opt.disableflags,
+      enableflags=mjm.opt.enableflags,
       impratio=mjm.opt.impratio,
       is_sparse=mujoco.mj_isSparse(mjm),
       ls_parallel=False,
@@ -319,6 +321,7 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
       epa_iterations=12,
       epa_exact_neg_distance=wp.bool(False),
       depth_extension=0.1,
+      broad_phase_tile_sort_threshold=1000,
     ),
     stat=types.Statistic(
       meaninertia=mjm.stat.meaninertia,
@@ -523,12 +526,14 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
     tendon_adr=wp.array(mjm.tendon_adr, dtype=int),
     tendon_num=wp.array(mjm.tendon_num, dtype=int),
     tendon_limited=wp.array(mjm.tendon_limited, dtype=int),
-    tendon_limited_adr=wp.array(np.nonzero(mjm.tendon_limited)[0], dtype=wp.int32, ndim=1),
+    tendon_limited_adr=wp.array(np.nonzero(mjm.tendon_limited)[0], dtype=int),
+    tendon_actfrclimited=wp.array(mjm.tendon_actfrclimited, dtype=bool),
     tendon_solref_lim=create_nmodel_batched_array(mjm.tendon_solref_lim, dtype=wp.vec2f),
     tendon_solimp_lim=create_nmodel_batched_array(mjm.tendon_solimp_lim, dtype=types.vec5),
     tendon_solref_fri=create_nmodel_batched_array(mjm.tendon_solref_fri, dtype=wp.vec2f),
     tendon_solimp_fri=create_nmodel_batched_array(mjm.tendon_solimp_fri, dtype=types.vec5),
     tendon_range=create_nmodel_batched_array(mjm.tendon_range, dtype=wp.vec2f),
+    tendon_actfrcrange=create_nmodel_batched_array(mjm.tendon_actfrcrange, dtype=wp.vec2),
     tendon_margin=create_nmodel_batched_array(mjm.tendon_margin, dtype=float),
     tendon_stiffness=create_nmodel_batched_array(mjm.tendon_stiffness, dtype=float),
     tendon_damping=create_nmodel_batched_array(mjm.tendon_damping, dtype=float),
@@ -629,6 +634,7 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
     qvel=wp.zeros((nworld, mjm.nv), dtype=float),
     act=wp.zeros((nworld, mjm.na), dtype=float),
     qacc_warmstart=wp.zeros((nworld, mjm.nv), dtype=float),
+    qacc_discrete=wp.zeros((nworld, mjm.nv), dtype=float),
     ctrl=wp.zeros((nworld, mjm.nu), dtype=float),
     qfrc_applied=wp.zeros((nworld, mjm.nv), dtype=float),
     xfrc_applied=wp.zeros((nworld, mjm.nbody), dtype=wp.spatial_vector),
@@ -683,6 +689,7 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
     qfrc_smooth=wp.zeros((nworld, mjm.nv), dtype=float),
     qacc_smooth=wp.zeros((nworld, mjm.nv), dtype=float),
     qfrc_constraint=wp.zeros((nworld, mjm.nv), dtype=float),
+    qfrc_inverse=wp.zeros((nworld, mjm.nv), dtype=float),
     contact=types.Contact(
       dist=wp.zeros((nconmax,), dtype=float),
       pos=wp.zeros((nconmax,), dtype=wp.vec3f),
@@ -793,6 +800,7 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
     ten_J=wp.zeros((nworld, mjm.ntendon, mjm.nv), dtype=float),
     ten_wrapadr=wp.zeros((nworld, mjm.ntendon), dtype=int),
     ten_wrapnum=wp.zeros((nworld, mjm.ntendon), dtype=int),
+    ten_actfrc=wp.zeros((nworld, mjm.ntendon), dtype=float),
     wrap_obj=wp.zeros((nworld, mjm.nwrap), dtype=wp.vec2i),
     wrap_xpos=wp.zeros((nworld, mjm.nwrap), dtype=wp.spatial_vector),
     wrap_geom_xpos=wp.zeros((nworld, mjm.nwrap), dtype=wp.spatial_vector),
@@ -926,6 +934,7 @@ def put_data(
     qvel=tile(mjd.qvel),
     act=tile(mjd.act),
     qacc_warmstart=tile(mjd.qacc_warmstart),
+    qacc_discrete=wp.zeros((nworld, mjm.nv), dtype=float),
     ctrl=tile(mjd.ctrl),
     qfrc_applied=tile(mjd.qfrc_applied),
     xfrc_applied=tile(mjd.xfrc_applied, dtype=wp.spatial_vector),
@@ -980,6 +989,7 @@ def put_data(
     qfrc_smooth=tile(mjd.qfrc_smooth),
     qacc_smooth=tile(mjd.qacc_smooth),
     qfrc_constraint=tile(mjd.qfrc_constraint),
+    qfrc_inverse=tile(mjd.qfrc_inverse),
     contact=types.Contact(
       dist=padtile(mjd.contact.dist, nconmax),
       pos=padtile(mjd.contact.pos, nconmax, dtype=wp.vec3),
@@ -1086,6 +1096,7 @@ def put_data(
     ten_J=tile(ten_J),
     ten_wrapadr=tile(mjd.ten_wrapadr),
     ten_wrapnum=tile(mjd.ten_wrapnum),
+    ten_actfrc=wp.zeros((nworld, mjm.ntendon), dtype=float),
     wrap_obj=tile(mjd.wrap_obj, dtype=wp.vec2i),
     wrap_xpos=tile(mjd.wrap_xpos, dtype=wp.spatial_vector),
     wrap_geom_xpos=wp.zeros((nworld, mjm.nwrap), dtype=wp.spatial_vector),
@@ -1168,6 +1179,7 @@ def get_data_into(
   result.qfrc_actuator = d.qfrc_actuator.numpy()[0]
   result.qfrc_smooth = d.qfrc_smooth.numpy()[0]
   result.qfrc_constraint = d.qfrc_constraint.numpy()[0]
+  result.qfrc_inverse = d.qfrc_inverse.numpy()[0]
   result.qacc_smooth = d.qacc_smooth.numpy()[0]
   result.act = d.act.numpy()[0]
   result.act_dot = d.act_dot.numpy()[0]
