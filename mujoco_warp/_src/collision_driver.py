@@ -20,6 +20,7 @@ import warp as wp
 from .collision_convex import gjk_narrowphase
 from .collision_hfield import hfield_midphase
 from .collision_primitive import primitive_narrowphase
+from .math import upper_tri_index
 from .types import MJ_MAXVAL
 from .types import Data
 from .types import DisableBit
@@ -122,11 +123,6 @@ def _binary_search(values: wp.array(dtype=Any), value: Any, lower: int, upper: i
       lower = mid + 1
 
   return upper
-
-
-@wp.func
-def _upper_tri_index(n: int, i: int, j: int) -> int:
-  return (n * (n - 1) - (n - i) * (n - i - 1)) / 2 + j - i - 1
 
 
 @wp.kernel
@@ -232,9 +228,9 @@ def _sap_broadphase(
 
     # find linear index of (geom1, geom2) in upper triangular nxn_pairid
     if geom2 < geom1:
-      idx = _upper_tri_index(ngeom, geom2, geom1)
+      idx = upper_tri_index(ngeom, geom2, geom1)
     else:
-      idx = _upper_tri_index(ngeom, geom1, geom2)
+      idx = upper_tri_index(ngeom, geom1, geom2)
 
     if nxn_pairid[idx] < -1:
       worldgeomid += nsweep_in
@@ -347,7 +343,8 @@ def sap_broadphase(m: Model, d: Data):
   # scan is used for load balancing among the threads
   wp.utils.array_scan(d.sap_range.reshape(-1), d.sap_cumulative_sum, True)
 
-  # estimate number of overlap checks - assumes each geom has 5 other geoms (batched over all worlds)
+  # estimate number of overlap checks
+  # assumes each geom has 5 other geoms (batched over all worlds)
   nsweep = 5 * nworldgeom
   wp.launch(
     kernel=_sap_broadphase,
@@ -467,6 +464,7 @@ def collision(m: Model, d: Data):
 
   d.ncollision.zero_()
   d.ncon.zero_()
+  d.ncon_hfield.zero_()
 
   # Clear the collision_hftri_index buffer
   d.collision_hftri_index.zero_()
