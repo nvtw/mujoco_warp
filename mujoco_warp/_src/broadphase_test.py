@@ -100,9 +100,9 @@ class BroadphaseTest(parameterized.TestCase):
       mjm, _, m, d0 = test_util.fixture(xml=_XML, keyframe=0)
 
       if i == 0:
-        m.opt.broad_phase_tile_sort_threshold = 1000
+        m.opt.broadphase = int(mjwarp.types.BroadphaseType.SAP_TILE)
       else:
-        m.opt.broad_phase_tile_sort_threshold = 0
+        m.opt.broadphase = int(mjwarp.types.BroadphaseType.SAP_SEGMENTED)
 
       broadphase(m, d0)
       np.testing.assert_allclose(d0.ncollision.numpy()[0], 0)

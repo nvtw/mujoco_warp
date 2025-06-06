@@ -22,6 +22,7 @@ from .collision_hfield import hfield_midphase
 from .collision_primitive import primitive_narrowphase
 from .math import upper_tri_index
 from .types import MJ_MAXVAL
+from .types import BroadphaseType
 from .types import Data
 from .types import DisableBit
 from .types import GeomType
@@ -313,7 +314,7 @@ def sap_broadphase(m: Model, d: Data):
     ],
   )
 
-  if m.ngeom > m.opt.broad_phase_tile_sort_threshold:
+  if m.opt.broadphase == int(BroadphaseType.SAP_TILE):
     wp.utils.segmented_sort_pairs(
       d.sap_projection_lower,
       d.sap_sort_index,
@@ -476,8 +477,7 @@ def collision(m: Model, d: Data):
   if (dsbl_flgs & DisableBit.CONSTRAINT) | (dsbl_flgs & DisableBit.CONTACT):
     return
 
-  # TODO(team): determine ngeom to switch from n^2 to sap
-  if m.ngeom <= 100:
+  if m.opt.broadphase == int(BroadphaseType.NXN):
     nxn_broadphase(m, d)
   else:
     sap_broadphase(m, d)
