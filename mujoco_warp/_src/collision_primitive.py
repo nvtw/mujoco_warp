@@ -15,6 +15,10 @@
 
 import warp as wp
 
+from .math import closest_segment_point
+from .math import closest_segment_to_segment_points
+from .math import make_frame
+from .math import normalize_with_norm
 from .types import MJ_MINVAL
 from .types import Data
 from .types import GeomType
@@ -22,6 +26,8 @@ from .types import Model
 from .types import vec5
 
 from .collision_primitive_newton import *
+from .collision_primitive_newton import _sphere_sphere
+from .collision_primitive_newton import _sphere_box
 
 
 wp.set_module_options({"enable_backward": False})
@@ -71,8 +77,7 @@ def write_contact(
   # In:
   dist_in: float,
   pos_in: wp.vec3,
-  normal_in: wp.vec3,
-  tangent_in: wp.vec3,
+  frame_in: wp.mat33,
   margin_in: float,
   gap_in: float,
   condim_in: int,
@@ -102,8 +107,7 @@ def write_contact(
     if cid < nconmax_in:
       contact_dist_out[cid] = dist_in
       contact_pos_out[cid] = pos_in
-      tangent2 = wp.cross(normal_in, tangent_in)
-      contact_frame_out[cid] = wp.mat33(normal_in[0], normal_in[1], normal_in[2], tangent2[0], tangent2[1], tangent2[2], tangent_in[0], tangent_in[1], tangent_in[2])
+      contact_frame_out[cid] = frame_in
       contact_geom_out[cid] = geoms_in
       contact_worldid_out[cid] = worldid_in
       contact_includemargin_out[cid] = margin_in - gap_in
@@ -313,8 +317,7 @@ def _primitive_narrowphase(
       nconmax_in,
       contact.dist,
       contact.pos,
-      contact.normal,
-      contact.tangent,
+      contact.frame,
       margin,
       gap,
       condim,
@@ -348,8 +351,7 @@ def _primitive_narrowphase(
       nconmax_in,
       contact.dist,
       contact.pos,
-      contact.normal,
-      contact.tangent,
+      contact.frame,
       margin,
       gap,
       condim,
@@ -383,8 +385,7 @@ def _primitive_narrowphase(
         nconmax_in,
         contact.dist,
         contact.pos,
-        contact.normal,
-        contact.tangent,
+        contact.frame,
         margin,
         gap,
         condim,
@@ -426,8 +427,7 @@ def _primitive_narrowphase(
         nconmax_in,
         contact.dist,
         contact.pos,
-        contact.normal,
-        contact.tangent,
+        contact.frame,
         margin,
         gap,
         condim,
@@ -456,8 +456,7 @@ def _primitive_narrowphase(
       nconmax_in,
       contact.dist,
       contact.pos,
-      contact.normal,
-      contact.tangent,
+      contact.frame,
       margin,
       gap,
       condim,
@@ -498,8 +497,7 @@ def _primitive_narrowphase(
         nconmax_in,
         contact.dist,
         contact.pos,
-        contact.normal,
-        contact.tangent,
+        contact.frame,
         margin,
         gap,
         condim,
@@ -528,8 +526,7 @@ def _primitive_narrowphase(
       nconmax_in,
       contact.dist,
       contact.pos,
-      contact.normal,
-      contact.tangent,
+      contact.frame,
       margin,
       gap,
       condim,
@@ -558,8 +555,7 @@ def _primitive_narrowphase(
       nconmax_in,
       contact.dist,
       contact.pos,
-      contact.normal,
-      contact.tangent,
+      contact.frame,
       margin,
       gap,
       condim,
@@ -588,8 +584,7 @@ def _primitive_narrowphase(
       nconmax_in,
       contact.dist,
       contact.pos,
-      contact.normal,
-      contact.tangent,
+      contact.frame,
       margin,
       gap,
       condim,
@@ -627,8 +622,7 @@ def _primitive_narrowphase(
         nconmax_in,
         contact.dist,
         contact.pos,
-        contact.normal,
-        contact.tangent,
+        contact.frame,
         margin,
         gap,
         condim,
@@ -678,8 +672,7 @@ def _primitive_narrowphase(
         nconmax_in,
         contact.dist,
         contact.pos,
-        contact.normal,
-        contact.tangent,
+        contact.frame,
         margin,
         gap,
         condim,
@@ -713,8 +706,7 @@ def _primitive_narrowphase(
         nconmax_in,
         contact.dist,
         contact.pos,
-        contact.normal,
-        contact.tangent,
+        contact.frame,
         margin,
         gap,
         condim,

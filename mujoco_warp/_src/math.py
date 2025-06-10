@@ -211,15 +211,6 @@ def make_frame(a: wp.vec3):
   )
   # fmt: on
 
-@wp.func
-def make_contact_frame(a: wp.vec3):
-  a = wp.normalize(a)
-  b, c = orthogonals(a)
-  # Return normal (a) and tangent (c)
-  # The normal represents the local frame's z-axis
-  # The tangent represents the local frame's x-axis
-  # The cross product of the normal and tangent represents the local frame's y-axis (c)
-  return a, c
 
 @wp.func
 def normalize_with_norm(x: Any):
