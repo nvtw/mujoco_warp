@@ -3,7 +3,7 @@ import warp as wp
 
 from .math import closest_segment_point
 from .math import closest_segment_to_segment_points
-from .math import make_frame
+from .math import make_contact_frame
 from .math import normalize_with_norm
 
 wp.config.enable_backward = False
@@ -23,10 +23,11 @@ class Geom:
 
 
 @wp.struct
-class ContactFrame:
+class ContactPoint:
   pos: wp.vec3
-  frame: wp.mat33  # The first row of the frame is the normal
-  dist: float
+  normal: wp.vec3  # The z-direction of the local contact frame
+  tangent: wp.vec3 # The x-direction of the local contact frame
+  depth: float
 
 
 @wp.func
@@ -41,15 +42,17 @@ def plane_sphere(
   # In:
   plane: Geom,
   sphere: Geom,
-) -> ContactFrame:
+) -> ContactPoint:
   dist, pos = _plane_sphere(plane.normal, plane.pos, sphere.pos, sphere.size[0])
 
   # Return contact frame using make_frame helper
-  return ContactFrame(pos=pos, frame=make_frame(plane.normal), dist=dist)
+  contact = ContactPoint(pos=pos, dist=dist)
+  contact.normal, contact.tangent = make_contact_frame(plane.normal)
+  return contact
 
 
 @wp.func
-def _sphere_sphere(pos1: wp.vec3, radius1: float, pos2: wp.vec3, radius2: float) -> ContactFrame:
+def _sphere_sphere(pos1: wp.vec3, radius1: float, pos2: wp.vec3, radius2: float) -> ContactPoint:
   dir = pos2 - pos1
   dist = wp.length(dir)
   if dist == 0.0:
@@ -59,7 +62,9 @@ def _sphere_sphere(pos1: wp.vec3, radius1: float, pos2: wp.vec3, radius2: float)
   dist = dist - (radius1 + radius2)
   pos = pos1 + n * (radius1 + 0.5 * dist)
 
-  return ContactFrame(pos=pos, frame=make_frame(n), dist=dist)
+  contact = ContactPoint(pos=pos, dist=dist)
+  contact.normal, contact.tangent = make_contact_frame(n)
+  return contact
 
 
 @wp.func
@@ -67,7 +72,7 @@ def sphere_sphere(
   # In:
   sphere1: Geom,
   sphere2: Geom,
-) -> ContactFrame:
+) -> ContactPoint:
   return _sphere_sphere(
     sphere1.pos,
     sphere1.size[0],
@@ -81,7 +86,7 @@ def sphere_capsule(
   # In:
   sphere: Geom,
   cap: Geom,
-) -> ContactFrame:
+) -> ContactPoint:
   """Calculates one contact between a sphere and a capsule."""
   axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
   length = cap.size[1]
@@ -104,7 +109,7 @@ def capsule_capsule(
   # In:
   cap1: Geom,
   cap2: Geom,
-) -> ContactFrame:
+) -> ContactPoint:
   """Calculates one contact between two capsules."""
   axis1 = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
   axis2 = wp.vec3(cap2.rot[0, 2], cap2.rot[1, 2], cap2.rot[2, 2])
@@ -147,13 +152,13 @@ def plane_capsule(
       b = wp.vec3(0.0, 0.0, 1.0)
 
   c = wp.cross(n, b)
-  frame = wp.mat33(n[0], n[1], n[2], b[0], b[1], b[2], c[0], c[1], c[2])
+  n, tangent = make_contact_frame(n)
   segment = axis * cap.size[1]
 
   dist1, pos1 = _plane_sphere(n, plane.pos, cap.pos + segment, cap.size[0])
   dist2, pos2 = _plane_sphere(n, plane.pos, cap.pos - segment, cap.size[0])
 
-  return ContactFrame(pos=pos1, frame=frame, dist=dist1), ContactFrame(pos=pos2, frame=frame, dist=dist2)
+  return ContactPoint(pos=pos1, normal=n, tangent=tangent, dist=dist1), ContactPoint(pos=pos2, normal=n, tangent=tangent, dist=dist2)
 
 
 @wp.func
@@ -165,7 +170,7 @@ def _sphere_sphere_ext(
   radius2: float,
   mat1: wp.mat33,
   mat2: wp.mat33,
-) -> ContactFrame:
+) -> ContactPoint:
   dir = pos2 - pos1
   dist = wp.length(dir)
   if dist == 0.0:
@@ -179,7 +184,9 @@ def _sphere_sphere_ext(
   dist = dist - (radius1 + radius2)
   pos = pos1 + n * (radius1 + 0.5 * dist)
 
-  return ContactFrame(pos=pos, frame=make_frame(n), dist=dist)
+  contact = ContactPoint(pos=pos, dist=dist)
+  contact.normal, contact.tangent = make_contact_frame(n)
+  return contact
 
 
 @wp.func
@@ -187,7 +194,7 @@ def sphere_cylinder(
   # In:
   sphere: Geom,
   cylinder: Geom,
-) -> ContactFrame:
+) -> ContactPoint:
   axis = wp.vec3(
     cylinder.rot[0, 2],
     cylinder.rot[1, 2],
@@ -240,7 +247,9 @@ def sphere_cylinder(
     dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere.pos, sphere.size[0])
     plane_normal = -plane_normal  # Flip normal after position calculation
 
-    return ContactFrame(pos=pos_contact, frame=make_frame(plane_normal), dist=dist)
+    contact = ContactPoint(pos=pos_contact, dist=dist)
+    contact.normal, contact.tangent = make_contact_frame(plane_normal)
+    return contact
 
   # Corner collision
   inv_len = 1.0 / wp.sqrt(p_proj_sqr)
@@ -262,14 +271,14 @@ def sphere_cylinder(
 @wp.func
 def _sphere_box(
   sphere_pos: wp.vec3, sphere_size: float, box_pos: wp.vec3, box_rot: wp.mat33, box_size: wp.vec3, margin: float
-) -> ContactFrame:
+) -> ContactPoint:
   center = wp.transpose(box_rot) @ (sphere_pos - box_pos)
 
   clamped = wp.max(-box_size, wp.min(box_size, center))
   clamped_dir, dist = normalize_with_norm(clamped - center)
 
   if dist - sphere_size > margin:
-    return ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=100000.0)
+    return ContactPoint(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=100000.0)
 
   # sphere center inside box
   if dist <= float(1e-8):
@@ -294,7 +303,9 @@ def _sphere_box(
     contact_dist = dist - sphere_size
 
   contact_pos = box_pos + box_rot @ pos
-  return ContactFrame(pos=contact_pos, frame=make_frame(contact_normal), dist=contact_dist)
+  contact = ContactPoint(pos=contact_pos, dist=contact_dist)
+  contact.normal, contact.tangent = make_contact_frame(contact_normal)
+  return contact
 
 
 @wp.func
@@ -303,7 +314,7 @@ def sphere_box(
   sphere: Geom,
   box: Geom,
   margin: float,
-) -> ContactFrame:
+) -> ContactPoint:
   return _sphere_box(sphere.pos, sphere.size[0], box.pos, box.rot, box.size, margin)
 
 
@@ -484,7 +495,7 @@ def capsule_box(
     c1 = wp.where((ee2 > 0) == w_neg, 1, 2)
 
   if cltype == -4:  # invalid type
-    return ContactFrame(), ContactFrame(), 0
+    return ContactPoint(), ContactPoint(), 0
 
   if cltype >= 0 and cltype / 3 != 1:  # closest to a corner of the box
     c1 = axisdir ^ clcorner
@@ -615,7 +626,7 @@ def capsule_box(
 
     return contact, contact2, 2
 
-  return contact, ContactFrame(), 1
+  return contact, ContactPoint(), 1
 
 
 @wp.func
@@ -630,10 +641,10 @@ def plane_box(
   dist = wp.dot(box.pos - plane.pos, plane.normal)
 
   # Initialize contact frames
-  contact1 = ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
-  contact2 = ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
-  contact3 = ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
-  contact4 = ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
+  contact1 = ContactPoint(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
+  contact2 = ContactPoint(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
+  contact3 = ContactPoint(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
+  contact4 = ContactPoint(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
   count = int(0)
 
   # test all corners, pick bottom 4
@@ -652,17 +663,17 @@ def plane_box(
       continue
 
     cdist = dist + ldist
-    frame = make_frame(plane.normal)
+    normal, tangent = make_contact_frame(plane.normal)
     pos = corner + box.pos + (plane.normal * cdist / -2.0)
 
     if count == 0:
-      contact1 = ContactFrame(pos=pos, frame=frame, dist=cdist)
+      contact1 = ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=cdist)
     elif count == 1:
-      contact2 = ContactFrame(pos=pos, frame=frame, dist=cdist)
+      contact2 = ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=cdist)
     elif count == 2:
-      contact3 = ContactFrame(pos=pos, frame=frame, dist=cdist)
+      contact3 = ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=cdist)
     elif count == 3:
-      contact4 = ContactFrame(pos=pos, frame=frame, dist=cdist)
+      contact4 = ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=cdist)
 
     count += 1
     if count >= 4:
@@ -749,11 +760,11 @@ def plane_convex(
       d_dist = dist_ap + dist_bp
 
   # Prepare contacts
-  frame = make_frame(plane.normal)
-  contact1 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
-  contact2 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
-  contact3 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
-  contact4 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
+  normal, tangent = make_contact_frame(plane.normal)
+  contact1 = ContactPoint(pos=wp.vec3(0.0), normal=normal, tangent=tangent, dist=0.0)
+  contact2 = ContactPoint(pos=wp.vec3(0.0), normal=normal, tangent=tangent, dist=0.0)
+  contact3 = ContactPoint(pos=wp.vec3(0.0), normal=normal, tangent=tangent, dist=0.0)
+  contact4 = ContactPoint(pos=wp.vec3(0.0), normal=normal, tangent=tangent, dist=0.0)
   count = int(0)
 
   for i in range(3, -1, -1):
@@ -772,13 +783,17 @@ def plane_convex(
       pos = pos - 0.5 * dist * plane.normal
 
       if count == 0:
-        contact1 = ContactFrame(pos=pos, frame=frame, dist=dist)
+        contact1.pos = pos
+        contact1.dist = dist
       elif count == 1:
-        contact2 = ContactFrame(pos=pos, frame=frame, dist=dist)
+        contact2.pos = pos
+        contact2.dist = dist
       elif count == 2:
-        contact3 = ContactFrame(pos=pos, frame=frame, dist=dist)
+        contact3.pos = pos
+        contact3.dist = dist
       elif count == 3:
-        contact4 = ContactFrame(pos=pos, frame=frame, dist=dist)
+        contact4.pos = pos
+        contact4.dist = dist
       count += 1
 
   return contact1, contact2, contact3, contact4, count
@@ -824,19 +839,20 @@ def plane_cylinder(
   axis = axis * cylinder.size[1]
   prjaxis = prjaxis * cylinder.size[1]
 
-  frame = make_frame(n)
+  normal, tangent = make_contact_frame(n)
   count = int(0)
 
-  contact1 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
-  contact2 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
-  contact3 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
-  contact4 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
+  contact1 = ContactPoint(pos=wp.vec3(0.0), normal=normal, tangent=tangent, dist=0.0)
+  contact2 = ContactPoint(pos=wp.vec3(0.0), normal=normal, tangent=tangent, dist=0.0)
+  contact3 = ContactPoint(pos=wp.vec3(0.0), normal=normal, tangent=tangent, dist=0.0)
+  contact4 = ContactPoint(pos=wp.vec3(0.0), normal=normal, tangent=tangent, dist=0.0)
 
   # First contact point (end cap closer to plane)
   dist1 = dist0 + prjaxis + prjvec
   if dist1 <= margin:
     pos1 = cylinder.pos + vec + axis - n * (dist1 * 0.5)
-    contact1 = ContactFrame(pos=pos1, frame=frame, dist=dist1)
+    contact1.pos = pos1
+    contact1.dist = dist1
     count = 1
   else:
     # If nearest point is above margin, no contacts
@@ -847,9 +863,11 @@ def plane_cylinder(
   if dist2 <= margin:
     pos2 = cylinder.pos + vec - axis - n * (dist2 * 0.5)
     if count == 0:
-      contact1 = ContactFrame(pos=pos2, frame=frame, dist=dist2)
+      contact1.pos = pos2
+      contact1.dist = dist2
     else:
-      contact2 = ContactFrame(pos=pos2, frame=frame, dist=dist2)
+      contact2.pos = pos2
+      contact2.dist = dist2
     count = count + 1
 
   # Try triangle contact points on side closer to plane
@@ -863,23 +881,30 @@ def plane_cylinder(
     # Add contact point A - adjust to closest side
     pos3 = cylinder.pos + vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
     if count == 0:
-      contact1 = ContactFrame(pos=pos3, frame=frame, dist=dist3)
+      contact1.pos = pos3
+      contact1.dist = dist3
     elif count == 1:
-      contact2 = ContactFrame(pos=pos3, frame=frame, dist=dist3)
+      contact2.pos = pos3
+      contact2.dist = dist3
     elif count:
-      contact3 = ContactFrame(pos=pos3, frame=frame, dist=dist3)
+      contact3.pos = pos3
+      contact3.dist = dist3
     count = count + 1
 
     # Add contact point B - adjust to closest side
     pos4 = cylinder.pos - vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
     if count == 0:
-      contact1 = ContactFrame(pos=pos4, frame=frame, dist=dist3)
+      contact1.pos = pos4
+      contact1.dist = dist3
     elif count == 1:
-      contact2 = ContactFrame(pos=pos4, frame=frame, dist=dist3)
+      contact2.pos = pos4
+      contact2.dist = dist3
     elif count == 2:
-      contact3 = ContactFrame(pos=pos4, frame=frame, dist=dist3)
+      contact3.pos = pos4
+      contact3.dist = dist3
     else:
-      contact4 = ContactFrame(pos=pos4, frame=frame, dist=dist3)
+      contact4.pos = pos4
+      contact4.dist = dist3
     count = count + 1
 
   return contact1, contact2, contact3, contact4, count
@@ -938,14 +963,14 @@ def box_box(
   # Compute transforms between box's frames
 
   # Initialize 8 empty contact frames
-  contact1 = ContactFrame()
-  contact2 = ContactFrame()
-  contact3 = ContactFrame()
-  contact4 = ContactFrame()
-  contact5 = ContactFrame()
-  contact6 = ContactFrame()
-  contact7 = ContactFrame()
-  contact8 = ContactFrame()
+  contact1 = ContactPoint()
+  contact2 = ContactPoint()
+  contact3 = ContactPoint()
+  contact4 = ContactPoint()
+  contact5 = ContactPoint()
+  contact6 = ContactPoint()
+  contact7 = ContactPoint()
+  contact8 = ContactPoint()
 
   pos21 = wp.transpose(box1.rot) @ (box2.pos - box1.pos)
   pos12 = wp.transpose(box2.rot) @ (box1.pos - box2.pos)
@@ -1352,7 +1377,7 @@ def box_box(
     pw = box1.pos
     normal = wp.where(inv, -1.0, 1.0) * rw @ rnorm
 
-  frame = make_frame(normal)
+  normal, tangent = make_contact_frame(normal)
 
   # prepare contacts
 
@@ -1360,7 +1385,7 @@ def box_box(
     points[i, 2] += hz
     pos = rw @ points[i] + pw
 
-    contact = ContactFrame(pos=pos, frame=frame, dist=depth[i])
+    contact = ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=depth[i])
 
     if i == 0:
       contact1 = contact
@@ -1511,7 +1536,7 @@ def _primitive_narrowphase_newton(
       nconmax_in,
       contact.pos,
       contact.pos,  # For plane-sphere, both contact points are the same
-      contact.frame[0],  # Normal is first row of frame
+      contact.normal,
       contact.dist,
       g1,
       g2,
@@ -1524,7 +1549,7 @@ def _primitive_narrowphase_newton(
       nconmax_in,
       contact.pos,
       contact.pos,  # For sphere-sphere, both contact points are the same
-      contact.frame[0],  # Normal is first row of frame
+      contact.normal,
       contact.dist,
       g1,
       g2,
@@ -1538,7 +1563,7 @@ def _primitive_narrowphase_newton(
       nconmax_in,
       contact1.pos,
       contact1.pos,
-      contact1.frame[0],
+      contact1.normal,
       contact1.dist,
       g1,
       g2,
@@ -1548,7 +1573,7 @@ def _primitive_narrowphase_newton(
       nconmax_in,
       contact2.pos,
       contact2.pos,
-      contact2.frame[0],
+      contact2.normal,
       contact2.dist,
       g1,
       g2,
@@ -1561,7 +1586,7 @@ def _primitive_narrowphase_newton(
       nconmax_in,
       contact.pos,
       contact.pos,
-      contact.frame[0],
+      contact.normal,
       contact.dist,
       g1,
       g2,
@@ -1574,7 +1599,7 @@ def _primitive_narrowphase_newton(
       nconmax_in,
       contact.pos,
       contact.pos,
-      contact.frame[0],
+      contact.normal,
       contact.dist,
       g1,
       g2,
@@ -1587,7 +1612,7 @@ def _primitive_narrowphase_newton(
       nconmax_in,
       contact.pos,
       contact.pos,
-      contact.frame[0],
+      contact.normal,
       contact.dist,
       g1,
       g2,
@@ -1608,7 +1633,7 @@ def _primitive_narrowphase_newton(
         nconmax_in,
         contact.pos,
         contact.pos,
-        contact.frame[0],
+        contact.normal,
         contact.dist,
         g1,
         g2,
@@ -1629,7 +1654,7 @@ def _primitive_narrowphase_newton(
         nconmax_in,
         contact.pos,
         contact.pos,
-        contact.frame[0],
+        contact.normal,
         contact.dist,
         g1,
         g2,
@@ -1642,7 +1667,7 @@ def _primitive_narrowphase_newton(
       nconmax_in,
       contact.pos,
       contact.pos,
-      contact.frame[0],
+      contact.normal,
       contact.dist,
       g1,
       g2,
@@ -1663,7 +1688,7 @@ def _primitive_narrowphase_newton(
         nconmax_in,
         contact.pos,
         contact.pos,
-        contact.frame[0],
+        contact.normal,
         contact.dist,
         g1,
         g2,
@@ -1694,7 +1719,7 @@ def _primitive_narrowphase_newton(
         nconmax_in,
         contact.pos,
         contact.pos,
-        contact.frame[0],
+        contact.normal,
         contact.dist,
         g1,
         g2,
@@ -1709,7 +1734,7 @@ def _primitive_narrowphase_newton(
         nconmax_in,
         contact.pos,
         contact.pos,
-        contact.frame[0],
+        contact.normal,
         contact.dist,
         g1,
         g2,
