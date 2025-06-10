@@ -3,7 +3,6 @@ import warp as wp
 
 from .math import closest_segment_point
 from .math import closest_segment_to_segment_points
-from .math import make_frame
 from .math import make_contact_frame
 from .math import normalize_with_norm
 
@@ -24,20 +23,15 @@ class Geom:
 
 
 @wp.struct
-class ContactFrame:
+class ContactPoint:
   pos: wp.vec3
   normal: wp.vec3
   tangent: wp.vec3
   dist: float
 
-
 @wp.func 
-def pack_frame(normal: wp.vec3, tangent: wp.vec3,) -> wp.mat33:
-  return wp.mat33(normal[0], normal[1], normal[2], tangent[0], tangent[1], tangent[2], 0.0, 0.0, 0.0)
-
-@wp.func 
-def pack_contact(pos: wp.vec3, normal: wp.vec3, tangent: wp.vec3, dist: float) -> ContactFrame:
-  return ContactFrame(pos=pos, normal=normal, tangent=tangent, dist=dist)
+def pack_contact(pos: wp.vec3, normal: wp.vec3, tangent: wp.vec3, dist: float) -> ContactPoint:
+  return ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=dist)
 
 @wp.func
 def _plane_sphere(plane_normal: wp.vec3, plane_pos: wp.vec3, sphere_pos: wp.vec3, sphere_radius: float):
@@ -51,7 +45,7 @@ def plane_sphere(
   # In:
   plane: Geom,
   sphere: Geom,
-) -> ContactFrame:
+) -> ContactPoint:
   dist, pos = _plane_sphere(plane.normal, plane.pos, sphere.pos, sphere.size[0])
 
   # Return contact frame using make_frame helper
@@ -60,7 +54,7 @@ def plane_sphere(
 
 
 @wp.func
-def _sphere_sphere(pos1: wp.vec3, radius1: float, pos2: wp.vec3, radius2: float) -> ContactFrame:
+def _sphere_sphere(pos1: wp.vec3, radius1: float, pos2: wp.vec3, radius2: float) -> ContactPoint:
   dir = pos2 - pos1
   dist = wp.length(dir)
   if dist == 0.0:
@@ -79,7 +73,7 @@ def sphere_sphere(
   # In:
   sphere1: Geom,
   sphere2: Geom,
-) -> ContactFrame:
+) -> ContactPoint:
   return _sphere_sphere(
     sphere1.pos,
     sphere1.size[0],
@@ -93,7 +87,7 @@ def sphere_capsule(
   # In:
   sphere: Geom,
   cap: Geom,
-) -> ContactFrame:
+) -> ContactPoint:
   """Calculates one contact between a sphere and a capsule."""
   axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
   length = cap.size[1]
@@ -116,7 +110,7 @@ def capsule_capsule(
   # In:
   cap1: Geom,
   cap2: Geom,
-) -> ContactFrame:
+) -> ContactPoint:
   """Calculates one contact between two capsules."""
   axis1 = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
   axis2 = wp.vec3(cap2.rot[0, 2], cap2.rot[1, 2], cap2.rot[2, 2])
@@ -177,7 +171,7 @@ def _sphere_sphere_ext(
   radius2: float,
   mat1: wp.mat33,
   mat2: wp.mat33,
-) -> ContactFrame:
+) -> ContactPoint:
   dir = pos2 - pos1
   dist = wp.length(dir)
   if dist == 0.0:
@@ -200,7 +194,7 @@ def sphere_cylinder(
   # In:
   sphere: Geom,
   cylinder: Geom,
-) -> ContactFrame:
+) -> ContactPoint:
   axis = wp.vec3(
     cylinder.rot[0, 2],
     cylinder.rot[1, 2],
@@ -276,7 +270,7 @@ def sphere_cylinder(
 @wp.func
 def _sphere_box(
   sphere_pos: wp.vec3, sphere_size: float, box_pos: wp.vec3, box_rot: wp.mat33, box_size: wp.vec3, margin: float
-) -> ContactFrame:
+) -> ContactPoint:
   center = wp.transpose(box_rot) @ (sphere_pos - box_pos)
 
   clamped = wp.max(-box_size, wp.min(box_size, center))
@@ -318,7 +312,7 @@ def sphere_box(
   sphere: Geom,
   box: Geom,
   margin: float,
-) -> ContactFrame:
+) -> ContactPoint:
   return _sphere_box(sphere.pos, sphere.size[0], box.pos, box.rot, box.size, margin)
 
 
@@ -499,7 +493,7 @@ def capsule_box(
     c1 = wp.where((ee2 > 0) == w_neg, 1, 2)
 
   if cltype == -4:  # invalid type
-    return ContactFrame(), ContactFrame(), 0
+    return 0, ContactPoint(), ContactPoint()
 
   if cltype >= 0 and cltype / 3 != 1:  # closest to a corner of the box
     c1 = axisdir ^ clcorner
@@ -628,9 +622,9 @@ def capsule_box(
     s2_pos_g = box.rot @ s2_pos_l + box.pos
     contact2 = _sphere_box(s2_pos_g, cap.size[0], box.pos, box.rot, box.size, margin)
 
-    return contact, contact2, 2
+    return 2, contact, contact2
 
-  return contact, ContactFrame(), 1
+  return 1, contact, ContactPoint()
 
 
 @wp.func
@@ -645,10 +639,10 @@ def plane_box(
   dist = wp.dot(box.pos - plane.pos, plane.normal)
 
   # Initialize contact frames
-  contact1 = ContactFrame(pos=wp.vec3(0.0), normal=wp.vec3(1.0), tangent=wp.vec3(0.0), dist=0.0)
-  contact2 = ContactFrame(pos=wp.vec3(0.0), normal=wp.vec3(1.0), tangent=wp.vec3(0.0), dist=0.0)
-  contact3 = ContactFrame(pos=wp.vec3(0.0), normal=wp.vec3(1.0), tangent=wp.vec3(0.0), dist=0.0)
-  contact4 = ContactFrame(pos=wp.vec3(0.0), normal=wp.vec3(1.0), tangent=wp.vec3(0.0), dist=0.0)
+  contact1 = ContactPoint(pos=wp.vec3(0.0), normal=wp.vec3(1.0), tangent=wp.vec3(0.0), dist=0.0)
+  contact2 = ContactPoint(pos=wp.vec3(0.0), normal=wp.vec3(1.0), tangent=wp.vec3(0.0), dist=0.0)
+  contact3 = ContactPoint(pos=wp.vec3(0.0), normal=wp.vec3(1.0), tangent=wp.vec3(0.0), dist=0.0)
+  contact4 = ContactPoint(pos=wp.vec3(0.0), normal=wp.vec3(1.0), tangent=wp.vec3(0.0), dist=0.0)
   count = int(0)
 
   # test all corners, pick bottom 4
@@ -683,7 +677,7 @@ def plane_box(
     if count >= 4:
       break
 
-  return contact1, contact2, contact3, contact4, count
+  return count, contact1, contact2, contact3, contact4
 
 
 _HUGE_VAL = 1e6
@@ -796,7 +790,7 @@ def plane_convex(
         contact4 = pack_contact(pos, normal, tangent, dist)
       count += 1
 
-  return contact1, contact2, contact3, contact4, count
+  return count, contact1, contact2, contact3, contact4
 
 
 @wp.func
@@ -855,7 +849,7 @@ def plane_cylinder(
     count = 1
   else:
     # If nearest point is above margin, no contacts
-    return contact1, contact2, contact3, contact4, count
+    return count, contact1, contact2, contact3, contact4
 
   # Second contact point (end cap farther from plane)
   dist2 = dist0 - prjaxis + prjvec
@@ -897,7 +891,7 @@ def plane_cylinder(
       contact4 = pack_contact(pos4, normal, tangent, dist3)
     count = count + 1
 
-  return contact1, contact2, contact3, contact4, count
+  return count, contact1, contact2, contact3, contact4
 
 
 class vec8f(wp.types.vector(length=8, dtype=wp.float32)):
@@ -953,14 +947,14 @@ def box_box(
   # Compute transforms between box's frames
 
   # Initialize 8 empty contact frames
-  contact1 = ContactFrame()
-  contact2 = ContactFrame()
-  contact3 = ContactFrame()
-  contact4 = ContactFrame()
-  contact5 = ContactFrame()
-  contact6 = ContactFrame()
-  contact7 = ContactFrame()
-  contact8 = ContactFrame()
+  contact1 = ContactPoint()
+  contact2 = ContactPoint()
+  contact3 = ContactPoint()
+  contact4 = ContactPoint()
+  contact5 = ContactPoint()
+  contact6 = ContactPoint()
+  contact7 = ContactPoint()
+  contact8 = ContactPoint()
 
   pos21 = wp.transpose(box1.rot) @ (box2.pos - box1.pos)
   pos12 = wp.transpose(box2.rot) @ (box1.pos - box2.pos)
@@ -986,7 +980,7 @@ def box_box(
     c2 = -wp.abs(pos12[i]) + box2.size[i] + plen1[i]
 
     if c1 < -margin or c2 < -margin:
-      return contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8, 0
+      return 0, contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8
 
     if c1 < separation:
       separation = c1
@@ -1031,7 +1025,7 @@ def box_box(
 
       # Early exit: no collision if separated along this axis
       if c3 < -margin:
-        return contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8, 0
+        return 0, contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8
 
       # Track minimum separation and which edge-edge pair it occurs on
       if c3 < separation * (1.0 - 1e-12):
@@ -1052,7 +1046,7 @@ def box_box(
 
   # No axis with separation < margin found
   if axis_code == -1:
-    return contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8, 0
+    return 0, contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8
 
   points = mat83f()
   depth = vec8f()
@@ -1228,7 +1222,7 @@ def box_box(
 
     # Check if contact normal is valid
     if wp.abs(rnorm[2]) < float(1e-8):
-      return contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8, 0  # Shouldn't happen
+      return 0, contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8  # Shouldn't happen
 
     # Calculate inverse normal for projection
     innorm = wp.where(inv, -1.0, 1.0) / rnorm[2]
@@ -1394,7 +1388,7 @@ def box_box(
     elif i == 7:
       contact8 = contact
 
-  return contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8, min(8, n)
+  return min(8, n), contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8
 
 
 # # newton/geometry/types.py (or within geometry/__init__.py)

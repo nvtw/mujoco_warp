@@ -201,7 +201,7 @@ def contact_params(
   return geoms, margin, gap, condim, friction, solref, solreffriction, solimp
 
 @wp.func
-def extract_frame(c : ContactFrame) -> wp.mat33:
+def extract_frame(c : ContactPoint) -> wp.mat33:
   normal = c.normal
   tangent = c.tangent
   tangent2 = wp.cross(normal, tangent)
@@ -414,7 +414,7 @@ def _primitive_narrowphase(
         contact_worldid_out,
       )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.BOX.value):
-    contact1, contact2, contact3, contact4, count = plane_box(
+    count, contact1, contact2, contact3, contact4 = plane_box(
       geom1,
       geom2,
       margin,
@@ -485,7 +485,7 @@ def _primitive_narrowphase(
       contact_worldid_out,
     )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.MESH.value):
-    contact1, contact2, contact3, contact4, count = plane_convex(
+    count, contact1, contact2, contact3, contact4 = plane_convex(
       geom1,
       geom2,
     )
@@ -613,7 +613,7 @@ def _primitive_narrowphase(
       contact_worldid_out,
     )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.CYLINDER.value):
-    contact1, contact2, contact3, contact4, count = plane_cylinder(geom1, geom2, margin)
+    count, contact1, contact2, contact3, contact4 = plane_cylinder(geom1, geom2, margin)
     for i in range(count):
       if i == 0:
         contact = contact1
@@ -651,7 +651,7 @@ def _primitive_narrowphase(
         contact_worldid_out,
       )
   elif type1 == int(GeomType.BOX.value) and type2 == int(GeomType.BOX.value):
-    contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8, count = box_box(
+    count, contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8 = box_box(
       geom1,
       geom2,
       margin,
@@ -701,8 +701,8 @@ def _primitive_narrowphase(
         contact_worldid_out,
       )
   elif type1 == int(GeomType.CAPSULE.value) and type2 == int(GeomType.BOX.value):
-    contact1, contact2, num_contacts = capsule_box(geom1, geom2, margin)
-    for i in range(num_contacts):
+    count, contact1, contact2 = capsule_box(geom1, geom2, margin)
+    for i in range(count):
       if i == 0:
         contact = contact1
       else:
