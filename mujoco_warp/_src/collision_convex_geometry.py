@@ -4,7 +4,7 @@ import warp as wp
 wp.config.enable_backward = False
 
 
-from .collision_primitive_newton import Geom
+from .collision_primitive_geometry import Geom
 from .math import orthonormal
 from .math import gjk_normalize
 from .support import all_same

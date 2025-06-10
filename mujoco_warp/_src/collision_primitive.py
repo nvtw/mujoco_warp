@@ -25,9 +25,9 @@ from .types import GeomType
 from .types import Model
 from .types import vec5
 
-from .collision_primitive_newton import *
-from .collision_primitive_newton import _sphere_sphere
-from .collision_primitive_newton import _sphere_box
+from .collision_primitive_geometry import *
+from .collision_primitive_geometry import _sphere_sphere
+from .collision_primitive_geometry import _sphere_box
 
 
 wp.set_module_options({"enable_backward": False})
