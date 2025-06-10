@@ -202,8 +202,8 @@ def contact_params(
 
 @wp.func
 def extract_frame(c : ContactFrame) -> wp.mat33:
-  normal = wp.vec3(c.frame[0, 0], c.frame[0, 1], c.frame[0, 2])
-  tangent = wp.vec3(c.frame[1, 0], c.frame[1, 1], c.frame[1, 2])
+  normal = c.normal
+  tangent = c.tangent
   tangent2 = wp.cross(normal, tangent)
   return wp.mat33(normal[0], normal[1], normal[2], tangent[0], tangent[1], tangent[2], tangent2[0], tangent2[1], tangent2[2])
 

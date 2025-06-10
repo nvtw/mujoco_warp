@@ -26,7 +26,8 @@ class Geom:
 @wp.struct
 class ContactFrame:
   pos: wp.vec3
-  frame: wp.mat33  # The first row of the frame is the normal
+  normal: wp.vec3
+  tangent: wp.vec3
   dist: float
 
 
@@ -36,7 +37,7 @@ def pack_frame(normal: wp.vec3, tangent: wp.vec3,) -> wp.mat33:
 
 @wp.func 
 def pack_contact(pos: wp.vec3, normal: wp.vec3, tangent: wp.vec3, dist: float) -> ContactFrame:
-  return ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=dist)
+  return ContactFrame(pos=pos, normal=normal, tangent=tangent, dist=dist)
 
 @wp.func
 def _plane_sphere(plane_normal: wp.vec3, plane_pos: wp.vec3, sphere_pos: wp.vec3, sphere_radius: float):
@@ -644,10 +645,10 @@ def plane_box(
   dist = wp.dot(box.pos - plane.pos, plane.normal)
 
   # Initialize contact frames
-  contact1 = ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
-  contact2 = ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
-  contact3 = ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
-  contact4 = ContactFrame(pos=wp.vec3(0.0), frame=wp.mat33(1.0), dist=0.0)
+  contact1 = ContactFrame(pos=wp.vec3(0.0), normal=wp.vec3(1.0), tangent=wp.vec3(0.0), dist=0.0)
+  contact2 = ContactFrame(pos=wp.vec3(0.0), normal=wp.vec3(1.0), tangent=wp.vec3(0.0), dist=0.0)
+  contact3 = ContactFrame(pos=wp.vec3(0.0), normal=wp.vec3(1.0), tangent=wp.vec3(0.0), dist=0.0)
+  contact4 = ContactFrame(pos=wp.vec3(0.0), normal=wp.vec3(1.0), tangent=wp.vec3(0.0), dist=0.0)
   count = int(0)
 
   # test all corners, pick bottom 4
