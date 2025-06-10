@@ -22,8 +22,16 @@ from absl.testing import parameterized
 
 import mujoco_warp as mjwarp
 
+from . import collision_driver
 from . import test_util
 from .types import BroadphaseType
+
+
+def broadphase_caller(m, d):
+  if m.opt.broadphase == int(BroadphaseType.NXN):
+    collision_driver.nxn_broadphase(m, d)
+  else:
+    collision_driver.sap_broadphase(m, d)
 
 
 class BroadphaseTest(parameterized.TestCase):
@@ -96,12 +104,12 @@ class BroadphaseTest(parameterized.TestCase):
 
     m.opt.broadphase = broadphase
 
-    broadphase(m, d0)
+    broadphase_caller(m, d0)
     np.testing.assert_allclose(d0.ncollision.numpy()[0], 0)
 
     # one world and one collision
     _, mjd1, _, d1 = test_util.fixture(xml=_XML, keyframe=1)
-    broadphase(m, d1)
+    broadphase_caller(m, d1)
 
     np.testing.assert_allclose(d1.ncollision.numpy()[0], 1)
     np.testing.assert_allclose(d1.collision_pair.numpy()[0][0], 0)
@@ -109,7 +117,7 @@ class BroadphaseTest(parameterized.TestCase):
 
     # one world and three collisions
     _, mjd2, _, d2 = test_util.fixture(xml=_XML, keyframe=2)
-    broadphase(m, d2)
+    broadphase_caller(m, d2)
 
     ncollision = d2.ncollision.numpy()[0]
     np.testing.assert_allclose(ncollision, 3)
@@ -124,7 +132,7 @@ class BroadphaseTest(parameterized.TestCase):
       np.vstack([np.expand_dims(mjd1.geom_xpos, axis=0), np.expand_dims(mjd2.geom_xpos, axis=0)]),
       dtype=wp.vec3,
     )
-    broadphase(m, d3)
+    broadphase_caller(m, d3)
 
     ncollision = d3.ncollision.numpy()[0]
     np.testing.assert_allclose(ncollision, 4)
@@ -141,12 +149,12 @@ class BroadphaseTest(parameterized.TestCase):
     mjm4.geom_contype[:3] = 0
     m4 = mjwarp.put_model(mjm4)
 
-    broadphase(m4, d4)
+    broadphase_caller(m4, d4)
     np.testing.assert_allclose(d4.ncollision.numpy()[0], 0)
 
     # one world and one collision: geomtype ordering
     _, _, _, d5 = test_util.fixture(xml=_XML, keyframe=3)
-    broadphase(m, d5)
+    broadphase_caller(m, d5)
     np.testing.assert_allclose(d5.ncollision.numpy()[0], 1)
     np.testing.assert_allclose(d5.collision_pair.numpy()[0][0], 3)
     np.testing.assert_allclose(d5.collision_pair.numpy()[0][1], 2)
