@@ -15,6 +15,9 @@
 
 import warp as wp
 
+from .collision_primitive_geometry import *
+from .collision_primitive_geometry import _sphere_box
+from .collision_primitive_geometry import _sphere_sphere
 from .math import closest_segment_point
 from .math import closest_segment_to_segment_points
 from .math import make_frame
@@ -24,11 +27,6 @@ from .types import Data
 from .types import GeomType
 from .types import Model
 from .types import vec5
-
-from .collision_primitive_geometry import *
-from .collision_primitive_geometry import _sphere_sphere
-from .collision_primitive_geometry import _sphere_box
-
 
 wp.set_module_options({"enable_backward": False})
 
@@ -200,12 +198,14 @@ def contact_params(
 
   return geoms, margin, gap, condim, friction, solref, solreffriction, solimp
 
+
 @wp.func
-def extract_frame(c : ContactPoint) -> wp.mat33:
+def extract_frame(c: ContactPoint) -> wp.mat33:
   normal = c.normal
   tangent = c.tangent
   tangent2 = wp.cross(normal, tangent)
   return wp.mat33(normal[0], normal[1], normal[2], tangent[0], tangent[1], tangent[2], tangent2[0], tangent2[1], tangent2[2])
+
 
 @wp.kernel
 def _primitive_narrowphase(
@@ -380,12 +380,9 @@ def _primitive_narrowphase(
       contact_worldid_out,
     )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.CAPSULE.value):
-    contact1, contact2 = plane_capsule(geom1, geom2)
-    for i in range(2):
-      if i == 0:
-        contact = contact1
-      else:
-        contact = contact2
+    result_plane_capsule = plane_capsule(geom1, geom2)
+    for i in range(0, wp.static(len(result_plane_capsule))):
+      contact = result_plane_capsule[i]
       write_contact(
         nconmax_in,
         contact.dist,
@@ -414,47 +411,41 @@ def _primitive_narrowphase(
         contact_worldid_out,
       )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.BOX.value):
-    count, contact1, contact2, contact3, contact4 = plane_box(
+    result_plane_box = plane_box(
       geom1,
       geom2,
       margin,
     )
-    for i in range(count):
-      if i == 0:
-        contact = contact1
-      elif i == 1:
-        contact = contact2
-      elif i == 2:
-        contact = contact3
-      else:
-        contact = contact4
-      write_contact(
-        nconmax_in,
-        contact.dist,
-        contact.pos,
-        extract_frame(contact),
-        margin,
-        gap,
-        condim,
-        friction,
-        solref,
-        solreffriction,
-        solimp,
-        geoms,
-        worldid,
-        ncon_out,
-        contact_dist_out,
-        contact_pos_out,
-        contact_frame_out,
-        contact_includemargin_out,
-        contact_friction_out,
-        contact_solref_out,
-        contact_solreffriction_out,
-        contact_solimp_out,
-        contact_dim_out,
-        contact_geom_out,
-        contact_worldid_out,
-      )
+    for i in range(1, wp.static(len(result_plane_box))):
+      if i <= result_plane_box[0]:
+        contact = result_plane_box[i]
+        write_contact(
+          nconmax_in,
+          contact.dist,
+          contact.pos,
+          extract_frame(contact),
+          margin,
+          gap,
+          condim,
+          friction,
+          solref,
+          solreffriction,
+          solimp,
+          geoms,
+          worldid,
+          ncon_out,
+          contact_dist_out,
+          contact_pos_out,
+          contact_frame_out,
+          contact_includemargin_out,
+          contact_friction_out,
+          contact_solref_out,
+          contact_solreffriction_out,
+          contact_solimp_out,
+          contact_dim_out,
+          contact_geom_out,
+          contact_worldid_out,
+        )
   elif type1 == int(GeomType.CAPSULE.value) and type2 == int(GeomType.CAPSULE.value):
     contact = capsule_capsule(geom1, geom2)
     write_contact(
@@ -485,46 +476,40 @@ def _primitive_narrowphase(
       contact_worldid_out,
     )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.MESH.value):
-    count, contact1, contact2, contact3, contact4 = plane_convex(
+    result_plane_convex = plane_convex(
       geom1,
       geom2,
     )
-    for i in range(count):
-      if i == 0:
-        contact = contact1
-      elif i == 1:
-        contact = contact2
-      elif i == 2:
-        contact = contact3
-      else:
-        contact = contact4
-      write_contact(
-        nconmax_in,
-        contact.dist,
-        contact.pos,
-        extract_frame(contact),
-        margin,
-        gap,
-        condim,
-        friction,
-        solref,
-        solreffriction,
-        solimp,
-        geoms,
-        worldid,
-        ncon_out,
-        contact_dist_out,
-        contact_pos_out,
-        contact_frame_out,
-        contact_includemargin_out,
-        contact_friction_out,
-        contact_solref_out,
-        contact_solreffriction_out,
-        contact_solimp_out,
-        contact_dim_out,
-        contact_geom_out,
-        contact_worldid_out,
-      )
+    for i in range(1, wp.static(len(result_plane_convex))):
+      if i <= result_plane_convex[0]:
+        contact = result_plane_convex[i]
+        write_contact(
+          nconmax_in,
+          contact.dist,
+          contact.pos,
+          extract_frame(contact),
+          margin,
+          gap,
+          condim,
+          friction,
+          solref,
+          solreffriction,
+          solimp,
+          geoms,
+          worldid,
+          ncon_out,
+          contact_dist_out,
+          contact_pos_out,
+          contact_frame_out,
+          contact_includemargin_out,
+          contact_friction_out,
+          contact_solref_out,
+          contact_solreffriction_out,
+          contact_solimp_out,
+          contact_dim_out,
+          contact_geom_out,
+          contact_worldid_out,
+        )
   elif type1 == int(GeomType.SPHERE.value) and type2 == int(GeomType.CAPSULE.value):
     contact = sphere_capsule(geom1, geom2)
     write_contact(
@@ -613,127 +598,105 @@ def _primitive_narrowphase(
       contact_worldid_out,
     )
   elif type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.CYLINDER.value):
-    count, contact1, contact2, contact3, contact4 = plane_cylinder(geom1, geom2, margin)
-    for i in range(count):
-      if i == 0:
-        contact = contact1
-      elif i == 1:
-        contact = contact2
-      elif i == 2:
-        contact = contact3
-      else:
-        contact = contact4
-      write_contact(
-        nconmax_in,
-        contact.dist,
-        contact.pos,
-        extract_frame(contact),
-        margin,
-        gap,
-        condim,
-        friction,
-        solref,
-        solreffriction,
-        solimp,
-        geoms,
-        worldid,
-        ncon_out,
-        contact_dist_out,
-        contact_pos_out,
-        contact_frame_out,
-        contact_includemargin_out,
-        contact_friction_out,
-        contact_solref_out,
-        contact_solreffriction_out,
-        contact_solimp_out,
-        contact_dim_out,
-        contact_geom_out,
-        contact_worldid_out,
-      )
+    result_plane_cylinder = plane_cylinder(geom1, geom2, margin)
+    for i in range(1, wp.static(len(result_plane_cylinder))):
+      if i <= result_plane_cylinder[0]:
+        contact = result_plane_cylinder[i]
+        write_contact(
+          nconmax_in,
+          contact.dist,
+          contact.pos,
+          extract_frame(contact),
+          margin,
+          gap,
+          condim,
+          friction,
+          solref,
+          solreffriction,
+          solimp,
+          geoms,
+          worldid,
+          ncon_out,
+          contact_dist_out,
+          contact_pos_out,
+          contact_frame_out,
+          contact_includemargin_out,
+          contact_friction_out,
+          contact_solref_out,
+          contact_solreffriction_out,
+          contact_solimp_out,
+          contact_dim_out,
+          contact_geom_out,
+          contact_worldid_out,
+        )
   elif type1 == int(GeomType.BOX.value) and type2 == int(GeomType.BOX.value):
-    count, contact1, contact2, contact3, contact4, contact5, contact6, contact7, contact8 = box_box(
+    result_box_box = box_box(
       geom1,
       geom2,
       margin,
     )
-    for i in range(count):
-      if i == 0:
-        contact = contact1
-      elif i == 1:
-        contact = contact2
-      elif i == 2:
-        contact = contact3
-      elif i == 3:
-        contact = contact4
-      elif i == 4:
-        contact = contact5
-      elif i == 5:
-        contact = contact6
-      elif i == 6:
-        contact = contact7
-      else:
-        contact = contact8
-      write_contact(
-        nconmax_in,
-        contact.dist,
-        contact.pos,
-        extract_frame(contact),
-        margin,
-        gap,
-        condim,
-        friction,
-        solref,
-        solreffriction,
-        solimp,
-        geoms,
-        worldid,
-        ncon_out,
-        contact_dist_out,
-        contact_pos_out,
-        contact_frame_out,
-        contact_includemargin_out,
-        contact_friction_out,
-        contact_solref_out,
-        contact_solreffriction_out,
-        contact_solimp_out,
-        contact_dim_out,
-        contact_geom_out,
-        contact_worldid_out,
-      )
+    for i in range(1, wp.static(len(result_box_box))):
+      if i <= result_box_box[0]:
+        contact = result_box_box[i]
+        write_contact(
+          nconmax_in,
+          contact.dist,
+          contact.pos,
+          extract_frame(contact),
+          margin,
+          gap,
+          condim,
+          friction,
+          solref,
+          solreffriction,
+          solimp,
+          geoms,
+          worldid,
+          ncon_out,
+          contact_dist_out,
+          contact_pos_out,
+          contact_frame_out,
+          contact_includemargin_out,
+          contact_friction_out,
+          contact_solref_out,
+          contact_solreffriction_out,
+          contact_solimp_out,
+          contact_dim_out,
+          contact_geom_out,
+          contact_worldid_out,
+        )
   elif type1 == int(GeomType.CAPSULE.value) and type2 == int(GeomType.BOX.value):
-    count, contact1, contact2 = capsule_box(geom1, geom2, margin)
-    for i in range(count):
-      if i == 0:
-        contact = contact1
-      else:
-        contact = contact2
-      write_contact(
-        nconmax_in,
-        contact.dist,
-        contact.pos,
-        extract_frame(contact),
-        margin,
-        gap,
-        condim,
-        friction,
-        solref,
-        solreffriction,
-        solimp,
-        geoms,
-        worldid,
-        ncon_out,
-        contact_dist_out,
-        contact_pos_out,
-        contact_frame_out,
-        contact_includemargin_out,
-        contact_friction_out,
-        contact_solref_out,
-        contact_solreffriction_out,
-        contact_solimp_out,
-        contact_dim_out,
-        contact_geom_out,
-        contact_worldid_out,
-      )
+    result_capsule_box = capsule_box(geom1, geom2, margin)
+    for i in range(1, wp.static(len(result_capsule_box))):
+      if i <= result_capsule_box[0]:
+        contact = result_capsule_box[i]
+        write_contact(
+          nconmax_in,
+          contact.dist,
+          contact.pos,
+          extract_frame(contact),
+          margin,
+          gap,
+          condim,
+          friction,
+          solref,
+          solreffriction,
+          solimp,
+          geoms,
+          worldid,
+          ncon_out,
+          contact_dist_out,
+          contact_pos_out,
+          contact_frame_out,
+          contact_includemargin_out,
+          contact_friction_out,
+          contact_solref_out,
+          contact_solreffriction_out,
+          contact_solimp_out,
+          contact_dim_out,
+          contact_geom_out,
+          contact_worldid_out,
+        )
 
 
 def primitive_narrowphase(m: Model, d: Data):

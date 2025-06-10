@@ -15,6 +15,7 @@
 
 import warp as wp
 
+from .collision_convex_geometry import *
 from .collision_primitive import Geom
 from .collision_primitive import _geom
 from .collision_primitive import contact_params
@@ -29,8 +30,6 @@ from .types import Data
 from .types import GeomType
 from .types import Model
 from .types import vec5
-
-from .collision_convex_geometry import *
 
 wp.clear_kernel_cache()
 

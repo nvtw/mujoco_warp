@@ -1,12 +1,11 @@
 import warp as wp
 
-
 wp.config.enable_backward = False
 
 
 from .collision_primitive_geometry import Geom
-from .math import orthonormal
 from .math import gjk_normalize
+from .math import orthonormal
 from .support import all_same
 from .support import any_different
 

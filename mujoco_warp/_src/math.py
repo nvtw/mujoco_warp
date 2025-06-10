@@ -216,7 +216,7 @@ def make_frame(a: wp.vec3):
 def make_contact_frame(a: wp.vec3):
   a = wp.normalize(a)
   b, c = orthogonals(a)
-  return a, b # z (normal), x (tangent)
+  return a, b  # z (normal), x (tangent)
 
 
 @wp.func
