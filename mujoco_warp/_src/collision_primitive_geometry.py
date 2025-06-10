@@ -4,6 +4,7 @@ import warp as wp
 from .math import closest_segment_point
 from .math import closest_segment_to_segment_points
 from .math import make_frame
+from .math import make_contact_frame
 from .math import normalize_with_norm
 
 wp.config.enable_backward = False
@@ -29,6 +30,10 @@ class ContactFrame:
   dist: float
 
 
+@wp.func 
+def pack_frame(normal: wp.vec3, tangent: wp.vec3,) -> wp.mat33:
+  return wp.mat33(normal[0], normal[1], normal[2], tangent[0], tangent[1], tangent[2], 0.0, 0.0, 0.0)
+
 @wp.func
 def _plane_sphere(plane_normal: wp.vec3, plane_pos: wp.vec3, sphere_pos: wp.vec3, sphere_radius: float):
   dist = wp.dot(sphere_pos - plane_pos, plane_normal) - sphere_radius
@@ -45,7 +50,8 @@ def plane_sphere(
   dist, pos = _plane_sphere(plane.normal, plane.pos, sphere.pos, sphere.size[0])
 
   # Return contact frame using make_frame helper
-  return ContactFrame(pos=pos, frame=make_frame(plane.normal), dist=dist)
+  normal, tangent = make_contact_frame(plane.normal)
+  return ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=dist)
 
 
 @wp.func
@@ -59,7 +65,8 @@ def _sphere_sphere(pos1: wp.vec3, radius1: float, pos2: wp.vec3, radius2: float)
   dist = dist - (radius1 + radius2)
   pos = pos1 + n * (radius1 + 0.5 * dist)
 
-  return ContactFrame(pos=pos, frame=make_frame(n), dist=dist)
+  normal, tangent = make_contact_frame(n)
+  return ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=dist)
 
 
 @wp.func
@@ -179,7 +186,8 @@ def _sphere_sphere_ext(
   dist = dist - (radius1 + radius2)
   pos = pos1 + n * (radius1 + 0.5 * dist)
 
-  return ContactFrame(pos=pos, frame=make_frame(n), dist=dist)
+  normal, tangent = make_contact_frame(n)
+  return ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=dist)
 
 
 @wp.func
@@ -240,7 +248,8 @@ def sphere_cylinder(
     dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere.pos, sphere.size[0])
     plane_normal = -plane_normal  # Flip normal after position calculation
 
-    return ContactFrame(pos=pos_contact, frame=make_frame(plane_normal), dist=dist)
+    normal, tangent = make_contact_frame(plane_normal)
+    return ContactFrame(pos=pos_contact, frame=pack_frame(normal, tangent), dist=dist)
 
   # Corner collision
   inv_len = 1.0 / wp.sqrt(p_proj_sqr)
@@ -294,7 +303,8 @@ def _sphere_box(
     contact_dist = dist - sphere_size
 
   contact_pos = box_pos + box_rot @ pos
-  return ContactFrame(pos=contact_pos, frame=make_frame(contact_normal), dist=contact_dist)
+  normal, tangent = make_contact_frame(contact_normal)
+  return ContactFrame(pos=contact_pos, frame=pack_frame(normal, tangent), dist=contact_dist)
 
 
 @wp.func
@@ -652,17 +662,17 @@ def plane_box(
       continue
 
     cdist = dist + ldist
-    frame = make_frame(plane.normal)
+    normal, tangent = make_contact_frame(plane.normal)
     pos = corner + box.pos + (plane.normal * cdist / -2.0)
 
     if count == 0:
-      contact1 = ContactFrame(pos=pos, frame=frame, dist=cdist)
+      contact1 = ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=cdist)
     elif count == 1:
-      contact2 = ContactFrame(pos=pos, frame=frame, dist=cdist)
+      contact2 = ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=cdist)
     elif count == 2:
-      contact3 = ContactFrame(pos=pos, frame=frame, dist=cdist)
+      contact3 = ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=cdist)
     elif count == 3:
-      contact4 = ContactFrame(pos=pos, frame=frame, dist=cdist)
+      contact4 = ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=cdist)
 
     count += 1
     if count >= 4:
@@ -749,11 +759,11 @@ def plane_convex(
       d_dist = dist_ap + dist_bp
 
   # Prepare contacts
-  frame = make_frame(plane.normal)
-  contact1 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
-  contact2 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
-  contact3 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
-  contact4 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
+  normal, tangent = make_contact_frame(plane.normal)
+  contact1 = ContactFrame(pos=wp.vec3(0.0), frame=pack_frame(normal, tangent), dist=0.0)
+  contact2 = ContactFrame(pos=wp.vec3(0.0), frame=pack_frame(normal, tangent), dist=0.0)
+  contact3 = ContactFrame(pos=wp.vec3(0.0), frame=pack_frame(normal, tangent), dist=0.0)
+  contact4 = ContactFrame(pos=wp.vec3(0.0), frame=pack_frame(normal, tangent), dist=0.0)
   count = int(0)
 
   for i in range(3, -1, -1):
@@ -772,13 +782,13 @@ def plane_convex(
       pos = pos - 0.5 * dist * plane.normal
 
       if count == 0:
-        contact1 = ContactFrame(pos=pos, frame=frame, dist=dist)
+        contact1 = ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=dist)
       elif count == 1:
-        contact2 = ContactFrame(pos=pos, frame=frame, dist=dist)
+        contact2 = ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=dist)
       elif count == 2:
-        contact3 = ContactFrame(pos=pos, frame=frame, dist=dist)
+        contact3 = ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=dist)
       elif count == 3:
-        contact4 = ContactFrame(pos=pos, frame=frame, dist=dist)
+        contact4 = ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=dist)
       count += 1
 
   return contact1, contact2, contact3, contact4, count
@@ -824,19 +834,19 @@ def plane_cylinder(
   axis = axis * cylinder.size[1]
   prjaxis = prjaxis * cylinder.size[1]
 
-  frame = make_frame(n)
+  normal, tangent = make_contact_frame(n)
   count = int(0)
 
-  contact1 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
-  contact2 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
-  contact3 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
-  contact4 = ContactFrame(pos=wp.vec3(0.0), frame=frame, dist=0.0)
+  contact1 = ContactFrame(pos=wp.vec3(0.0), frame=pack_frame(normal, tangent), dist=0.0)
+  contact2 = ContactFrame(pos=wp.vec3(0.0), frame=pack_frame(normal, tangent), dist=0.0)
+  contact3 = ContactFrame(pos=wp.vec3(0.0), frame=pack_frame(normal, tangent), dist=0.0)
+  contact4 = ContactFrame(pos=wp.vec3(0.0), frame=pack_frame(normal, tangent), dist=0.0)
 
   # First contact point (end cap closer to plane)
   dist1 = dist0 + prjaxis + prjvec
   if dist1 <= margin:
     pos1 = cylinder.pos + vec + axis - n * (dist1 * 0.5)
-    contact1 = ContactFrame(pos=pos1, frame=frame, dist=dist1)
+    contact1 = ContactFrame(pos=pos1, frame=pack_frame(normal, tangent), dist=dist1)
     count = 1
   else:
     # If nearest point is above margin, no contacts
@@ -847,9 +857,9 @@ def plane_cylinder(
   if dist2 <= margin:
     pos2 = cylinder.pos + vec - axis - n * (dist2 * 0.5)
     if count == 0:
-      contact1 = ContactFrame(pos=pos2, frame=frame, dist=dist2)
+      contact1 = ContactFrame(pos=pos2, frame=pack_frame(normal, tangent), dist=dist2)
     else:
-      contact2 = ContactFrame(pos=pos2, frame=frame, dist=dist2)
+      contact2 = ContactFrame(pos=pos2, frame=pack_frame(normal, tangent), dist=dist2)
     count = count + 1
 
   # Try triangle contact points on side closer to plane
@@ -863,23 +873,23 @@ def plane_cylinder(
     # Add contact point A - adjust to closest side
     pos3 = cylinder.pos + vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
     if count == 0:
-      contact1 = ContactFrame(pos=pos3, frame=frame, dist=dist3)
+      contact1 = ContactFrame(pos=pos3, frame=pack_frame(normal, tangent), dist=dist3)
     elif count == 1:
-      contact2 = ContactFrame(pos=pos3, frame=frame, dist=dist3)
+      contact2 = ContactFrame(pos=pos3, frame=pack_frame(normal, tangent), dist=dist3)
     elif count:
-      contact3 = ContactFrame(pos=pos3, frame=frame, dist=dist3)
+      contact3 = ContactFrame(pos=pos3, frame=pack_frame(normal, tangent), dist=dist3)
     count = count + 1
 
     # Add contact point B - adjust to closest side
     pos4 = cylinder.pos - vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
     if count == 0:
-      contact1 = ContactFrame(pos=pos4, frame=frame, dist=dist3)
+      contact1 = ContactFrame(pos=pos4, frame=pack_frame(normal, tangent), dist=dist3)
     elif count == 1:
-      contact2 = ContactFrame(pos=pos4, frame=frame, dist=dist3)
+      contact2 = ContactFrame(pos=pos4, frame=pack_frame(normal, tangent), dist=dist3)
     elif count == 2:
-      contact3 = ContactFrame(pos=pos4, frame=frame, dist=dist3)
+      contact3 = ContactFrame(pos=pos4, frame=pack_frame(normal, tangent), dist=dist3)
     else:
-      contact4 = ContactFrame(pos=pos4, frame=frame, dist=dist3)
+      contact4 = ContactFrame(pos=pos4, frame=pack_frame(normal, tangent), dist=dist3)
     count = count + 1
 
   return contact1, contact2, contact3, contact4, count
@@ -1352,7 +1362,7 @@ def box_box(
     pw = box1.pos
     normal = wp.where(inv, -1.0, 1.0) * rw @ rnorm
 
-  frame = make_frame(normal)
+  normal, tangent = make_contact_frame(normal)
 
   # prepare contacts
 
@@ -1360,7 +1370,7 @@ def box_box(
     points[i, 2] += hz
     pos = rw @ points[i] + pw
 
-    contact = ContactFrame(pos=pos, frame=frame, dist=depth[i])
+    contact = ContactFrame(pos=pos, frame=pack_frame(normal, tangent), dist=depth[i])
 
     if i == 0:
       contact1 = contact
