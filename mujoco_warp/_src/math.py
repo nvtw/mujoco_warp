@@ -213,6 +213,13 @@ def make_frame(a: wp.vec3):
 
 
 @wp.func
+def make_contact_frame(a: wp.vec3):
+  a = wp.normalize(a)
+  b, c = orthogonals(a)
+  return a, c
+
+
+@wp.func
 def normalize_with_norm(x: Any):
   norm = wp.length(x)
   if norm == 0.0:
