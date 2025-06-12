@@ -66,6 +66,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install mujoco --pre -f https://py.mujoco.org/
           pip install warp-lang --pre --upgrade -f https://pypi.nvidia.com/warp-lang/
+          pip install "git+https://github.com/newton-physics/newton@main"
           pip install -e .[dev,cpu]
       - name: Test with pytest
         run: |
