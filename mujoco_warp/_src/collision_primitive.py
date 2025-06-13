@@ -58,7 +58,7 @@ class Geom:
 @wp.func
 def _geom(
   # Model:
-  geom_type: wp.array(dtype=int),
+  geom_type: int,
   geom_dataid: wp.array(dtype=int),
   geom_size: wp.array2d(dtype=wp.vec3),
   hfield_adr: wp.array(dtype=int),
@@ -88,7 +88,7 @@ def _geom(
   dataid = geom_dataid[gid]
 
   # If geom is MESH, get mesh verts
-  if dataid >= 0 and geom_type[gid] == int(GeomType.MESH.value):
+  if dataid >= 0 and geom_type == int(GeomType.MESH.value):
     geom.vertadr = mesh_vertadr[dataid]
     geom.vertnum = mesh_vertnum[dataid]
     geom.graphadr = mesh_graphadr[dataid]
@@ -97,12 +97,12 @@ def _geom(
     geom.vertnum = -1
     geom.graphadr = -1
 
-  if geom_type[gid] == int(GeomType.MESH.value):
+  if geom_type == int(GeomType.MESH.value):
     geom.vert = mesh_vert
     geom.graph = mesh_graph
 
   # If geom is HFIELD triangle, compute triangle prism verts
-  if geom_type[gid] == int(GeomType.HFIELD.value):
+  if geom_type == int(GeomType.HFIELD.value):
     geom.hfprism = hfield_triangle_prism(
       geom_dataid, hfield_adr, hfield_nrow, hfield_ncol, hfield_size, hfield_data, gid, hftri_index
     )
@@ -2485,8 +2485,11 @@ def _primitive_narrowphase(
 
   hftri_index = collision_hftri_index_in[tid]
 
+  type1 = geom_type[g1]
+  type2 = geom_type[g2]
+
   geom1 = _geom(
-    geom_type,
+    type1,
     geom_dataid,
     geom_size,
     hfield_adr,
@@ -2506,7 +2509,7 @@ def _primitive_narrowphase(
     hftri_index,
   )
   geom2 = _geom(
-    geom_type,
+    type2,
     geom_dataid,
     geom_size,
     hfield_adr,
@@ -2526,8 +2529,6 @@ def _primitive_narrowphase(
     hftri_index,
   )
 
-  type1 = geom_type[g1]
-  type2 = geom_type[g2]
 
   # TODO(team): static loop unrolling to remove unnecessary branching
   if type1 == int(GeomType.PLANE.value) and type2 == int(GeomType.SPHERE.value):

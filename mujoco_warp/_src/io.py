@@ -904,6 +904,7 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
     # collision driver
     collision_pair=wp.zeros((nconmax,), dtype=wp.vec2i),
     collision_hftri_index=wp.zeros((nconmax,), dtype=int),
+    collision_normal_depth=wp.zeros((nconmax,), dtype=wp.vec4),
     collision_pairid=wp.zeros((nconmax,), dtype=int),
     collision_worldid=wp.zeros((nconmax,), dtype=int),
     ncollision=wp.zeros((1,), dtype=int),
@@ -1221,6 +1222,7 @@ def put_data(
     # collision driver
     collision_pair=wp.empty(nconmax, dtype=wp.vec2i),
     collision_hftri_index=wp.empty(nconmax, dtype=int),
+    collision_normal_depth=wp.empty(nconmax, dtype=wp.vec4),
     collision_pairid=wp.empty(nconmax, dtype=int),
     collision_worldid=wp.empty(nconmax, dtype=int),
     ncollision=wp.zeros(1, dtype=int),

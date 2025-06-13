@@ -824,6 +824,156 @@ def _gjk_epa_pipeline(
     contact_dim_out: wp.array(dtype=int),
     contact_geom_out: wp.array(dtype=wp.vec2i),
     contact_worldid_out: wp.array(dtype=int),
+    normal_depth_out: wp.array(dtype=wp.vec4),
+  ):
+    tid = wp.tid()
+    if tid >= ncollision_in[0]:
+      return
+
+    worldid = collision_worldid_in[tid]
+    geoms, margin, gap, condim, friction, solref, solreffriction, solimp = contact_params(
+      geom_condim,
+      geom_priority,
+      geom_solmix,
+      geom_solref,
+      geom_solimp,
+      geom_friction,
+      geom_margin,
+      geom_gap,
+      pair_dim,
+      pair_solref,
+      pair_solreffriction,
+      pair_solimp,
+      pair_margin,
+      pair_gap,
+      pair_friction,
+      collision_pair_in,
+      collision_pairid_in,
+      tid,
+      worldid,
+    )
+
+    g1 = geoms[0]
+    g2 = geoms[1]
+
+    if geom_type[g1] != geomtype1 or geom_type[g2] != geomtype2:
+      return
+    
+    # Since geomtype1 and geomtype2 are static, we should only use them starting from this point in the kernel.
+    # All other cases will return early, see statement above.
+    # TODO: Are the following two lines necessary?
+    gtype1 = wp.static(geomtype1)
+    gtype2 = wp.static(geomtype2)
+
+    hftri_index = collision_hftri_index_in[tid]
+
+    geom1 = _geom(
+      gtype1,
+      geom_dataid,
+      geom_size,
+      hfield_adr,
+      hfield_nrow,
+      hfield_ncol,
+      hfield_size,
+      hfield_data,
+      mesh_vertadr,
+      mesh_vertnum,
+      mesh_vert,
+      mesh_graphadr,
+      mesh_graph,
+      geom_xpos_in,
+      geom_xmat_in,
+      worldid,
+      g1,
+      hftri_index,
+    )
+
+    geom2 = _geom(
+      gtype2,
+      geom_dataid,
+      geom_size,
+      hfield_adr,
+      hfield_nrow,
+      hfield_ncol,
+      hfield_size,
+      hfield_data,
+      mesh_vertadr,
+      mesh_vertnum,
+      mesh_vert,
+      mesh_graphadr,
+      mesh_graph,
+      geom_xpos_in,
+      geom_xmat_in,
+      worldid,
+      g2,
+      hftri_index,
+    )
+
+    simplex, normal = _gjk(geom1, geom2)
+
+    # TODO(btaba): get depth from GJK, conditionally run EPA.
+    depth, normal = _epa(geom1, geom2, simplex, normal)
+
+    normal_depth_out[tid] = wp.vec4(normal.x, normal.y, normal.z, depth)
+
+  # runs GJK and EPA on a set of sparse geom pairs per env
+  @wp.kernel
+  def gjk_epa_sparse_multicontact(
+    # Model:
+    ngeom: int,
+    geom_type: wp.array(dtype=int),
+    geom_condim: wp.array(dtype=int),
+    geom_dataid: wp.array(dtype=int),
+    geom_priority: wp.array(dtype=int),
+    geom_solmix: wp.array2d(dtype=float),
+    geom_solref: wp.array2d(dtype=wp.vec2),
+    geom_solimp: wp.array2d(dtype=vec5),
+    geom_size: wp.array2d(dtype=wp.vec3),
+    geom_friction: wp.array2d(dtype=wp.vec3),
+    geom_margin: wp.array2d(dtype=float),
+    geom_gap: wp.array2d(dtype=float),
+    hfield_adr: wp.array(dtype=int),
+    hfield_nrow: wp.array(dtype=int),
+    hfield_ncol: wp.array(dtype=int),
+    hfield_size: wp.array(dtype=wp.vec4),
+    hfield_data: wp.array(dtype=float),
+    mesh_vertadr: wp.array(dtype=int),
+    mesh_vertnum: wp.array(dtype=int),
+    mesh_vert: wp.array(dtype=wp.vec3),
+    mesh_graphadr: wp.array(dtype=int),
+    mesh_graph: wp.array(dtype=int),
+    pair_dim: wp.array(dtype=int),
+    pair_solref: wp.array2d(dtype=wp.vec2),
+    pair_solreffriction: wp.array2d(dtype=wp.vec2),
+    pair_solimp: wp.array2d(dtype=vec5),
+    pair_margin: wp.array2d(dtype=float),
+    pair_gap: wp.array2d(dtype=float),
+    pair_friction: wp.array2d(dtype=vec5),
+    geompair2hfgeompair: wp.array(dtype=int),
+    # Data in:
+    nconmax_in: int,
+    geom_xpos_in: wp.array2d(dtype=wp.vec3),
+    geom_xmat_in: wp.array2d(dtype=wp.mat33),
+    collision_pair_in: wp.array(dtype=wp.vec2i),
+    collision_hftri_index_in: wp.array(dtype=int),
+    collision_pairid_in: wp.array(dtype=int),
+    collision_worldid_in: wp.array(dtype=int),
+    ncollision_in: wp.array(dtype=int),
+    normal_depth_in: wp.array(dtype=wp.vec4),
+    # Data out:
+    ncon_out: wp.array(dtype=int),
+    ncon_hfield_out: wp.array2d(dtype=int),
+    contact_dist_out: wp.array(dtype=float),
+    contact_pos_out: wp.array(dtype=wp.vec3),
+    contact_frame_out: wp.array(dtype=wp.mat33),
+    contact_includemargin_out: wp.array(dtype=float),
+    contact_friction_out: wp.array(dtype=vec5),
+    contact_solref_out: wp.array(dtype=wp.vec2),
+    contact_solreffriction_out: wp.array(dtype=wp.vec2),
+    contact_solimp_out: wp.array(dtype=vec5),
+    contact_dim_out: wp.array(dtype=int),
+    contact_geom_out: wp.array(dtype=wp.vec2i),
+    contact_worldid_out: wp.array(dtype=int),
   ):
     tid = wp.tid()
     if tid >= ncollision_in[0]:
@@ -858,10 +1008,16 @@ def _gjk_epa_pipeline(
     if geom_type[g1] != geomtype1 or geom_type[g2] != geomtype2:
       return
 
+    # Since geomtype1 and geomtype2 are static, we should only use them starting from this point in the kernel.
+    # All other cases will return early, see statement above.
+    # TODO: Are the following two lines necessary?
+    gtype1 = wp.static(geomtype1)
+    gtype2 = wp.static(geomtype2)
+
     hftri_index = collision_hftri_index_in[tid]
 
     geom1 = _geom(
-      geom_type,
+      gtype1,
       geom_dataid,
       geom_size,
       hfield_adr,
@@ -882,7 +1038,7 @@ def _gjk_epa_pipeline(
     )
 
     geom2 = _geom(
-      geom_type,
+      gtype2,
       geom_dataid,
       geom_size,
       hfield_adr,
@@ -904,24 +1060,29 @@ def _gjk_epa_pipeline(
 
     margin = wp.max(geom_margin[worldid, g1], geom_margin[worldid, g2])
 
-    simplex, normal = _gjk(geom1, geom2)
+    normal_depth = normal_depth_in[tid]
+    normal = wp.vec3(normal_depth[0], normal_depth[1], normal_depth[2])
+    depth = normal_depth[3]
 
-    # TODO(btaba): get depth from GJK, conditionally run EPA.
-    depth, normal = _epa(geom1, geom2, simplex, normal)
     dist = -depth
 
     if (dist - margin) >= 0.0 or depth != depth:
       return
 
-    # TODO(btaba): split get_multiple_contacts into a separate kernel.
-
     sphere = int(GeomType.SPHERE.value)
     ellipsoid = int(GeomType.ELLIPSOID.value)
+
     if geom_type[g1] == sphere or geom_type[g1] == ellipsoid or geom_type[g2] == sphere or geom_type[g2] == ellipsoid:
       # TODO(team): _multiple_contacts should work with perturbation_angle=0
-      count, points = _multiple_contacts(geom1, geom2, depth, normal, 1, 2, 1.0e-5)
+      ncontact = 1
+      npolygon = 2
+      perturbation_angle = 1.0e-5
     else:
-      count, points = _multiple_contacts(geom1, geom2, depth, normal, 4, 8, 1.0e-3)
+      ncontact = 4
+      npolygon = 8
+      perturbation_angle = 1.0e-3
+
+    count, points = _multiple_contacts(geom1, geom2, depth, normal, ncontact, npolygon, perturbation_angle)
 
     frame = make_frame(normal)
     for i in range(count):
@@ -957,7 +1118,7 @@ def _gjk_epa_pipeline(
         contact_worldid_out,
       )
 
-  return gjk_epa_sparse
+  return gjk_epa_sparse, gjk_epa_sparse_multicontact
 
 
 _collision_kernels = {}
@@ -978,62 +1139,185 @@ def gjk_narrowphase(m: Model, d: Data):
       )
 
   for collision_kernel in _collision_kernels.values():
-    wp.launch(
-      collision_kernel,
-      dim=d.nconmax,
-      inputs=[
-        m.ngeom,
-        m.geom_type,
-        m.geom_condim,
-        m.geom_dataid,
-        m.geom_priority,
-        m.geom_solmix,
-        m.geom_solref,
-        m.geom_solimp,
-        m.geom_size,
-        m.geom_friction,
-        m.geom_margin,
-        m.geom_gap,
-        m.hfield_adr,
-        m.hfield_nrow,
-        m.hfield_ncol,
-        m.hfield_size,
-        m.hfield_data,
-        m.mesh_vertadr,
-        m.mesh_vertnum,
-        m.mesh_vert,
-        m.mesh_graphadr,
-        m.mesh_graph,
-        m.pair_dim,
-        m.pair_solref,
-        m.pair_solreffriction,
-        m.pair_solimp,
-        m.pair_margin,
-        m.pair_gap,
-        m.pair_friction,
-        m.geompair2hfgeompair,
-        d.nconmax,
-        d.geom_xpos,
-        d.geom_xmat,
-        d.collision_pair,
-        d.collision_hftri_index,
-        d.collision_pairid,
-        d.collision_worldid,
-        d.ncollision,
-      ],
-      outputs=[
-        d.ncon,
-        d.ncon_hfield,
-        d.contact.dist,
-        d.contact.pos,
-        d.contact.frame,
-        d.contact.includemargin,
-        d.contact.friction,
-        d.contact.solref,
-        d.contact.solreffriction,
-        d.contact.solimp,
-        d.contact.dim,
-        d.contact.geom,
-        d.contact.worldid,
-      ],
-    )
+    # Check if collision_kernel is a tuple or list and has length 2
+    if isinstance(collision_kernel, (tuple, list)) and len(collision_kernel) == 2:
+      wp.launch(
+        collision_kernel[0],
+        dim=d.nconmax,
+        inputs=[
+          m.ngeom,
+          m.geom_type,
+          m.geom_condim,
+          m.geom_dataid,
+          m.geom_priority,
+          m.geom_solmix,
+          m.geom_solref,
+          m.geom_solimp,
+          m.geom_size,
+          m.geom_friction,
+          m.geom_margin,
+          m.geom_gap,
+          m.hfield_adr,
+          m.hfield_nrow,
+          m.hfield_ncol,
+          m.hfield_size,
+          m.hfield_data,
+          m.mesh_vertadr,
+          m.mesh_vertnum,
+          m.mesh_vert,
+          m.mesh_graphadr,
+          m.mesh_graph,
+          m.pair_dim,
+          m.pair_solref,
+          m.pair_solreffriction,
+          m.pair_solimp,
+          m.pair_margin,
+          m.pair_gap,
+          m.pair_friction,
+          m.geompair2hfgeompair,
+          d.nconmax,
+          d.geom_xpos,
+          d.geom_xmat,
+          d.collision_pair,
+          d.collision_hftri_index,
+          d.collision_pairid,
+          d.collision_worldid,
+          d.ncollision,
+        ],
+        outputs=[
+          d.ncon,
+          d.ncon_hfield,
+          d.contact.dist,
+          d.contact.pos,
+          d.contact.frame,
+          d.contact.includemargin,
+          d.contact.friction,
+          d.contact.solref,
+          d.contact.solreffriction,
+          d.contact.solimp,
+          d.contact.dim,
+          d.contact.geom,
+          d.contact.worldid,
+          d.collision_normal_depth,
+        ],
+      )
+      wp.launch(
+        collision_kernel[1],
+        dim=d.nconmax,
+        inputs=[
+          m.ngeom,
+          m.geom_type,
+          m.geom_condim,
+          m.geom_dataid,
+          m.geom_priority,
+          m.geom_solmix,
+          m.geom_solref,
+          m.geom_solimp,
+          m.geom_size,
+          m.geom_friction,
+          m.geom_margin,
+          m.geom_gap,
+          m.hfield_adr,
+          m.hfield_nrow,
+          m.hfield_ncol,
+          m.hfield_size,
+          m.hfield_data,
+          m.mesh_vertadr,
+          m.mesh_vertnum,
+          m.mesh_vert,
+          m.mesh_graphadr,
+          m.mesh_graph,
+          m.pair_dim,
+          m.pair_solref,
+          m.pair_solreffriction,
+          m.pair_solimp,
+          m.pair_margin,
+          m.pair_gap,
+          m.pair_friction,
+          m.geompair2hfgeompair,
+          d.nconmax,
+          d.geom_xpos,
+          d.geom_xmat,
+          d.collision_pair,
+          d.collision_hftri_index,
+          d.collision_pairid,
+          d.collision_worldid,
+          d.ncollision,
+          d.collision_normal_depth,
+        ],
+        outputs=[
+          d.ncon,
+          d.ncon_hfield,
+          d.contact.dist,
+          d.contact.pos,
+          d.contact.frame,
+          d.contact.includemargin,
+          d.contact.friction,
+          d.contact.solref,
+          d.contact.solreffriction,
+          d.contact.solimp,
+          d.contact.dim,
+          d.contact.geom,
+          d.contact.worldid,
+        ],
+      )
+    else:
+      wp.launch(
+        collision_kernel,
+        dim=d.nconmax,
+        inputs=[
+          m.ngeom,
+          m.geom_type,
+          m.geom_condim,
+          m.geom_dataid,
+          m.geom_priority,
+          m.geom_solmix,
+          m.geom_solref,
+          m.geom_solimp,
+          m.geom_size,
+          m.geom_friction,
+          m.geom_margin,
+          m.geom_gap,
+          m.hfield_adr,
+          m.hfield_nrow,
+          m.hfield_ncol,
+          m.hfield_size,
+          m.hfield_data,
+          m.mesh_vertadr,
+          m.mesh_vertnum,
+          m.mesh_vert,
+          m.mesh_graphadr,
+          m.mesh_graph,
+          m.pair_dim,
+          m.pair_solref,
+          m.pair_solreffriction,
+          m.pair_solimp,
+          m.pair_margin,
+          m.pair_gap,
+          m.pair_friction,
+          m.geompair2hfgeompair,
+          d.nconmax,
+          d.geom_xpos,
+          d.geom_xmat,
+          d.collision_pair,
+          d.collision_hftri_index,
+          d.collision_pairid,
+          d.collision_worldid,
+          d.ncollision,
+        ],
+        outputs=[
+          d.ncon,
+          d.ncon_hfield,
+          d.contact.dist,
+          d.contact.pos,
+          d.contact.frame,
+          d.contact.includemargin,
+          d.contact.friction,
+          d.contact.solref,
+          d.contact.solreffriction,
+          d.contact.solimp,
+          d.contact.dim,
+          d.contact.geom,
+          d.contact.worldid,
+        ],
+      )

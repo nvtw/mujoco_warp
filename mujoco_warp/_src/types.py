@@ -1529,6 +1529,7 @@ class Data:
   # collision driver
   collision_pair: wp.array(dtype=wp.vec2i)
   collision_hftri_index: wp.array(dtype=int)
+  collision_normal_depth: wp.array(dtype=wp.vec4)
   collision_pairid: wp.array(dtype=int)
   collision_worldid: wp.array(dtype=int)
   ncollision: wp.array(dtype=int)
