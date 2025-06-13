@@ -147,8 +147,8 @@ def create_blocked_cholesky_solve_func(block_size: int):
         num_tile_elements = block_size * block_size
         num_iterations = (num_tile_elements + num_threads_per_block - 1) // num_threads_per_block
 
-        for i in range(num_iterations):
-          linear_index = tid_block + i * num_threads_per_block
+        for ii in range(num_iterations):
+          linear_index = tid_block + ii * num_threads_per_block
           linear_index = linear_index % num_tile_elements
           row = linear_index // block_size
           col = linear_index % block_size
@@ -156,6 +156,18 @@ def create_blocked_cholesky_solve_func(block_size: int):
           if i + row >= active_matrix_size or i + col >= active_matrix_size:
             value = wp.where(row == col, float(1), float(0))
           L_tile[row, col] = value
+
+        # Handle rhs
+        num_tile_elements = block_size
+        num_iterations = (num_tile_elements + num_threads_per_block - 1) // num_threads_per_block
+
+        for ii in range(num_iterations):
+          linear_index = tid_block + ii * num_threads_per_block
+          linear_index = linear_index % num_tile_elements
+          value = rhs_tile[linear_index, 0]
+          if i + linear_index >= active_matrix_size:
+            value = float(0)
+          rhs_tile[linear_index, 0] = value
 
       y_tile = wp.tile_lower_solve(L_tile, rhs_tile)
       wp.tile_store(tmp, y_tile, offset=(i, 0))
@@ -178,8 +190,8 @@ def create_blocked_cholesky_solve_func(block_size: int):
         num_tile_elements = block_size * block_size
         num_iterations = (num_tile_elements + num_threads_per_block - 1) // num_threads_per_block
 
-        for i in range(num_iterations):
-          linear_index = tid_block + i * num_threads_per_block
+        for ii in range(num_iterations):
+          linear_index = tid_block + ii * num_threads_per_block
           linear_index = linear_index % num_tile_elements
           row = linear_index // block_size
           col = linear_index % block_size
@@ -187,6 +199,18 @@ def create_blocked_cholesky_solve_func(block_size: int):
           if i + row >= active_matrix_size or i + col >= active_matrix_size:
             value = wp.where(row == col, float(1), float(0))
           L_tile[row, col] = value
+
+        # Handle rhs
+        num_tile_elements = block_size
+        num_iterations = (num_tile_elements + num_threads_per_block - 1) // num_threads_per_block
+
+        for ii in range(num_iterations):
+          linear_index = tid_block + ii * num_threads_per_block
+          linear_index = linear_index % num_tile_elements
+          value = rhs_tile[linear_index, 0]
+          if i + linear_index >= active_matrix_size:
+            value = float(0)
+          rhs_tile[linear_index, 0] = value
 
       x_tile = wp.tile_upper_solve(wp.tile_transpose(L_tile), rhs_tile)
       wp.tile_store(x, x_tile, offset=(i, 0))
