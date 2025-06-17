@@ -19,19 +19,6 @@ import numpy as np
 import warp as wp
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Collision filtering
 @wp.func
 def proceed_broad_phase(group_a: int, group_b: int) -> bool:
@@ -78,7 +65,7 @@ def nxn_broadphase_precomputed_pairs(
   # Input arrays
   elementid: int,
   geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
-  geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),  
+  geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
   geom_cutoff: wp.array(dtype=float, ndim=1),  # per-geom (take the max)
   nxn_geom_pair: wp.array(
     dtype=wp.vec2i, ndim=1
@@ -108,17 +95,27 @@ def nxn_broadphase_precomputed_pairs(
     )
 
 
+# Based on binary search
 @wp.func
-def isqrt(y: int) -> int:
-    L = int(0)
-    R = int(y + 1)
-    while L != R - 1:
-        M = (L + R) // 2
-        if M * M <= y:
-            L = M
-        else:
-            R = M
-    return L
+def get_lower_triangular_indices(index: int, matrix_size: int) -> wp.vec2i:
+  total = (matrix_size * (matrix_size - 1)) >> 1
+  if index >= total:
+    # In Warp, we can't throw, so return an invalid pair
+    return wp.vec2i(-1, -1)
+
+  low = int(0)
+  high = matrix_size - 1
+  while low < high:
+    mid = (low + high) >> 1
+    count = (mid * (2 * matrix_size - mid - 1)) >> 1
+    if count <= index:
+      low = mid + 1
+    else:
+      high = mid
+  r = low - 1
+  f = (r * (2 * matrix_size - r - 1)) >> 1
+  c = (index - f) + r + 1
+  return wp.vec2i(r, c)
 
 
 @wp.func
@@ -127,7 +124,7 @@ def nxn_broadphase(
   elementid: int,
   geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
   geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
-  num_boxes : int,
+  num_boxes: int,
   geom_cutoff: wp.array(dtype=float, ndim=1),  # per-geom (take the max)
   collision_group: wp.array(dtype=int, ndim=1),  # per-geom
   # Output arrays
@@ -135,14 +132,7 @@ def nxn_broadphase(
   num_candidate_pair: wp.array(dtype=int, ndim=1),  # Size one array
   max_candidate_pair: int,
 ):
-  # For lower triangle (i > j), no diagonal, elementid in [0, n*(n-1)//2)
-  i = (isqrt(8 * elementid + 1) + 1) // 2
-  j = elementid - i * (i - 1) // 2
-  pair = wp.vec2i(j, i)  # with i > j guaranteed
-
-  if i >= num_boxes or j >= num_boxes:
-    wp.printf("%d geom1=%d, geom2=%d\n",elementid, j, i)
-    return
+  pair = get_lower_triangular_indices(elementid, num_boxes)
 
   geom1 = pair[0]
   geom2 = pair[1]
@@ -168,23 +158,6 @@ def nxn_broadphase(
     )
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 wp.set_module_options({"enable_backward": False})
 
 
@@ -193,7 +166,7 @@ def nxn_broadphase_kernel(
   # Input arrays
   geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
   geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
-  num_boxes : int,
+  num_boxes: int,
   geom_cutoff: wp.array(dtype=float, ndim=1),  # per-geom (take the max)
   collision_group: wp.array(dtype=int, ndim=1),  # per-geom
   # Output arrays
@@ -216,27 +189,26 @@ def nxn_broadphase_kernel(
 
 
 def find_overlapping_pairs_np(box_lower: np.ndarray, box_upper: np.ndarray):
-    """
-    Brute-force n^2 algorithm to find all overlapping bounding box pairs.
-    Each box is axis-aligned, defined by min (lower) and max (upper) corners.
-    Returns a list of (i, j) pairs with i < j, where boxes i and j overlap.
-    """
-    n = box_lower.shape[0]
-    pairs = []
-    for i in range(n):
-        for j in range(i + 1, n):
-            # Check for overlap in all three axes
-            if (
-                (box_lower[i, 0] <= box_upper[j, 0] and box_upper[i, 0] >= box_lower[j, 0]) and
-                (box_lower[i, 1] <= box_upper[j, 1] and box_upper[i, 1] >= box_lower[j, 1]) and
-                (box_lower[i, 2] <= box_upper[j, 2] and box_upper[i, 2] >= box_lower[j, 2])
-            ):
-                pairs.append((i, j))
-    return pairs
+  """
+  Brute-force n^2 algorithm to find all overlapping bounding box pairs.
+  Each box is axis-aligned, defined by min (lower) and max (upper) corners.
+  Returns a list of (i, j) pairs with i < j, where boxes i and j overlap.
+  """
+  n = box_lower.shape[0]
+  pairs = []
+  for i in range(n):
+    for j in range(i + 1, n):
+      # Check for overlap in all three axes
+      if (
+        (box_lower[i, 0] <= box_upper[j, 0] and box_upper[i, 0] >= box_lower[j, 0])
+        and (box_lower[i, 1] <= box_upper[j, 1] and box_upper[i, 1] >= box_lower[j, 1])
+        and (box_lower[i, 2] <= box_upper[j, 2] and box_upper[i, 2] >= box_lower[j, 2])
+      ):
+        pairs.append((i, j))
+  return pairs
 
 
 def test_nxn_broadphase():
-
   # Create random bounding boxes in min-max format
   ngeom = 200  # You can parameterize this as needed
   # Generate random centers and sizes
@@ -248,8 +220,6 @@ def test_nxn_broadphase():
   pairs_np = find_overlapping_pairs_np(geom_bounding_box_lower, geom_bounding_box_upper)
   # print(pairs_np)
 
-  
-
   # The number of elements in the lower triangular part of an n x n matrix (excluding the diagonal)
   # is given by n * (n - 1) // 2
   num_lower_tri_elements = ngeom * (ngeom - 1) // 2
@@ -257,10 +227,15 @@ def test_nxn_broadphase():
   geom_bounding_box_lower_wp = wp.array(geom_bounding_box_lower, dtype=wp.vec3)
   geom_bounding_box_upper_wp = wp.array(geom_bounding_box_upper, dtype=wp.vec3)
   geom_cutoff = wp.array(np.zeros(ngeom, dtype=np.float32))
-  collision_group = wp.array(np.ones(ngeom, dtype=np.int32)) 
-  num_candidate_pair = wp.array([0, ], dtype=wp.int32)
+  collision_group = wp.array(np.ones(ngeom, dtype=np.int32))
+  num_candidate_pair = wp.array(
+    [
+      0,
+    ],
+    dtype=wp.int32,
+  )
   max_candidate_pair = num_lower_tri_elements
-  candidate_pair = wp.array(np.zeros((max_candidate_pair, 2), dtype=wp.int32), dtype= wp.vec2i)
+  candidate_pair = wp.array(np.zeros((max_candidate_pair, 2), dtype=wp.int32), dtype=wp.vec2i)
 
   wp.launch(
     nxn_broadphase_kernel,
@@ -285,7 +260,6 @@ def test_nxn_broadphase():
     assert tuple(pair) in pairs_np_set, f"Pair {tuple(pair)} from Warp not found in numpy pairs"
 
   print(len(pairs_np))
-
 
 
 def test_sap_broadphase():
