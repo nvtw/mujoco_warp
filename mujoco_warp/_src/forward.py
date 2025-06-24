@@ -525,7 +525,7 @@ def implicit(m: Model, d: Data):
 
 
 @event_scope
-def fwd_position(m: Model, d: Data):
+def fwd_position(m: Model, d: Data, skip_collision: bool = False):
   """Position-dependent computations."""
 
   smooth.kinematics(m, d)
@@ -535,7 +535,8 @@ def fwd_position(m: Model, d: Data):
   smooth.crb(m, d)
   smooth.tendon_armature(m, d)
   smooth.factor_m(m, d)
-  collision_driver.collision(m, d)
+  if not skip_collision:
+    collision_driver.collision(m, d)
   constraint.make_constraint(m, d)
   smooth.transmission(m, d)
 
@@ -1078,11 +1079,11 @@ def fwd_acceleration(m: Model, d: Data):
 
 
 @event_scope
-def forward(m: Model, d: Data):
+def forward(m: Model, d: Data, skip_collision: bool = False):
   """Forward dynamics."""
   energy = m.opt.enableflags & EnableBit.ENERGY
 
-  fwd_position(m, d)
+  fwd_position(m, d, skip_collision)
   sensor.sensor_pos(m, d)
 
   if energy:
@@ -1106,9 +1107,9 @@ def forward(m: Model, d: Data):
 
 
 @event_scope
-def step(m: Model, d: Data):
+def step(m: Model, d: Data, skip_collision: bool = False):
   """Advance simulation."""
-  forward(m, d)
+  forward(m, d, skip_collision)
 
   if m.opt.integrator == IntegratorType.EULER:
     euler(m, d)
