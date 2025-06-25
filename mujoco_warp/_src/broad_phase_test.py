@@ -215,6 +215,7 @@ def sap_broadphase_kernel(
   geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
   num_boxes: int,
   num_minus_one_boxes: wp.array(dtype=int, ndim=1),# Size one array
+  sorted_collision_group: wp.array(dtype=int, ndim=1),
   sap_sort_index_in: wp.array(dtype=int, ndim=1),
   sap_cumulative_sum_in: wp.array(dtype=int, ndim=1),
   geom_cutoff: wp.array(dtype=float, ndim=1),
@@ -248,6 +249,11 @@ def sap_broadphase_kernel(
     # get geom indices and swap if necessary
     geom1 = sap_sort_index_in[i]
     geom2 = sap_sort_index_in[j]
+    group1 = sorted_collision_group[geom1]
+    group2 = sorted_collision_group[geom2]
+
+    if(group1 == 0 or group2 == 0):
+      continue
 
     if(geom1 > geom2):
       tmp = geom1
@@ -460,6 +466,7 @@ def sap_broadphase(
       geom_bounding_box_upper_wp,
       -1,
       index_tracking_tmp_counter,
+      collision_group_tmp,
       sap_sort_index,
       sap_cumulative_sum,
       geom_cutoff,
@@ -516,6 +523,7 @@ def sap_broadphase(
       geom_bounding_box_upper_wp,
       num_boxes,
       index_tracking_tmp_counter,
+      collision_group_tmp,
       sap_sort_index,
       sap_cumulative_sum,
       geom_cutoff,
