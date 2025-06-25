@@ -23,15 +23,15 @@ import warp as wp
 wp.set_module_options({"enable_backward": False})
 
 
-# Collision filtering
-@wp.func
-def proceed_broad_phase(group_a: int, group_b: int) -> bool:
-  if group_a == 0 or group_b == 0:
-    return False
-  if group_a > 0:
-    return group_a == group_b or group_b < 0
-  if group_a < 0:
-    return group_a != group_b
+# # Collision filtering
+# @wp.func
+# def proceed_broad_phase(group_a: int, group_b: int) -> bool:
+#   if group_a == 0 or group_b == 0:
+#     return False
+#   if group_a > 0:
+#     return group_a == group_b or group_b < 0
+#   if group_a < 0:
+#     return group_a != group_b
 
 
 @wp.func
@@ -64,106 +64,6 @@ def write_pair(
   candidate_pair[pairid] = pair
 
 
-@wp.func
-def nxn_broadphase_precomputed_pairs(
-  # Input arrays
-  elementid: int,
-  geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
-  geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
-  geom_cutoff: wp.array(dtype=float, ndim=1),  # per-geom (take the max)
-  nxn_geom_pair: wp.array(
-    dtype=wp.vec2i, ndim=1
-  ),  # Precompute, all pairs that need to be checked - static information, not associated with a specific environment - make optional, empty list (None) allowed
-  # Output arrays
-  candidate_pair: wp.array(dtype=wp.vec2i, ndim=1),
-  num_candidate_pair: wp.array(dtype=int, ndim=1),  # Size one array
-  max_candidate_pair: int,
-):
-  pair = nxn_geom_pair[elementid]
-  geom1 = pair[0]
-  geom2 = pair[1]
-
-  if check_aabb_overlap(
-    geom_bounding_box_lower[geom1],
-    geom_bounding_box_upper[geom1],
-    geom_cutoff[geom1],
-    geom_bounding_box_lower[geom2],
-    geom_bounding_box_upper[geom2],
-    geom_cutoff[geom2],
-  ):
-    write_pair(
-      pair,
-      candidate_pair,
-      num_candidate_pair,
-      max_candidate_pair,
-    )
-
-
-# Based on binary search
-@wp.func
-def get_lower_triangular_indices(index: int, matrix_size: int) -> wp.vec2i:
-  total = (matrix_size * (matrix_size - 1)) >> 1
-  if index >= total:
-    # In Warp, we can't throw, so return an invalid pair
-    return wp.vec2i(-1, -1)
-
-  low = int(0)
-  high = matrix_size - 1
-  while low < high:
-    mid = (low + high) >> 1
-    count = (mid * (2 * matrix_size - mid - 1)) >> 1
-    if count <= index:
-      low = mid + 1
-    else:
-      high = mid
-  r = low - 1
-  f = (r * (2 * matrix_size - r - 1)) >> 1
-  c = (index - f) + r + 1
-  return wp.vec2i(r, c)
-
-
-@wp.func
-def nxn_broadphase(
-  # Input arrays
-  elementid: int,
-  geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
-  geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
-  first_box_index : int,
-  num_boxes: int,
-  geom_cutoff: wp.array(dtype=float, ndim=1),  # per-geom (take the max)
-  collision_group: wp.array(dtype=int, ndim=1),  # per-geom
-  # Output arrays
-  candidate_pair: wp.array(dtype=wp.vec2i, ndim=1),
-  num_candidate_pair: wp.array(dtype=int, ndim=1),  # Size one array
-  max_candidate_pair: int,
-):
-  pair = get_lower_triangular_indices(elementid, num_boxes)
-  pair[0] += first_box_index
-  pair[1] += first_box_index
-
-  geom1 = pair[0]
-  geom2 = pair[1]
-
-  if collision_group.shape[0] > 0 and not proceed_broad_phase(collision_group[geom1], collision_group[geom2]):
-    return
-
-  # wp.printf("geom1=%d, geom2=%d\n", geom1, geom2)
-
-  if check_aabb_overlap(
-    geom_bounding_box_lower[geom1],
-    geom_bounding_box_upper[geom1],
-    geom_cutoff[geom1],
-    geom_bounding_box_lower[geom2],
-    geom_bounding_box_upper[geom2],
-    geom_cutoff[geom2],
-  ):
-    write_pair(
-      pair,
-      candidate_pair,
-      num_candidate_pair,
-      max_candidate_pair,
-    )
-
 
 @wp.func
 def _binary_search(values: wp.array(dtype=Any), value: Any, lower: int, upper: int) -> int:
@@ -177,10 +77,6 @@ def _binary_search(values: wp.array(dtype=Any), value: Any, lower: int, upper: i
   return upper
 
 
-
-
-
-
 # Determines the amount of geoms that need to be checked for overlap
 # Can vary a lot between different threads
 # Use load balancing (by using a scan) based on the result of sap_range
@@ -188,9 +84,9 @@ def _binary_search(values: wp.array(dtype=Any), value: Any, lower: int, upper: i
 def sap_range(
   elementid: int,
   ngeom: int,
-  sap_projection_lower_in: wp.array(dtype=wp.float, ndim=1),
-  sap_projection_upper_in: wp.array(dtype=wp.float, ndim=1),
-  sap_sort_index_in: wp.array(dtype=wp.int, ndim=1),
+  sap_projection_lower_in: wp.array(dtype=float, ndim=1),
+  sap_projection_upper_in: wp.array(dtype=float, ndim=1),
+  sap_sort_index_in: wp.array(dtype=int, ndim=1),
 ):
   # current bounding geom
   idx = sap_sort_index_in[elementid]
@@ -204,13 +100,44 @@ def sap_range(
   return limit - elementid
 
 
+@wp.kernel
+def sap_range_kernel(
+  ngeom: int,
+  sap_projection_lower_in: wp.array(dtype=float, ndim=1),
+  sap_projection_upper_in: wp.array(dtype=float, ndim=1),
+  sap_sort_index_in: wp.array(dtype=int, ndim=1),
+  sap_range_out: wp.array(dtype=int, ndim=1),
+):
+  elementid = wp.tid()
+  if elementid >= ngeom:
+    return
+  count = sap_range(elementid, ngeom, sap_projection_lower_in, sap_projection_upper_in, sap_sort_index_in)
+  sap_range_out[elementid] = count
+
+
+@wp.kernel
+def sap_range_indexed_kernel(
+  indexer: wp.array(dtype=int, ndim=1),
+  indexer_length : wp.array(dtype=int, ndim=1), # Length 1 array
+  ngeom: int,
+  sap_projection_lower_in: wp.array(dtype=float, ndim=1),
+  sap_projection_upper_in: wp.array(dtype=float, ndim=1),
+  sap_sort_index_in: wp.array(dtype=int, ndim=1),
+  sap_range_out: wp.array(dtype=int, ndim=1),
+):
+  elementid = wp.tid()
+  if elementid >= indexer_length[0]:
+    return
+  count = sap_range(indexer[elementid], ngeom, sap_projection_lower_in, sap_projection_upper_in, sap_sort_index_in)
+  sap_range_out[elementid] = count
+
 
 @wp.func
 def process_single_sap_pair(
   pair: wp.vec2i,
   geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
   geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
-  geom_cutoff: wp.array(dtype=wp.float, ndim=1),  # per-geom (take the max)
+  geom_cutoff: wp.array(dtype=float, ndim=1), 
   candidate_pair: wp.array(dtype=wp.vec2i, ndim=1),
   num_candidate_pair: wp.array(dtype=int, ndim=1),  # Size one array
   max_candidate_pair: int,
@@ -233,71 +160,6 @@ def process_single_sap_pair(
       max_candidate_pair,
     )
 
-# Uses load balancing over envs
-@wp.func
-def sap_find_overlaps(
-  worldgeomid: int,
-
-):  
-  nworldgeom = nworld_in * ngeom
-  nworkpackages = sap_cumulative_sum_in[nworldgeom - 1]
-
-  while worldgeomid < nworkpackages:
-    # binary search to find current and next geom pair indices
-    i = _binary_search(sap_cumulative_sum_in, worldgeomid, 0, nworldgeom)
-    j = i + worldgeomid + 1
-
-    if i > 0:
-      j -= sap_cumulative_sum_in[i - 1]
-
-    worldid = i // ngeom
-    i = i % ngeom
-    j = j % ngeom
-
-    # get geom indices and swap if necessary
-    geom1 = sap_sort_index_in[worldid, i]
-    geom2 = sap_sort_index_in[worldid, j]
-
-    # find linear index of (geom1, geom2) in upper triangular nxn_pairid
-    if geom2 < geom1:
-      idx = upper_tri_index(ngeom, geom2, geom1)
-    else:
-      idx = upper_tri_index(ngeom, geom1, geom2)
-
-    if nxn_pairid[idx] < -1:
-      worldgeomid += nsweep_in
-      continue
-
-    pair = wp.vec2i(geom1, geom2)
-    process_single_sap_pair(
-      pair,
-      geom_bounding_box_lower,
-      geom_bounding_box_upper,
-      geom_cutoff,
-      candidate_pair,
-    )
-
-    worldgeomid += nsweep_in
-
-
-# @wp.func
-# def broad_phase_aabb(
-#   geom_bounding_box_lower: wp.array(dtype=vec3, ndim=1),
-#   geom_bounding_box_upper: wp.array(dtype=vec3, ndim=1),
-#   geom_cutoff: wp.array(dtype=wp.float, ndim=1),  # per-geom (take the max)
-#   collision_group: wp.array(
-#     dtype=int, ndim=1
-#   ),  # per-geom collision group. If number is negative, it collides with all the positive collision groups, and collides with all negative groups except itself. If number is positive, the the geom only collides with geoms that have the same collision group, and all negative groups. If number is zero, the geom collides with nothing.
-#   nxn_geom_pair: wp.array(dtype=vec2i, ndim=1)
-#   | None,  # Precompute, all pairs that need to be checkd - static information, not associated with a specific environment - make optional, empty list (None) allowed
-#   # outputs
-#   candidate_pair: wp.array(dtype=wp.vec2i, ndim=1),
-#   num_candidate_pair: wp.array(dtype=wp.int, ndim=1),  # Size one array
-#   max_candidate_pair: int,
-# ):
-#   pass
-
-
 
 @wp.kernel
 def sap_broadphase_kernel(
@@ -305,16 +167,52 @@ def sap_broadphase_kernel(
   geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
   geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
   num_boxes: int,
-  geom_cutoff: wp.array(dtype=float, ndim=1),  # per-geom (take the max)
-  collision_group: wp.array(dtype=int, ndim=1),  # per-geom
+  num_minus_one_boxes: wp.array(dtype=int, ndim=1),# Size one array
+  sap_sort_index_in: wp.array(dtype=int, ndim=1),
+  sap_cumulative_sum_in: wp.array(dtype=int, ndim=1),
+  geom_cutoff: wp.array(dtype=float, ndim=1),
+  nsweep_in: int,
   # Output arrays
   candidate_pair: wp.array(dtype=wp.vec2i, ndim=1),
   num_candidate_pair: wp.array(dtype=int, ndim=1),  # Size one array
   max_candidate_pair: int,
 ):
+  geomid = wp.tid()
+
+  if (num_boxes == -1):
+    num_boxes = num_minus_one_boxes[0]
+  else:
+    num_boxes = num_boxes - num_minus_one_boxes[0]
+ 
+  nworkpackages = int(0)
+  if num_boxes > 0:
+    nworkpackages = sap_cumulative_sum_in[num_boxes - 1]
+
+  while geomid < nworkpackages:
+    # binary search to find current and next geom pair indices
+    i = _binary_search(sap_cumulative_sum_in, geomid, 0, num_boxes)
+    j = i + geomid + 1
+
+    if i > 0:
+      j -= sap_cumulative_sum_in[i - 1]
 
 
-  pass
+
+    # get geom indices and swap if necessary
+    geom1 = sap_sort_index_in[i]
+    geom2 = sap_sort_index_in[j]
+
+    process_single_sap_pair(
+      wp.vec2i(geom1, geom2),
+      geom_bounding_box_lower,
+      geom_bounding_box_upper,
+      geom_cutoff,
+      candidate_pair,
+      num_candidate_pair,
+      max_candidate_pair,
+    )
+
+    geomid += nsweep_in
 
 
 
@@ -324,7 +222,7 @@ def sap_project_aabb(
   direction: wp.vec3, # Must be normalized
   geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
   geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
-  geom_cutoff: wp.array(dtype=wp.float, ndim=1),  # per-geom (take the max)
+  geom_cutoff: wp.array(dtype=float, ndim=1),  # per-geom (take the max)
 ) -> wp.vec2:
   lower = geom_bounding_box_lower[elementid]
   upper = geom_bounding_box_upper[elementid]
@@ -342,19 +240,38 @@ def sap_project_aabb_kernel(
   direction: wp.vec3, # Must be normalized
   geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
   geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
-  geom_cutoff: wp.array(dtype=wp.float, ndim=1),  # per-geom (take the max)
+  geom_cutoff: wp.array(dtype=float, ndim=1),  # per-geom (take the max)
+  sap_projection_lower_out: wp.array(dtype=float, ndim=1),
+  sap_projection_upper_out: wp.array(dtype=float, ndim=1),
+  sap_sort_index_out: wp.array(dtype=int, ndim=1),
 ):
   elementid = wp.tid()
-  sap_project_aabb(
+  proj = sap_project_aabb(
     elementid,
     direction,
     geom_bounding_box_lower,
     geom_bounding_box_upper,
     geom_cutoff,
   )
+  sap_projection_lower_out[elementid] = proj[0]
+  sap_projection_upper_out[elementid] = proj[1]
+  sap_sort_index_out[elementid] = elementid
 
-
-
+@wp.kernel
+def sap_assign_collision_group_kernel(
+  collision_group: wp.array(dtype=int, ndim=1),
+  sap_sort_index_out: wp.array(dtype=int, ndim=1),
+  collision_group_tmp: wp.array(dtype=int, ndim=1),
+  index_tracking_tmp: wp.array(dtype=int, ndim=1),
+  index_tracking_tmp_indexer: wp.array(dtype=int, ndim=1),
+):
+  id = wp.tid()
+  source_id = sap_sort_index_out[id]
+  group = collision_group[source_id]
+  collision_group_tmp[id] = group
+  if group == -1:
+    index = wp.atomic_add(index_tracking_tmp_indexer, 0, 1)
+    index_tracking_tmp[index] = id
 
 
 # Currently all sections that get sorted must have the same length
@@ -401,6 +318,16 @@ def sap_broadphase(
     candidate_pair: wp.array(dtype=wp.vec2i, ndim=1),
     num_candidate_pair: wp.array(dtype=int, ndim=1),
     max_candidate_pair: int,
+
+    # Temp memory
+    sap_projection_lower_out: wp.array(dtype=float, ndim=1),
+    sap_projection_upper_out: wp.array(dtype=float, ndim=1),
+    sap_sort_index_out: wp.array(dtype=int, ndim=1),
+    collision_group_tmp: wp.array(dtype=int, ndim=1),
+    index_tracking_tmp: wp.array(dtype=int, ndim=1),
+    index_tracking_tmp_indexer: wp.array(dtype=int, ndim=1), # Length 1 array
+    sap_range_out: wp.array(dtype=int, ndim=1),
+    sap_cumulative_sum: wp.array(dtype=int, ndim=1),
 ):
 
   # TODO: direction
@@ -417,6 +344,11 @@ def sap_broadphase(
       geom_bounding_box_lower_wp,
       geom_bounding_box_upper_wp,
       geom_cutoff,
+    ],
+    outputs=[
+      sap_projection_lower_out,
+      sap_projection_upper_out,
+      sap_sort_index_out,
     ]
   )
 
@@ -424,72 +356,134 @@ def sap_broadphase(
   # Then Extract the location of all objects with -1 as collision group -> index array
   # Run collision detection only for objects with collision group -1 - use load balancing
 
+  wp.utils.radix_sort_pairs(
+    sap_projection_lower_out,
+    sap_sort_index_out,
+    ngeom
+    )
+  
+
+  wp.launch(
+    kernel=sap_assign_collision_group_kernel,
+    dim=ngeom,
+    inputs=[
+      collision_group,
+      sap_sort_index_out
+    ],
+    outputs=[
+      collision_group_tmp,
+      index_tracking_tmp,
+      index_tracking_tmp_indexer,
+    ]
+  )
+
+
+  # Process collision group -1
+  wp.launch(
+    kernel=sap_range_indexed_kernel,
+    dim=ngeom,
+    inputs=[
+      index_tracking_tmp,
+      index_tracking_tmp_indexer,
+      ngeom,
+      sap_projection_lower_out,
+      sap_projection_upper_out,
+      sap_sort_index_out,
+      sap_range_out,
+    ]
+  )
+
+  # TODO: Is it possible to only do the scan over index_tracking_tmp_indexer[0] elements?
+  wp.utils.array_scan(sap_range_out.reshape(-1), sap_cumulative_sum, True)
+
+  nsweep_in = 5 * ngeom
+  wp.launch(
+    kernel=sap_broadphase_kernel,
+    dim=ngeom,
+    inputs=[
+      geom_bounding_box_lower_wp,
+      geom_bounding_box_upper_wp,
+      -1,
+      index_tracking_tmp_indexer,
+      sap_sort_index_out,
+      sap_cumulative_sum,
+      geom_cutoff,
+      nsweep_in,
+    ],
+    outputs=[
+      candidate_pair,
+      num_candidate_pair,
+      max_candidate_pair,
+    ]
+  )
+
+
+  wp.synchronize()
+  # print(collision_group_tmp.numpy())
+  # print(index_tracking_tmp.numpy())
+  print(sap_projection_lower_out.numpy())
+  print(sap_sort_index_out.numpy())
+  print(index_tracking_tmp_indexer.numpy())
+  print(num_candidate_pair.numpy())
+
+  # Process collision groups > 0
+  # Requires sort_pairs to be a stable sort
+  wp.utils.radix_sort_pairs(
+    collision_group_tmp,
+    sap_sort_index_out,
+    ngeom
+    )
+
+  # TODO: Ensure that negative collision groups end up at the end of the array
+  wp.launch(
+    kernel=sap_range_kernel,
+    dim=ngeom,
+    inputs=[
+      ngeom,
+      sap_projection_lower_out,
+      sap_projection_upper_out,
+      sap_sort_index_out,
+      sap_range_out,
+    ]
+  )
+
+  wp.utils.array_scan(sap_range_out.reshape(-1), sap_cumulative_sum, True)
+
   # Second: Sort according to groups starting reusing the track array as payload
   # Now run collision detection for all objects with collision group > 0 - only collide them against the same group since -1 group was already handled
 
+  wp.launch(
+    kernel=sap_broadphase_kernel,
+    dim=ngeom,
+    inputs=[
+      geom_bounding_box_lower_wp,
+      geom_bounding_box_upper_wp,
+      ngeom,
+      index_tracking_tmp_indexer,
+      sap_sort_index_out,
+      sap_cumulative_sum,
+      geom_cutoff,
+      nsweep_in,
+    ],
+    outputs=[
+      candidate_pair,
+      num_candidate_pair,
+      max_candidate_pair,
+    ]
+  )
+
+
+  wp.synchronize()
+  print("End ------------------------")
+  # print(index_tracking_tmp.numpy())
+  print(sap_projection_lower_out.numpy())
+  print(sap_sort_index_out.numpy())
+  print(sap_cumulative_sum.numpy())
+  print(index_tracking_tmp_indexer.numpy())
+  print(num_candidate_pair.numpy())
+
 
   pass
-
-
-
-
-
-
-@wp.kernel
-def nxn_broadphase_kernel(
-  # Input arrays
-  geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
-  geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
-  num_boxes: int,
-  geom_cutoff: wp.array(dtype=float, ndim=1),  # per-geom (take the max)
-  collision_group: wp.array(dtype=int, ndim=1),  # per-geom
-  # Output arrays
-  candidate_pair: wp.array(dtype=wp.vec2i, ndim=1),
-  num_candidate_pair: wp.array(dtype=int, ndim=1),  # Size one array
-  max_candidate_pair: int,
-):
-  elementid = wp.tid()
-  nxn_broadphase(
-    elementid,
-    geom_bounding_box_lower,
-    geom_bounding_box_upper,
-    0,
-    num_boxes,
-    geom_cutoff,
-    collision_group,
-    candidate_pair,
-    num_candidate_pair,
-    max_candidate_pair,
-  )
-
-
-@wp.kernel
-def nxn_broadphase_kernel_identical_envs(
-  # Input arrays
-  geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
-  geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
-  num_boxes: int,
-  geom_cutoff: wp.array(dtype=float, ndim=1),  # per-geom (take the max)
-  collision_group: wp.array(dtype=int, ndim=1),  # per-geom
-  num_boxes_per_env: int,
-  # Output arrays
-  candidate_pair: wp.array(dtype=wp.vec2i, ndim=1),
-  num_candidate_pair: wp.array(dtype=int, ndim=1),  # Size one array
-  max_candidate_pair: int,
-):
-  thread_id = wp.tid()
-  
-  nxn_broadphase(
-    elementid,
-    geom_bounding_box_lower,
-    geom_bounding_box_upper,
-    num_boxes,
-    geom_cutoff,
-    collision_group,
-    candidate_pair,
-    num_candidate_pair,
-    max_candidate_pair,
-  )
 
 
 def find_overlapping_pairs_np(box_lower: np.ndarray, box_upper: np.ndarray):
@@ -512,65 +506,13 @@ def find_overlapping_pairs_np(box_lower: np.ndarray, box_upper: np.ndarray):
   return pairs
 
 
-def test_nxn_broadphase():
-  # Create random bounding boxes in min-max format
-  ngeom = 200  # You can parameterize this as needed
-  # Generate random centers and sizes
-  centers = np.random.rand(ngeom, 3) * 10.0
-  sizes = np.random.rand(ngeom, 3) * 2.0  # box half-extent up to 1.0 in each direction
-  geom_bounding_box_lower = centers - sizes
-  geom_bounding_box_upper = centers + sizes
-
-  pairs_np = find_overlapping_pairs_np(geom_bounding_box_lower, geom_bounding_box_upper)
-  # print(pairs_np)
-
-  # The number of elements in the lower triangular part of an n x n matrix (excluding the diagonal)
-  # is given by n * (n - 1) // 2
-  num_lower_tri_elements = ngeom * (ngeom - 1) // 2
-
-  geom_bounding_box_lower_wp = wp.array(geom_bounding_box_lower, dtype=wp.vec3)
-  geom_bounding_box_upper_wp = wp.array(geom_bounding_box_upper, dtype=wp.vec3)
-  geom_cutoff = wp.array(np.zeros(ngeom, dtype=np.float32))
-  collision_group = wp.array(np.ones(ngeom, dtype=np.int32))
-  num_candidate_pair = wp.array(
-    [
-      0,
-    ],
-    dtype=wp.int32,
-  )
-  max_candidate_pair = num_lower_tri_elements
-  candidate_pair = wp.array(np.zeros((max_candidate_pair, 2), dtype=wp.int32), dtype=wp.vec2i)
-
-  wp.launch(
-    nxn_broadphase_kernel,
-    dim=num_lower_tri_elements,
-    inputs=[geom_bounding_box_lower_wp, geom_bounding_box_upper_wp, ngeom, geom_cutoff, collision_group],
-    outputs=[candidate_pair, num_candidate_pair, max_candidate_pair],
-  )
-  wp.synchronize()
-
-  pairs_wp = candidate_pair.numpy()
-  num_candidate_pair = num_candidate_pair.numpy()[0]
-
-  if len(pairs_np) != num_candidate_pair:
-    print(f"len(pairs_np)={len(pairs_np)}, num_candidate_pair={num_candidate_pair}")
-    # print("pairs_np:", pairs_np)
-    # print("pairs_wp[:num_candidate_pair]:", pairs_wp[:num_candidate_pair])
-    assert len(pairs_np) == num_candidate_pair
-
-  # Ensure every element in pairs_wp is also present in pairs_np
-  pairs_np_set = set(tuple(pair) for pair in pairs_np)
-  for pair in pairs_wp[:num_candidate_pair]:
-    assert tuple(pair) in pairs_np_set, f"Pair {tuple(pair)} from Warp not found in numpy pairs"
-
-  print(len(pairs_np))
 
 
 def test_sap_broadphase():
   # Create random bounding boxes in min-max format
-  ngeom = 200  # You can parameterize this as needed
+  ngeom = 10
   # Generate random centers and sizes
-  centers = np.random.rand(ngeom, 3) * 10.0
+  centers = np.random.rand(ngeom, 3) * 3.0
   sizes = np.random.rand(ngeom, 3) * 2.0  # box half-extent up to 1.0 in each direction
   geom_bounding_box_lower = centers - sizes
   geom_bounding_box_upper = centers + sizes
@@ -594,6 +536,17 @@ def test_sap_broadphase():
   )
   max_candidate_pair = num_lower_tri_elements
   candidate_pair = wp.array(np.zeros((max_candidate_pair, 2), dtype=wp.int32), dtype=wp.vec2i)
+
+  # Temp memory arrays needed for sap_broadphase
+  # Factor 2 in some arrays is required for radix sort
+  sap_projection_lower_out = wp.array(np.zeros(2*ngeom, dtype=np.float32))
+  sap_projection_upper_out = wp.array(np.zeros(ngeom, dtype=np.float32))
+  sap_sort_index_out = wp.array(np.zeros(2*ngeom, dtype=np.int32))
+  collision_group_tmp = wp.array(np.zeros(2*ngeom, dtype=np.int32))
+  index_tracking_tmp = wp.array(np.zeros(ngeom, dtype=np.int32))
+  index_tracking_tmp_indexer = wp.array(np.zeros(1, dtype=np.int32))
+  sap_range_out = wp.array(np.zeros(ngeom, dtype=np.int32))
+  sap_cumulative_sum = wp.array(np.zeros(ngeom, dtype=np.int32))
 
   sap_broadphase(
     geom_bounding_box_lower_wp,
@@ -604,6 +557,14 @@ def test_sap_broadphase():
     candidate_pair,
     num_candidate_pair,
     max_candidate_pair,
+    sap_projection_lower_out,
+    sap_projection_upper_out,
+    sap_sort_index_out,
+    collision_group_tmp,
+    index_tracking_tmp,
+    index_tracking_tmp_indexer,
+    sap_range_out,
+    sap_cumulative_sum,
   )
 
   wp.synchronize()
@@ -627,5 +588,4 @@ def test_sap_broadphase():
 
 if __name__ == "__main__":
   wp.clear_kernel_cache()
-  test_nxn_broadphase()
   test_sap_broadphase()
