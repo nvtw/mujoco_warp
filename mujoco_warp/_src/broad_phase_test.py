@@ -66,6 +66,42 @@ def _binary_search(values: wp.array(dtype=Any), value: Any, lower: int, upper: i
 
   return upper
 
+@wp.func
+def _binary_search_2(
+    values_high_bit: wp.array(dtype=Any),
+    values: wp.array(dtype=Any),
+    value_high: int,
+    value: Any,
+    lower: int,
+    upper: int
+) -> int:
+    """
+    Binary search for a value in a sorted array, where the high bit is the primary key.
+
+    Args:
+        values_high_bit: Array of "high" values (primary key, e.g., group or priority).
+        values: Array of values to search (secondary key, must be sorted within high bit).
+        value_high: The high value to compare (primary key).
+        value: The value to search for (secondary key).
+        lower: Lower bound index (inclusive).
+        upper: Upper bound index (exclusive).
+
+    Returns:
+        The index where (value_high, value) should be inserted to maintain order.
+    """
+    while lower < upper:
+        mid = (lower + upper) >> 1
+        if values_high_bit[mid] > value_high:
+            upper = mid
+        elif values_high_bit[mid] < value_high:
+            lower = mid + 1
+        else:
+            if values[mid] > value:
+                upper = mid
+            else:
+                lower = mid + 1
+    return upper
+
 
 # Determines the amount of geoms that need to be checked for overlap
 # Can vary a lot between different threads
@@ -89,10 +125,31 @@ def sap_range(
   # range of geoms for the sweep and prune process
   return limit - elementid
 
+@wp.func
+def sap_range_2(
+  elementid: int,
+  ngeom: int,
+  sap_collision_group_in: wp.array(dtype=int, ndim=1),
+  sap_projection_lower_in: wp.array(dtype=float, ndim=1),
+  sap_projection_upper_in: wp.array(dtype=float, ndim=1),
+  sap_sort_index_in: wp.array(dtype=int, ndim=1),
+):
+  # current bounding geom
+  idx = sap_sort_index_in[elementid]
+
+  group = sap_collision_group_in[elementid]
+  upper = sap_projection_upper_in[idx]
+
+  limit = _binary_search_2(sap_collision_group_in, sap_projection_lower_in, group, upper, elementid + 1, ngeom)
+  limit = wp.min(ngeom - 1, limit)
+
+  # range of geoms for the sweep and prune process
+  return limit - elementid
 
 @wp.kernel
 def sap_range_kernel(
   ngeom: int,
+  sorted_collision_group: wp.array(dtype=int, ndim=1),
   sap_projection_lower_in: wp.array(dtype=float, ndim=1),
   sap_projection_upper_in: wp.array(dtype=float, ndim=1),
   sap_sort_index_in: wp.array(dtype=int, ndim=1),
@@ -101,7 +158,7 @@ def sap_range_kernel(
   elementid = wp.tid()
   if elementid >= ngeom:
     return
-  count = sap_range(elementid, ngeom, sap_projection_lower_in, sap_projection_upper_in, sap_sort_index_in)
+  count = sap_range_2(elementid, ngeom, sorted_collision_group, sap_projection_lower_in, sap_projection_upper_in, sap_sort_index_in)
   sap_range_out[elementid] = count
 
 
@@ -300,6 +357,12 @@ def create_sap_sort_func(sort_length: int):
   return sap_sort_index
 
 
+
+
+
+
+
+
 def sap_broadphase(
     geom_bounding_box_lower_wp: wp.array(dtype=wp.vec3, ndim=1),
     geom_bounding_box_upper_wp: wp.array(dtype=wp.vec3, ndim=1),
@@ -432,6 +495,7 @@ def sap_broadphase(
     dim=num_boxes,
     inputs=[
       num_boxes,
+      collision_group_tmp,
       sap_projection_lower,
       sap_projection_upper,
       sap_sort_index,
