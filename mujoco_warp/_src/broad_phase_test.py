@@ -23,16 +23,6 @@ import warp as wp
 wp.set_module_options({"enable_backward": False})
 
 
-# # Collision filtering
-# @wp.func
-# def proceed_broad_phase(group_a: int, group_b: int) -> bool:
-#   if group_a == 0 or group_b == 0:
-#     return False
-#   if group_a > 0:
-#     return group_a == group_b or group_b < 0
-#   if group_a < 0:
-#     return group_a != group_b
-
 
 @wp.func
 def check_aabb_overlap(
@@ -228,10 +218,16 @@ def sap_project_aabb(
   geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
   geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
   geom_cutoff: wp.array(dtype=float, ndim=1),  # per-geom (take the max)
+  collision_group: wp.array(dtype=int, ndim=1),
 ) -> wp.vec2:
   lower = geom_bounding_box_lower[elementid]
   upper = geom_bounding_box_upper[elementid]
   cutoff = geom_cutoff[elementid]
+  group = collision_group[elementid]
+
+  if(group == 0):
+    # Collision group 0 does not collide with anything
+    return wp.vec2(1000000.0 + float(elementid), 1000000.0 + float(elementid))
 
   half_size = 0.5 * (upper - lower)
   half_size = wp.vec3(half_size[0]+ cutoff, half_size[1]+ cutoff, half_size[2]+ cutoff)
@@ -246,6 +242,7 @@ def sap_project_aabb_kernel(
   geom_bounding_box_lower: wp.array(dtype=wp.vec3, ndim=1),
   geom_bounding_box_upper: wp.array(dtype=wp.vec3, ndim=1),
   geom_cutoff: wp.array(dtype=float, ndim=1),  # per-geom (take the max)
+  collision_group: wp.array(dtype=int, ndim=1),
   sap_projection_lower_out: wp.array(dtype=float, ndim=1),
   sap_projection_upper_out: wp.array(dtype=float, ndim=1),
   sap_sort_index_out: wp.array(dtype=int, ndim=1),
@@ -257,6 +254,7 @@ def sap_project_aabb_kernel(
     geom_bounding_box_lower,
     geom_bounding_box_upper,
     geom_cutoff,
+    collision_group
   )
   sap_projection_lower_out[elementid] = proj[0]
   sap_projection_upper_out[elementid] = proj[1]
@@ -337,6 +335,7 @@ def sap_broadphase(
       geom_bounding_box_lower_wp,
       geom_bounding_box_upper_wp,
       geom_cutoff,
+      collision_group
     ],
     outputs=[
       sap_projection_lower,
@@ -345,8 +344,8 @@ def sap_broadphase(
     ]
   )
 
-  # First: sort lower projections - keep track of the original index -> track array
-  # Then Extract the location of all objects with -1 as collision group -> index array
+  # First: sort lower projections - keep track of the original index
+  # Then Extract the location of all objects with -1 as collision group 
   # Run collision detection only for objects with collision group -1 - use load balancing
 
   wp.utils.radix_sort_pairs(
@@ -477,7 +476,18 @@ def sap_broadphase(
   
 
 
-def find_overlapping_pairs_np(box_lower: np.ndarray, box_upper: np.ndarray):
+# Collision filtering
+def proceed_broad_phase(group_a: int, group_b: int) -> bool:
+  if group_a == 0 or group_b == 0:
+    return False
+  if group_a > 0:
+    return group_a == group_b or group_b < 0
+  if group_a < 0:
+    return group_a != group_b
+
+
+def find_overlapping_pairs_np(box_lower: np.ndarray, box_upper: np.ndarray, 
+                              cutoff: np.ndarray, collision_group: np.ndarray):
   """
   Brute-force n^2 algorithm to find all overlapping bounding box pairs.
   Each box is axis-aligned, defined by min (lower) and max (upper) corners.
@@ -488,10 +498,17 @@ def find_overlapping_pairs_np(box_lower: np.ndarray, box_upper: np.ndarray):
   for i in range(n):
     for j in range(i + 1, n):
       # Check for overlap in all three axes
+      cutoff_combined = max(cutoff[i], cutoff[j])
+      if not proceed_broad_phase(collision_group[i], collision_group[j]):
+        continue
+
       if (
-        (box_lower[i, 0] <= box_upper[j, 0] and box_upper[i, 0] >= box_lower[j, 0])
-        and (box_lower[i, 1] <= box_upper[j, 1] and box_upper[i, 1] >= box_lower[j, 1])
-        and (box_lower[i, 2] <= box_upper[j, 2] and box_upper[i, 2] >= box_lower[j, 2])
+        (box_lower[i, 0] <= box_upper[j, 0] + cutoff_combined
+        and box_upper[i, 0] >= box_lower[j, 0]) - cutoff_combined
+        and (box_lower[i, 1] <= box_upper[j, 1]+ cutoff_combined
+        and box_upper[i, 1] >= box_lower[j, 1]) - cutoff_combined
+        and (box_lower[i, 2] <= box_upper[j, 2]+ cutoff_combined
+        and box_upper[i, 2] >= box_lower[j, 2]) - cutoff_combined
       ):
         pairs.append((i, j))
   return pairs
@@ -508,7 +525,11 @@ def test_sap_broadphase():
   geom_bounding_box_lower = centers - sizes
   geom_bounding_box_upper = centers + sizes
 
-  pairs_np = find_overlapping_pairs_np(geom_bounding_box_lower, geom_bounding_box_upper)
+  np_geom_cutoff = np.zeros(ngeom, dtype=np.float32)
+  np_collision_group = np.ones(ngeom, dtype=np.int32)
+
+  pairs_np = find_overlapping_pairs_np(geom_bounding_box_lower, geom_bounding_box_upper,
+                                        np_geom_cutoff, np_collision_group)
   # print(pairs_np)
 
   # The number of elements in the lower triangular part of an n x n matrix (excluding the diagonal)
@@ -516,9 +537,9 @@ def test_sap_broadphase():
   num_lower_tri_elements = ngeom * (ngeom - 1) // 2
 
   geom_bounding_box_lower_wp = wp.array(geom_bounding_box_lower, dtype=wp.vec3)
-  geom_bounding_box_upper_wp = wp.array(geom_bounding_box_upper, dtype=wp.vec3)
-  geom_cutoff = wp.array(np.zeros(ngeom, dtype=np.float32))
-  collision_group = wp.array(np.ones(ngeom, dtype=np.int32))
+  geom_bounding_box_upper_wp = wp.array(geom_bounding_box_upper, dtype=wp.vec3)  
+  geom_cutoff = wp.array(np_geom_cutoff)
+  collision_group = wp.array(np_collision_group)
   num_candidate_pair = wp.array(
     [
       0,
