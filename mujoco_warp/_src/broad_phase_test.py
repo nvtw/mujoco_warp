@@ -202,6 +202,11 @@ def sap_broadphase_kernel(
     geom1 = sap_sort_index_in[i]
     geom2 = sap_sort_index_in[j]
 
+    if(geom1 > geom2):
+      tmp = geom1
+      geom1 = geom2
+      geom2 = tmp
+
     process_single_sap_pair(
       wp.vec2i(geom1, geom2),
       geom_bounding_box_lower,
@@ -297,22 +302,10 @@ def create_sap_sort_func(sort_length: int):
   return sap_sort_index
 
 
-def create_sap_sort_kernel(sort_length: int):
-  @wp.kernel
-  def sap_sort_index_kernel(
-    startid: int,
-    sap_projection_lower_in: wp.array(dtype=float),
-    sap_sort_index_in: wp.array(dtype=int),
-  ):
-    sap_sort_index(startid, sap_projection_lower_in, sap_sort_index_in)
-  return sap_sort_index_kernel
-
-
-
 def sap_broadphase(
     geom_bounding_box_lower_wp: wp.array(dtype=wp.vec3, ndim=1),
     geom_bounding_box_upper_wp: wp.array(dtype=wp.vec3, ndim=1),
-    ngeom: int,
+    num_boxes: int,
     geom_cutoff: wp.array(dtype=float, ndim=1),
     collision_group: wp.array(dtype=int, ndim=1),
     candidate_pair: wp.array(dtype=wp.vec2i, ndim=1),
@@ -320,13 +313,13 @@ def sap_broadphase(
     max_candidate_pair: int,
 
     # Temp memory
-    sap_projection_lower_out: wp.array(dtype=float, ndim=1),
-    sap_projection_upper_out: wp.array(dtype=float, ndim=1),
-    sap_sort_index_out: wp.array(dtype=int, ndim=1),
+    sap_projection_lower: wp.array(dtype=float, ndim=1),
+    sap_projection_upper: wp.array(dtype=float, ndim=1),
+    sap_sort_index: wp.array(dtype=int, ndim=1),
     collision_group_tmp: wp.array(dtype=int, ndim=1),
     index_tracking_tmp: wp.array(dtype=int, ndim=1),
-    index_tracking_tmp_indexer: wp.array(dtype=int, ndim=1), # Length 1 array
-    sap_range_out: wp.array(dtype=int, ndim=1),
+    index_tracking_tmp_counter: wp.array(dtype=int, ndim=1), # Length 1 array
+    sap_range: wp.array(dtype=int, ndim=1),
     sap_cumulative_sum: wp.array(dtype=int, ndim=1),
 ):
 
@@ -338,7 +331,7 @@ def sap_broadphase(
 
   wp.launch(
     kernel=sap_project_aabb_kernel,
-    dim=ngeom,
+    dim=num_boxes,
     inputs=[
       direction,
       geom_bounding_box_lower_wp,
@@ -346,9 +339,9 @@ def sap_broadphase(
       geom_cutoff,
     ],
     outputs=[
-      sap_projection_lower_out,
-      sap_projection_upper_out,
-      sap_sort_index_out,
+      sap_projection_lower,
+      sap_projection_upper,
+      sap_sort_index,
     ]
   )
 
@@ -357,23 +350,23 @@ def sap_broadphase(
   # Run collision detection only for objects with collision group -1 - use load balancing
 
   wp.utils.radix_sort_pairs(
-    sap_projection_lower_out,
-    sap_sort_index_out,
-    ngeom
+    sap_projection_lower,
+    sap_sort_index,
+    num_boxes
     )
   
 
   wp.launch(
     kernel=sap_assign_collision_group_kernel,
-    dim=ngeom,
+    dim=num_boxes,
     inputs=[
       collision_group,
-      sap_sort_index_out
+      sap_sort_index
     ],
     outputs=[
       collision_group_tmp,
       index_tracking_tmp,
-      index_tracking_tmp_indexer,
+      index_tracking_tmp_counter,
     ]
   )
 
@@ -381,31 +374,31 @@ def sap_broadphase(
   # Process collision group -1
   wp.launch(
     kernel=sap_range_indexed_kernel,
-    dim=ngeom,
+    dim=num_boxes,
     inputs=[
       index_tracking_tmp,
-      index_tracking_tmp_indexer,
-      ngeom,
-      sap_projection_lower_out,
-      sap_projection_upper_out,
-      sap_sort_index_out,
-      sap_range_out,
+      index_tracking_tmp_counter,
+      num_boxes,
+      sap_projection_lower,
+      sap_projection_upper,
+      sap_sort_index,
+      sap_range,
     ]
   )
 
   # TODO: Is it possible to only do the scan over index_tracking_tmp_indexer[0] elements?
-  wp.utils.array_scan(sap_range_out.reshape(-1), sap_cumulative_sum, True)
+  wp.utils.array_scan(sap_range.reshape(-1), sap_cumulative_sum, True)
 
-  nsweep_in = 5 * ngeom
+  nsweep_in = 5 * num_boxes
   wp.launch(
     kernel=sap_broadphase_kernel,
-    dim=ngeom,
+    dim=nsweep_in,
     inputs=[
       geom_bounding_box_lower_wp,
       geom_bounding_box_upper_wp,
       -1,
-      index_tracking_tmp_indexer,
-      sap_sort_index_out,
+      index_tracking_tmp_counter,
+      sap_sort_index,
       sap_cumulative_sum,
       geom_cutoff,
       nsweep_in,
@@ -418,49 +411,49 @@ def sap_broadphase(
   )
 
 
-  wp.synchronize()
-  # print(collision_group_tmp.numpy())
-  # print(index_tracking_tmp.numpy())
-  print(sap_projection_lower_out.numpy())
-  print(sap_sort_index_out.numpy())
-  print(index_tracking_tmp_indexer.numpy())
-  print(num_candidate_pair.numpy())
+  # wp.synchronize()
+  # # print(collision_group_tmp.numpy())
+  # # print(index_tracking_tmp.numpy())
+  # print(sap_projection_lower_out.numpy())
+  # print(sap_sort_index_out.numpy())
+  # print(index_tracking_tmp_indexer.numpy())
+  # print(num_candidate_pair.numpy())
 
   # Process collision groups > 0
   # Requires sort_pairs to be a stable sort
   wp.utils.radix_sort_pairs(
     collision_group_tmp,
-    sap_sort_index_out,
-    ngeom
+    sap_sort_index,
+    num_boxes
     )
 
   # TODO: Ensure that negative collision groups end up at the end of the array
   wp.launch(
     kernel=sap_range_kernel,
-    dim=ngeom,
+    dim=num_boxes,
     inputs=[
-      ngeom,
-      sap_projection_lower_out,
-      sap_projection_upper_out,
-      sap_sort_index_out,
-      sap_range_out,
+      num_boxes,
+      sap_projection_lower,
+      sap_projection_upper,
+      sap_sort_index,
+      sap_range,
     ]
   )
 
-  wp.utils.array_scan(sap_range_out.reshape(-1), sap_cumulative_sum, True)
+  wp.utils.array_scan(sap_range.reshape(-1), sap_cumulative_sum, True)
 
   # Second: Sort according to groups starting reusing the track array as payload
   # Now run collision detection for all objects with collision group > 0 - only collide them against the same group since -1 group was already handled
 
   wp.launch(
     kernel=sap_broadphase_kernel,
-    dim=ngeom,
+    dim=nsweep_in,
     inputs=[
       geom_bounding_box_lower_wp,
       geom_bounding_box_upper_wp,
-      ngeom,
-      index_tracking_tmp_indexer,
-      sap_sort_index_out,
+      num_boxes,
+      index_tracking_tmp_counter,
+      sap_sort_index,
       sap_cumulative_sum,
       geom_cutoff,
       nsweep_in,
@@ -473,17 +466,15 @@ def sap_broadphase(
   )
 
 
-  wp.synchronize()
-  print("End ------------------------")
-  # print(index_tracking_tmp.numpy())
-  print(sap_projection_lower_out.numpy())
-  print(sap_sort_index_out.numpy())
-  print(sap_cumulative_sum.numpy())
-  print(index_tracking_tmp_indexer.numpy())
-  print(num_candidate_pair.numpy())
-
-
-  pass
+  # wp.synchronize()
+  # print("End ------------------------")
+  # # print(index_tracking_tmp.numpy())
+  # print(sap_projection_lower_out.numpy())
+  # print(sap_sort_index_out.numpy())
+  # print(sap_cumulative_sum.numpy())
+  # print(index_tracking_tmp_indexer.numpy())
+  # print(num_candidate_pair.numpy())
+  
 
 
 def find_overlapping_pairs_np(box_lower: np.ndarray, box_upper: np.ndarray):
