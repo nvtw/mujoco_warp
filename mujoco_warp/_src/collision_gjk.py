@@ -15,11 +15,11 @@
 
 import warp as wp
 
+from .collision_gjk_generic import build_ccd_generic
 from .collision_hfield import hfield_prism_vertex
 from .collision_primitive import Geom
 from .types import MJ_MINVAL
 from .types import GeomType
-from .collision_gjk_generic import build_ccd_generic
 
 # TODO(team): improve compile time to enable backward pass
 wp.config.enable_backward = False

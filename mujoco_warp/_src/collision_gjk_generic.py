@@ -13,9 +13,9 @@
 # limitations under the License.
 # ==============================================================================
 
-import warp as wp
-
 from typing import Any
+
+import warp as wp
 
 # TODO(team): improve compile time to enable backward pass
 wp.config.enable_backward = False
@@ -178,8 +178,8 @@ def build_ccd_generic(support_func: Any):
     #   [ s1_y, s2_y, s3_y, s4_y ],
     #   [ s1_z, s2_z, s3_z, s4_z ],
     #   [ 1,    1,    1,    1    ]]
-    # we want to solve M*lambda = P, where P = [p_x, p_y, p_z, 1] with [p_x, p_y, p_z] is the
-    # origin projected onto the simplex
+    # we want to solve M*lambda = P, where P = [p_x, p_y, p_z, 1] with [p_x, p_y, p_z] is
+    # the origin projected onto the simplex
 
     # compute cofactors to find det(M)
     C41 = -_det3(s2, s3, s4)
@@ -825,8 +825,8 @@ def build_ccd_generic(support_func: Any):
       pt.status = 4
       return pt
 
-    # if origin does not lie on simplex then we need to check that the hexahedron contains the
-    # origin
+    # if origin does not lie on simplex then we need to check that the hexahedron contains
+    # the origin
     if dist > 1e-5 and not _test_tetra(v1, v2, v3, v4) and not _test_tetra(v1, v2, v3, v5):
       pt.status = 5
       return pt
