@@ -17,9 +17,10 @@ from typing import Any
 
 import warp as wp
 
-from .collision_convex import gjk_narrowphase
+from .collision_convex import convex_narrowphase
 from .collision_hfield import hfield_midphase
 from .collision_primitive import primitive_narrowphase
+from .collision_sdf import sdf_narrowphase
 from .math import upper_tri_index
 from .types import MJ_MAXVAL
 from .types import BroadphaseType
@@ -30,6 +31,32 @@ from .types import Model
 from .warp_util import event_scope
 
 wp.set_module_options({"enable_backward": False})
+
+
+@wp.kernel
+def _zero_collision_arrays(
+  # Data in:
+  nworld_in: int,
+  # In:
+  hfield_geom_pair_in: int,
+  # Data out:
+  ncon_out: wp.array(dtype=int),
+  ncon_hfield_out: wp.array(dtype=int),  # kernel_analyzer: ignore
+  collision_hftri_index_out: wp.array(dtype=int),
+  ncollision_out: wp.array(dtype=int),
+):
+  tid = wp.tid()
+
+  if tid == 0:
+    # Zero the single collision counter
+    ncollision_out[0] = 0
+    ncon_out[0] = 0
+
+  if tid < hfield_geom_pair_in * nworld_in:
+    ncon_hfield_out[tid] = 0
+
+  # Zero collision pair indices
+  collision_hftri_index_out[tid] = 0
 
 
 @wp.func
@@ -287,6 +314,7 @@ def _segmented_sort(tile_size: int):
   return segmented_sort
 
 
+@event_scope
 def sap_broadphase(m: Model, d: Data):
   """Broadphase collision detection via sweep-and-prune."""
 
@@ -430,6 +458,7 @@ def _nxn_broadphase(
     )
 
 
+@event_scope
 def nxn_broadphase(m: Model, d: Data):
   """Broadphase collision detection via brute-force search."""
 
@@ -457,20 +486,44 @@ def nxn_broadphase(m: Model, d: Data):
     )
 
 
+def _narrowphase(m, d):
+  # Process heightfield collisions
+  if m.nhfield > 0:
+    hfield_midphase(m, d)
+
+  # TODO(team): we should reject far-away contacts in the narrowphase instead of constraint
+  #             partitioning because we can move some pressure of the atomics
+  convex_narrowphase(m, d)
+  primitive_narrowphase(m, d)
+
+  if m.has_sdf_geom:
+    sdf_narrowphase(m, d)
+
+
+def narrowphase(m, d):
+  if m.opt.graph_conditional:
+    wp.capture_if(condition=d.ncollision, on_true=_narrowphase, m=m, d=d)
+  else:
+    _narrowphase(m, d)
+
+
 @event_scope
 def collision(m: Model, d: Data):
   """Collision detection."""
 
-  # AD: based on engine_collision_driver.py in Eric's warp fork/mjx-collisions-dev
-  # which is further based on the CUDA code here:
-  # https://github.com/btaba/mujoco/blob/warp-collisions/mjx/mujoco/mjx/_src/cuda/engine_collision_driver.cu.cc#L458-L583
-
-  d.ncollision.zero_()
-  d.ncon.zero_()
-  d.ncon_hfield.zero_()
-
-  # Clear the collision_hftri_index buffer
-  d.collision_hftri_index.zero_()
+  # zero collision-related arrays
+  wp.launch(
+    _zero_collision_arrays,
+    dim=d.nconmax,
+    inputs=[
+      d.nworld,
+      d.ncon_hfield.shape[1],
+      d.ncon,
+      d.ncon_hfield.reshape(-1),
+      d.collision_hftri_index,
+      d.ncollision,
+    ],
+  )
 
   if d.nconmax == 0:
     return
@@ -484,12 +537,4 @@ def collision(m: Model, d: Data):
   else:
     sap_broadphase(m, d)
 
-  # Process heightfield collisions
-  if m.nhfield > 0:
-    hfield_midphase(m, d)
-
-  # TODO(team): we should reject far-away contacts in the narrowphase instead of constraint
-  #             partitioning because we can move some pressure of the atomics
-  # TODO(team) switch between collision functions and GJK/EPA here
-  gjk_narrowphase(m, d)
-  primitive_narrowphase(m, d)
+  narrowphase(m, d)

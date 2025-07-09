@@ -16,6 +16,9 @@
 import warp as wp
 from absl.testing import absltest
 
+from mujoco_warp._src.warp_util import cache_kernel
+from mujoco_warp._src.warp_util import kernel as nested_kernel
+
 from . import test_util
 from .collision_gjk import ccd
 from .collision_primitive import Geom
@@ -27,7 +30,7 @@ MAX_ITERATIONS = 10
 
 
 def _geom_dist(m: Model, d: Data, gid1: int, gid2: int, iterations: int):
-  @wp.kernel
+  @nested_kernel
   def _gjk_kernel(
     # Model:
     geom_type: wp.array(dtype=int),
@@ -43,15 +46,17 @@ def _geom_dist(m: Model, d: Data, gid1: int, gid2: int, iterations: int):
     gid1: int,
     gid2: int,
     iterations: int,
-    verts: wp.array(dtype=wp.vec3),
-    verts1: wp.array(dtype=wp.vec3),
-    verts2: wp.array(dtype=wp.vec3),
-    face_verts: wp.array(dtype=wp.vec3i),
-    face_v: wp.array(dtype=wp.vec3),
-    face_dist2: wp.array(dtype=float),
+    vert: wp.array(dtype=wp.vec3),
+    vert1: wp.array(dtype=wp.vec3),
+    vert2: wp.array(dtype=wp.vec3),
+    vert_index1: wp.array(dtype=int),
+    vert_index2: wp.array(dtype=int),
+    face: wp.array(dtype=wp.vec3i),
+    face_pr: wp.array(dtype=wp.vec3),
+    face_norm2: wp.array(dtype=float),
     face_index: wp.array(dtype=int),
-    map: wp.array(dtype=int),
-    edges: wp.array(dtype=int),
+    face_map: wp.array(dtype=int),
+    horizon: wp.array(dtype=int),
     # Out:
     dist_out: wp.array(dtype=float),
     pos_out: wp.array(dtype=wp.vec3),
@@ -59,6 +64,7 @@ def _geom_dist(m: Model, d: Data, gid1: int, gid2: int, iterations: int):
     MESHGEOM = int(GeomType.MESH.value)
 
     geom1 = Geom()
+    geom1.index = -1
     geomtype1 = geom_type[gid1]
     geom1.pos = geom_xpos_in[0, gid1]
     geom1.rot = geom_xmat_in[0, gid1]
@@ -72,6 +78,7 @@ def _geom_dist(m: Model, d: Data, gid1: int, gid2: int, iterations: int):
       geom1.vert = mesh_vert
 
     geom2 = Geom()
+    geom2.index = -1
     geomtype2 = geom_type[gid2]
     geom2.pos = geom_xpos_in[0, gid2]
     geom2.rot = geom_xmat_in[0, gid2]
@@ -101,30 +108,34 @@ def _geom_dist(m: Model, d: Data, gid1: int, gid2: int, iterations: int):
       geomtype2,
       x_1,
       x_2,
-      verts,
-      verts1,
-      verts2,
-      face_verts,
-      face_v,
-      face_dist2,
+      vert,
+      vert1,
+      vert2,
+      vert_index1,
+      vert_index2,
+      face,
+      face_pr,
+      face_norm2,
       face_index,
-      map,
-      edges,
+      face_map,
+      horizon,
     )
 
     dist_out[0] = dist
     pos_out[0] = x1
     pos_out[1] = x2
 
-  verts = wp.array(shape=(iterations,), dtype=wp.vec3)
-  verts1 = wp.array(shape=(iterations,), dtype=wp.vec3)
-  verts2 = wp.array(shape=(iterations,), dtype=wp.vec3)
-  face_verts = wp.array(shape=(2 * iterations,), dtype=wp.vec3i)
-  face_v = wp.array(shape=(2 * iterations,), dtype=wp.vec3)
-  face_dist2 = wp.array(shape=(2 * iterations,), dtype=float)
+  vert = wp.array(shape=(iterations,), dtype=wp.vec3)
+  vert1 = wp.array(shape=(iterations,), dtype=wp.vec3)
+  vert2 = wp.array(shape=(iterations,), dtype=wp.vec3)
+  vert_index1 = wp.array(shape=(iterations,), dtype=int)
+  vert_index2 = wp.array(shape=(iterations,), dtype=int)
+  face = wp.array(shape=(2 * iterations,), dtype=wp.vec3i)
+  face_pr = wp.array(shape=(2 * iterations,), dtype=wp.vec3)
+  face_norm2 = wp.array(shape=(2 * iterations,), dtype=float)
   face_index = wp.array(shape=(2 * iterations,), dtype=int)
-  map = wp.array(shape=(2 * iterations,), dtype=int)
-  edges = wp.array(shape=(2 * iterations,), dtype=int)
+  face_map = wp.array(shape=(2 * iterations,), dtype=int)
+  horizon = wp.array(shape=(2 * iterations,), dtype=int)
   dist_out = wp.array(shape=(1,), dtype=float)
   pos_out = wp.array(shape=(2,), dtype=wp.vec3)
   wp.launch(
@@ -142,15 +153,17 @@ def _geom_dist(m: Model, d: Data, gid1: int, gid2: int, iterations: int):
       gid1,
       gid2,
       iterations,
-      verts,
-      verts1,
-      verts2,
-      face_verts,
-      face_v,
-      face_dist2,
+      vert,
+      vert1,
+      vert2,
+      vert_index1,
+      vert_index2,
+      face,
+      face_pr,
+      face_norm2,
       face_index,
-      map,
-      edges,
+      face_map,
+      horizon,
     ],
     outputs=[
       dist_out,

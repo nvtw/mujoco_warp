@@ -26,6 +26,29 @@ from .warp_util import event_scope
 wp.config.enable_backward = False
 
 
+@wp.kernel
+def zero_constraint_counts(
+  # Data out:
+  ne_out: wp.array(dtype=int),
+  ne_connect_out: wp.array(dtype=int),
+  ne_weld_out: wp.array(dtype=int),
+  ne_jnt_out: wp.array(dtype=int),
+  ne_ten_out: wp.array(dtype=int),
+  nf_out: wp.array(dtype=int),
+  nl_out: wp.array(dtype=int),
+  nefc_out: wp.array(dtype=int),
+):
+  # Zero all constraint counters
+  ne_out[0] = 0
+  ne_connect_out[0] = 0
+  ne_weld_out[0] = 0
+  ne_jnt_out[0] = 0
+  ne_ten_out[0] = 0
+  nf_out[0] = 0
+  nl_out[0] = 0
+  nefc_out[0] = 0
+
+
 @wp.func
 def _update_efc_row(
   # In:
@@ -1125,6 +1148,7 @@ def _efc_contact_pyramidal(
   solimp_in: wp.array(dtype=vec5),
   # Data out:
   nefc_out: wp.array(dtype=int),
+  contact_efc_address_out: wp.array2d(dtype=int),
   efc_worldid_out: wp.array(dtype=int),
   efc_type_out: wp.array(dtype=int),
   efc_id_out: wp.array(dtype=int),
@@ -1161,6 +1185,7 @@ def _efc_contact_pyramidal(
     worldid = worldid_in[conid]
     timestep = opt_timestep[worldid]
     efc_worldid_out[efcid] = worldid
+    contact_efc_address_out[conid, dimid] = efcid
 
     geom = geom_in[conid]
     body1 = geom_bodyid[geom[0]]
@@ -1288,6 +1313,7 @@ def _efc_contact_elliptic(
   solimp_in: wp.array(dtype=vec5),
   # Data out:
   nefc_out: wp.array(dtype=int),
+  contact_efc_address_out: wp.array2d(dtype=int),
   efc_worldid_out: wp.array(dtype=int),
   efc_type_out: wp.array(dtype=int),
   efc_id_out: wp.array(dtype=int),
@@ -1298,8 +1324,6 @@ def _efc_contact_elliptic(
   efc_vel_out: wp.array(dtype=float),
   efc_aref_out: wp.array(dtype=float),
   efc_frictionloss_out: wp.array(dtype=float),
-  # Out:
-  efc_address_out: wp.array2d(dtype=int),
 ):
   conid, dimid = wp.tid()
 
@@ -1324,7 +1348,7 @@ def _efc_contact_elliptic(
     worldid = worldid_in[conid]
     timestep = opt_timestep[worldid]
     efc_worldid_out[efcid] = worldid
-    efc_address_out[conid, dimid] = efcid
+    contact_efc_address_out[conid, dimid] = efcid
 
     geom = geom_in[conid]
     body1 = geom_bodyid[geom[0]]
@@ -1454,14 +1478,20 @@ def _update_nefc(
 def make_constraint(m: types.Model, d: types.Data):
   """Creates constraint jacobians and other supporting data."""
 
-  d.ne.zero_()
-  d.ne_connect.zero_()
-  d.ne_weld.zero_()
-  d.ne_jnt.zero_()
-  d.ne_ten.zero_()
-  d.nefc.zero_()
-  d.nf.zero_()
-  d.nl.zero_()
+  wp.launch(
+    zero_constraint_counts,
+    dim=1,
+    inputs=[
+      d.ne,
+      d.ne_connect,
+      d.ne_weld,
+      d.ne_jnt,
+      d.ne_ten,
+      d.nf,
+      d.nl,
+      d.nefc,
+    ],
+  )
 
   if not (m.opt.disableflags & types.DisableBit.CONSTRAINT.value):
     refsafe = m.opt.disableflags & types.DisableBit.REFSAFE
@@ -1872,6 +1902,7 @@ def make_constraint(m: types.Model, d: types.Data):
           ],
           outputs=[
             d.nefc,
+            d.contact.efc_address,
             d.efc.worldid,
             d.efc.type,
             d.efc.id,
@@ -1917,6 +1948,7 @@ def make_constraint(m: types.Model, d: types.Data):
           ],
           outputs=[
             d.nefc,
+            d.contact.efc_address,
             d.efc.worldid,
             d.efc.type,
             d.efc.id,
@@ -1927,6 +1959,5 @@ def make_constraint(m: types.Model, d: types.Data):
             d.efc.vel,
             d.efc.aref,
             d.efc.frictionloss,
-            d.contact.efc_address,
           ],
         )
