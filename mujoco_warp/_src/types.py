@@ -564,6 +564,7 @@ class Option:
   graph_conditional: bool  # warp only
   sdf_initpoints: int
   sdf_iterations: int
+  run_collision_detection: bool  # warp only
 
 
 @dataclasses.dataclass

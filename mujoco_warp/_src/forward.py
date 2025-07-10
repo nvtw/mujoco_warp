@@ -1092,11 +1092,14 @@ def _zero_energy(
 
 
 @event_scope
-def forward(m: Model, d: Data, run_collision_detection: bool = True):
+def forward(
+  m: Model,
+  d: Data,
+):
   """Forward dynamics."""
   energy = m.opt.enableflags & EnableBit.ENERGY
 
-  fwd_position(m, d, factorize=False, run_collision_detection=run_collision_detection)
+  fwd_position(m, d, factorize=False, run_collision_detection=m.opt.run_collision_detection)
   sensor.sensor_pos(m, d)
 
   if energy:
@@ -1124,9 +1127,9 @@ def forward(m: Model, d: Data, run_collision_detection: bool = True):
 
 
 @event_scope
-def step(m: Model, d: Data, run_collision_detection: bool = True):
+def step(m: Model, d: Data):
   """Advance simulation."""
-  forward(m, d, run_collision_detection)
+  forward(m, d)
 
   if m.opt.integrator == IntegratorType.EULER:
     euler(m, d)
