@@ -535,7 +535,8 @@ class Option:
     graph_conditional: flag to use cuda graph conditional, should be False when JAX is used
     sdf_initpoints: number of starting points for gradient descent
     sdf_iterations: max number of iterations for gradient descent
-    run_collision_detection: flag to run collision detection (if the collision detection is skipped, the contact buffer is not updated or cleared)
+    run_collision_detection: flag to run collision detection (if the collision detection is
+      skipped, the contact buffer is not updated or cleared)
   """
 
   timestep: wp.array(dtype=float)
