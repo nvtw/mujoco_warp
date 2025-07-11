@@ -525,7 +525,7 @@ def implicit(m: Model, d: Data):
 
 
 @event_scope
-def fwd_position(m: Model, d: Data, factorize: bool = True, run_collision_detection: bool = True):
+def fwd_position(m: Model, d: Data, factorize: bool = True):
   """Position-dependent computations."""
 
   smooth.kinematics(m, d)
@@ -536,7 +536,7 @@ def fwd_position(m: Model, d: Data, factorize: bool = True, run_collision_detect
   smooth.tendon_armature(m, d)
   if factorize:
     smooth.factor_m(m, d)
-  if run_collision_detection:
+  if m.opt.run_collision_detection:
     collision_driver.collision(m, d)
   constraint.make_constraint(m, d)
   smooth.transmission(m, d)
@@ -1092,14 +1092,11 @@ def _zero_energy(
 
 
 @event_scope
-def forward(
-  m: Model,
-  d: Data,
-):
+def forward(m: Model, d: Data):
   """Forward dynamics."""
   energy = m.opt.enableflags & EnableBit.ENERGY
 
-  fwd_position(m, d, factorize=False, run_collision_detection=m.opt.run_collision_detection)
+  fwd_position(m, d, factorize=False)
   sensor.sensor_pos(m, d)
 
   if energy:
