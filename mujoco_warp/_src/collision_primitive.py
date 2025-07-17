@@ -21,6 +21,7 @@ from .math import closest_segment_to_segment_points
 from .math import make_frame
 from .math import normalize_with_norm
 from .math import upper_trid_index
+from .math import orthogonals
 from .types import MJ_MINMU
 from .types import MJ_MINVAL
 from .types import Data
@@ -28,6 +29,8 @@ from .types import GeomType
 from .types import Model
 from .types import vec5
 from .warp_util import event_scope
+
+from .collision_primitive_core import *
 
 wp.set_module_options({"enable_backward": False})
 
@@ -44,57 +47,6 @@ class mat83f(wp.types.matrix(shape=(8, 3), dtype=wp.float32)):
   pass
 
 
-
-
-@wp.struct
-class ContactPoint:
-  pos: wp.vec3
-  normal: wp.vec3
-  tangent: wp.vec3
-  dist: float
-
-@wp.func
-def pack_contact(pos: wp.vec3, normal: wp.vec3, tangent: wp.vec3, dist: float) -> ContactPoint:
-  return ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=dist)
-
-@wp.func
-def extract_frame(c: ContactPoint) -> wp.mat33:
-  normal = c.normal
-  tangent = c.tangent
-  tangent2 = wp.cross(normal, tangent)
-  return wp.mat33(normal[0], normal[1], normal[2], tangent[0], tangent[1], tangent[2], tangent2[0], tangent2[1], tangent2[2])
-
-
-
-
-
-@wp.struct
-class GeomCore:
-  pos: wp.vec3
-  rot: wp.mat33
-  size: wp.vec3
-
-@wp.func
-def _get_plane_normal(rot: wp.mat33) -> wp.vec3:
-  return wp.vec3(rot[0, 2], rot[1, 2], rot[2, 2])
-
-
-@wp.func
-def _geom_core(
-  # Data in:
-  geom_xpos_in: wp.array2d(dtype=wp.vec3),
-  geom_xmat_in: wp.array2d(dtype=wp.mat33),
-  geom_size: wp.array2d(dtype=wp.vec3),
-  # In:
-  worldid: int,
-  gid: int,
-) -> GeomCore:
-  geom = GeomCore()
-  geom.pos = geom_xpos_in[worldid, gid]
-  rot = geom_xmat_in[worldid, gid]
-  geom.rot = rot
-  geom.size = geom_size[worldid, gid]
-  return geom
 
 
 
@@ -120,6 +72,17 @@ class Geom:
   mesh_polymapnum: wp.array(dtype=int)
   mesh_polymap: wp.array(dtype=int)
   index: int
+
+@wp.func
+def _geom_core_from_geom(
+  # Data in:
+  geom: Geom,
+) -> GeomCore:
+  core = GeomCore()
+  core.pos = geom.pos
+  core.rot = geom.rot
+  core.size = geom.size
+  return core
 
 @wp.func
 def _geom(
@@ -667,35 +630,7 @@ def capsule_capsule(
   )
 
 
-@wp.func
-def plane_capsule_core(
-  plane: GeomCore,
-  cap: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
-) -> int:
-  """Calculates two contacts between a capsule and a plane."""
-  n = _get_plane_normal(plane.rot)
-  axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  # align contact frames with capsule axis
-  b, b_norm = normalize_with_norm(axis - n * wp.dot(n, axis))
 
-  if b_norm < 0.5:
-    if -0.5 < n[1] and n[1] < 0.5:
-      b = wp.vec3(0.0, 1.0, 0.0)
-    else:
-      b = wp.vec3(0.0, 0.0, 1.0)
-
-  # c = wp.cross(n, b)
-  # frame = wp.mat33(n[0], n[1], n[2], b[0], b[1], b[2], c[0], c[1], c[2])
-  segment = axis * cap.size[1]
-
-  dist1, pos1 = _plane_sphere(n, plane.pos, cap.pos + segment, cap.size[0])
-  contacts[0] = pack_contact(pos1, n, b, dist1)
-
-  dist2, pos2 = _plane_sphere(n, plane.pos, cap.pos - segment, cap.size[0])
-  contacts[1] = pack_contact(pos2, n, b, dist2)
-
-  return 2
 
 
 
@@ -746,8 +681,8 @@ def plane_capsule(
   # segment = axis * cap.size[1]
 
 
-  contacts = wp.zeros(shape=(2, 3), dtype=ContactPoint)
-  ncon = plane_capsule_core(plane, cap, contacts)
+  contacts = wp.zeros(shape=2, dtype=ContactPoint)
+  ncon = plane_capsule_core(_geom_core_from_geom(plane), _geom_core_from_geom(cap), contacts)
 
 
 
@@ -810,6 +745,8 @@ def plane_capsule(
   )
 
 
+
+
 @wp.func
 def plane_ellipsoid(
   # Data in:
@@ -840,16 +777,13 @@ def plane_ellipsoid(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
-  sphere_support = -wp.normalize(wp.cw_mul(wp.transpose(ellipsoid.rot) @ plane.normal, ellipsoid.size))
-  pos = ellipsoid.pos + ellipsoid.rot @ wp.cw_mul(sphere_support, ellipsoid.size)
-  dist = wp.dot(plane.normal, pos - plane.pos)
-  pos = pos - plane.normal * dist * 0.5
+  contact = plane_ellipsoid_core(_geom_core_from_geom(plane), _geom_core_from_geom(ellipsoid))
 
   write_contact(
     nconmax_in,
-    dist,
-    pos,
-    make_frame(plane.normal),
+    contact.dist,
+    contact.pos,
+    extract_frame(contact),
     margin,
     gap,
     condim,
