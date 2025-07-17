@@ -44,6 +44,60 @@ class mat83f(wp.types.matrix(shape=(8, 3), dtype=wp.float32)):
   pass
 
 
+
+
+@wp.struct
+class ContactPoint:
+  pos: wp.vec3
+  normal: wp.vec3
+  tangent: wp.vec3
+  dist: float
+
+@wp.func
+def pack_contact(pos: wp.vec3, normal: wp.vec3, tangent: wp.vec3, dist: float) -> ContactPoint:
+  return ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=dist)
+
+@wp.func
+def extract_frame(c: ContactPoint) -> wp.mat33:
+  normal = c.normal
+  tangent = c.tangent
+  tangent2 = wp.cross(normal, tangent)
+  return wp.mat33(normal[0], normal[1], normal[2], tangent[0], tangent[1], tangent[2], tangent2[0], tangent2[1], tangent2[2])
+
+
+
+
+
+@wp.struct
+class GeomCore:
+  pos: wp.vec3
+  rot: wp.mat33
+  size: wp.vec3
+
+@wp.func
+def _get_plane_normal(rot: wp.mat33) -> wp.vec3:
+  return wp.vec3(rot[0, 2], rot[1, 2], rot[2, 2])
+
+
+@wp.func
+def _geom_core(
+  # Data in:
+  geom_xpos_in: wp.array2d(dtype=wp.vec3),
+  geom_xmat_in: wp.array2d(dtype=wp.mat33),
+  geom_size: wp.array2d(dtype=wp.vec3),
+  # In:
+  worldid: int,
+  gid: int,
+) -> GeomCore:
+  geom = GeomCore()
+  geom.pos = geom_xpos_in[worldid, gid]
+  rot = geom_xmat_in[worldid, gid]
+  geom.rot = rot
+  geom.size = geom_size[worldid, gid]
+  return geom
+
+
+
 @wp.struct
 class Geom:
   pos: wp.vec3
@@ -66,7 +120,6 @@ class Geom:
   mesh_polymapnum: wp.array(dtype=int)
   mesh_polymap: wp.array(dtype=int)
   index: int
-
 
 @wp.func
 def _geom(
@@ -260,7 +313,6 @@ def plane_sphere(
     contact_worldid_out,
   )
 
-
 @wp.func
 def _sphere_sphere(
   # Data in:
@@ -406,7 +458,6 @@ def _sphere_sphere_ext(
     contact_worldid_out,
   )
 
-
 @wp.func
 def sphere_sphere(
   # Data in:
@@ -465,6 +516,12 @@ def sphere_sphere(
     contact_geom_out,
     contact_worldid_out,
   )
+
+
+# @wp.func
+# def sphere_capsule_core(
+#   sphere: GeomCore,
+#   cap: GeomCore) -> ContactPoint:
 
 
 @wp.func
@@ -611,6 +668,38 @@ def capsule_capsule(
 
 
 @wp.func
+def plane_capsule_core(
+  plane: GeomCore,
+  cap: GeomCore,
+  contacts: wp.array(dtype=ContactPoint),
+) -> int:
+  """Calculates two contacts between a capsule and a plane."""
+  n = _get_plane_normal(plane.rot)
+  axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
+  # align contact frames with capsule axis
+  b, b_norm = normalize_with_norm(axis - n * wp.dot(n, axis))
+
+  if b_norm < 0.5:
+    if -0.5 < n[1] and n[1] < 0.5:
+      b = wp.vec3(0.0, 1.0, 0.0)
+    else:
+      b = wp.vec3(0.0, 0.0, 1.0)
+
+  # c = wp.cross(n, b)
+  # frame = wp.mat33(n[0], n[1], n[2], b[0], b[1], b[2], c[0], c[1], c[2])
+  segment = axis * cap.size[1]
+
+  dist1, pos1 = _plane_sphere(n, plane.pos, cap.pos + segment, cap.size[0])
+  contacts[0] = pack_contact(pos1, n, b, dist1)
+
+  dist2, pos2 = _plane_sphere(n, plane.pos, cap.pos - segment, cap.size[0])
+  contacts[1] = pack_contact(pos2, n, b, dist2)
+
+  return 2
+
+
+
+@wp.func
 def plane_capsule(
   # Data in:
   nconmax_in: int,
@@ -641,27 +730,33 @@ def plane_capsule(
   contact_worldid_out: wp.array(dtype=int),
 ):
   """Calculates two contacts between a capsule and a plane."""
-  n = plane.normal
-  axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  # align contact frames with capsule axis
-  b, b_norm = normalize_with_norm(axis - n * wp.dot(n, axis))
+  # n = plane.normal
+  # axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
+  # # align contact frames with capsule axis
+  # b, b_norm = normalize_with_norm(axis - n * wp.dot(n, axis))
 
-  if b_norm < 0.5:
-    if -0.5 < n[1] and n[1] < 0.5:
-      b = wp.vec3(0.0, 1.0, 0.0)
-    else:
-      b = wp.vec3(0.0, 0.0, 1.0)
+  # if b_norm < 0.5:
+  #   if -0.5 < n[1] and n[1] < 0.5:
+  #     b = wp.vec3(0.0, 1.0, 0.0)
+  #   else:
+  #     b = wp.vec3(0.0, 0.0, 1.0)
 
-  c = wp.cross(n, b)
-  frame = wp.mat33(n[0], n[1], n[2], b[0], b[1], b[2], c[0], c[1], c[2])
-  segment = axis * cap.size[1]
+  # c = wp.cross(n, b)
+  # frame = wp.mat33(n[0], n[1], n[2], b[0], b[1], b[2], c[0], c[1], c[2])
+  # segment = axis * cap.size[1]
 
-  dist1, pos1 = _plane_sphere(n, plane.pos, cap.pos + segment, cap.size[0])
+
+  contacts = wp.zeros(shape=(2, 3), dtype=ContactPoint)
+  ncon = plane_capsule_core(plane, cap, contacts)
+
+
+
+  # dist1, pos1 = _plane_sphere(n, plane.pos, cap.pos + segment, cap.size[0])
   write_contact(
     nconmax_in,
-    dist1,
-    pos1,
-    frame,
+    contacts[0].dist,
+    contacts[0].pos,
+    extract_frame(contacts[0]),
     margin,
     gap,
     condim,
@@ -685,12 +780,12 @@ def plane_capsule(
     contact_worldid_out,
   )
 
-  dist2, pos2 = _plane_sphere(n, plane.pos, cap.pos - segment, cap.size[0])
+  #dist2, pos2 = _plane_sphere(n, plane.pos, cap.pos - segment, cap.size[0])
   write_contact(
     nconmax_in,
-    dist2,
-    pos2,
-    frame,
+    contacts[1].dist,
+    contacts[1].pos,
+    extract_frame(contacts[1]),
     margin,
     gap,
     condim,
