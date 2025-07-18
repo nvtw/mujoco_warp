@@ -249,37 +249,41 @@ def plane_sphere(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
-  dist, pos = _plane_sphere(plane.normal, plane.pos, sphere.pos, sphere.size[0])
-
-  write_contact(
-    nconmax_in,
-    dist,
-    pos,
-    make_frame(plane.normal),
-    margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    worldid,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
+  num_contacts = plane_sphere_core(
+    __geom_core_from_geom(plane),
+    __geom_core_from_geom(sphere),
+    contacts,
   )
 
-
+  for i in range(num_contacts):
+    contact = contacts[i]
+    write_contact(
+      nconmax_in,
+      contact.dist,
+      contact.pos,
+      extract_frame(contact),
+      margin,
+      gap,
+      condim,
+      friction,
+      solref,
+      solreffriction,
+      solimp,
+      geoms,
+      worldid,
+      ncon_out,
+      contact_dist_out,
+      contact_pos_out,
+      contact_frame_out,
+      contact_includemargin_out,
+      contact_friction_out,
+      contact_solref_out,
+      contact_solreffriction_out,
+      contact_solimp_out,
+      contact_dim_out,
+      contact_geom_out,
+      contact_worldid_out,
+    )
 
 
 @wp.func

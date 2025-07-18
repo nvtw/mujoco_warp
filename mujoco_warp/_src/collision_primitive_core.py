@@ -111,6 +111,18 @@ def _plane_sphere(plane_normal: wp.vec3, plane_pos: wp.vec3, sphere_pos: wp.vec3
   return dist, pos
 
 
+@wp.func
+def plane_sphere_core(
+  plane: GeomCore,
+  sphere: GeomCore,
+  contacts: wp.array(dtype=ContactPoint),
+) -> int:
+  """Calculates one contact between a plane and a sphere."""
+  plane_normal = get_plane_normal(plane.rot)
+  dist, pos = _plane_sphere(plane_normal, plane.pos, sphere.pos, sphere.size[0])
+  contacts[0] = pack_contact_auto_tangent(pos, plane_normal, dist)
+  return 1
+
 
 @wp.func
 def _sphere_sphere(
