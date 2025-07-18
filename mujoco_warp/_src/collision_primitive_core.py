@@ -18,6 +18,7 @@ from typing import Any, Tuple
 from .math import normalize_with_norm
 from .math import closest_segment_to_segment_points
 from .types import MJ_MINVAL
+from .math import closest_segment_point
 
 wp.set_module_options({"enable_backward": False})
 
@@ -168,6 +169,50 @@ def _sphere_sphere_ext(
   pos = pos1 + n * (radius1 + 0.5 * dist)
 
   return pack_contact_auto_tangent(pos, n, dist)
+
+
+@wp.func
+def sphere_sphere_core(
+  sphere1: GeomCore,
+  sphere2: GeomCore,
+  contacts: wp.array(dtype=ContactPoint),
+) -> int:
+  """Calculates one contact between two spheres."""
+  contact = _sphere_sphere(
+    sphere1.pos,
+    sphere1.size[0],
+    sphere2.pos,
+    sphere2.size[0],
+  )
+  contacts[0] = contact
+  return 1
+
+
+@wp.func
+def sphere_capsule_core(
+  sphere: GeomCore,
+  cap: GeomCore,
+  contacts: wp.array(dtype=ContactPoint),
+) -> int:
+  """Calculates one contact between a sphere and a capsule."""
+  axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
+  length = cap.size[1]
+  segment = axis * length
+
+  # Find closest point on capsule centerline to sphere center
+  pt = closest_segment_point(cap.pos - segment, cap.pos + segment, sphere.pos)
+
+  # Treat as sphere-sphere collision between sphere and closest point
+  contact = _sphere_sphere_ext(
+    sphere.pos,
+    sphere.size[0],
+    pt,
+    cap.size[0],
+    sphere.rot,
+    cap.rot,
+  )
+  contacts[0] = contact
+  return 1
 
 
 @wp.func

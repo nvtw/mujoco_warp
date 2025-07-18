@@ -317,39 +317,41 @@ def sphere_sphere(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
-  contact = _sphere_sphere(
-    sphere1.pos,
-    sphere1.size[0],
-    sphere2.pos,
-    sphere2.size[0],
+  num_contacts = sphere_sphere_core(
+    __geom_core_from_geom(sphere1),
+    __geom_core_from_geom(sphere2),
+    contacts,
   )
-  write_contact(
-    nconmax_in,
-    contact.dist,
-    contact.pos,
-    extract_frame(contact),
-    margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    worldid,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
-  )
+
+  for i in range(num_contacts):
+    contact = contacts[i]
+    write_contact(
+      nconmax_in,
+      contact.dist,
+      contact.pos,
+      extract_frame(contact),
+      margin,
+      gap,
+      condim,
+      friction,
+      solref,
+      solreffriction,
+      solimp,
+      geoms,
+      worldid,
+      ncon_out,
+      contact_dist_out,
+      contact_pos_out,
+      contact_frame_out,
+      contact_includemargin_out,
+      contact_friction_out,
+      contact_solref_out,
+      contact_solreffriction_out,
+      contact_solimp_out,
+      contact_dim_out,
+      contact_geom_out,
+      contact_worldid_out,
+    )
 
 
 @wp.func
@@ -384,47 +386,41 @@ def sphere_capsule(
   contact_worldid_out: wp.array(dtype=int),
 ):
   """Calculates one contact between a sphere and a capsule."""
-  axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  length = cap.size[1]
-  segment = axis * length
-
-  # Find closest point on capsule centerline to sphere center
-  pt = closest_segment_point(cap.pos - segment, cap.pos + segment, sphere.pos)
-
-  # Treat as sphere-sphere collision between sphere and closest point
-  contact = _sphere_sphere(
-    sphere.pos,
-    sphere.size[0],
-    pt,
-    cap.size[0],
+  num_contacts = sphere_capsule_core(
+    __geom_core_from_geom(sphere),
+    __geom_core_from_geom(cap),
+    contacts,
   )
-  write_contact(
-    nconmax_in,
-    contact.dist,
-    contact.pos,
-    extract_frame(contact),
-    margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    worldid,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
-  )
+
+  for i in range(num_contacts):
+    contact = contacts[i]
+    write_contact(
+      nconmax_in,
+      contact.dist,
+      contact.pos,
+      extract_frame(contact),
+      margin,
+      gap,
+      condim,
+      friction,
+      solref,
+      solreffriction,
+      solimp,
+      geoms,
+      worldid,
+      ncon_out,
+      contact_dist_out,
+      contact_pos_out,
+      contact_frame_out,
+      contact_includemargin_out,
+      contact_friction_out,
+      contact_solref_out,
+      contact_solreffriction_out,
+      contact_solimp_out,
+      contact_dim_out,
+      contact_geom_out,
+      contact_worldid_out,
+    )
 
 
 @wp.func
