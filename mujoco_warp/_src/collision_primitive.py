@@ -16,6 +16,7 @@
 import warp as wp
 
 from .collision_hfield import hfield_triangle_prism
+from .collision_primitive_core import *
 from .math import closest_segment_point
 from .math import closest_segment_to_segment_points
 from .math import make_frame
@@ -44,6 +45,23 @@ class mat83f(wp.types.matrix(shape=(8, 3), dtype=wp.float32)):
   pass
 
 
+
+BLOCK_SIZE = 128
+
+snippet_struct = f"""
+        constexpr int array_size = 8;
+        constexpr int multiplier = 10; // The Contact struct has 10 floats
+        __shared__ int s[{BLOCK_SIZE}*array_size*multiplier];
+
+        auto ptr = &s[tid * array_size * multiplier];
+        return (uint64_t)ptr;
+        """
+
+@wp.func_native(snippet_struct)
+def get_shared_memory_array(tid: int) -> wp.uint64: ...
+
+
+
 @wp.struct
 class Geom:
   pos: wp.vec3
@@ -67,6 +85,9 @@ class Geom:
   mesh_polymap: wp.array(dtype=int)
   index: int
 
+@wp.func
+def __geom_core_from_geom(geom: Geom) -> GeomCore:
+  return GeomCore(pos=geom.pos, rot=geom.rot, size=geom.size)
 
 @wp.func
 def _geom(
@@ -615,28 +636,9 @@ def capsule_capsule(
 
 
 
-@wp.struct
-class ContactPoint:
-  pos: wp.vec3
-  normal: wp.vec3
-  tangent: wp.vec3
-  dist: float
 
 
 
-
-
-snippet_struct = f"""
-        constexpr int array_size = 8;
-        constexpr int multiplier = 10;
-        __shared__ int s[128*array_size*multiplier];
-
-        auto ptr = &s[tid * array_size * multiplier];
-        return (uint64_t)ptr;
-        """
-
-@wp.func_native(snippet_struct)
-def get_shared_memory_array(tid: int) -> wp.uint64: ...
 
 
 
@@ -678,28 +680,18 @@ def plane_capsule(
 
   contacts = wp.array(ptr=get_shared_memory_array(tid), shape=(8,), dtype=ContactPoint)
 
+  plane_capsule_core(
+    __geom_core_from_geom(plane),
+    __geom_core_from_geom(cap),
+    contacts,
+  )
 
-  n = plane.normal
-  axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  # align contact frames with capsule axis
-  b, b_norm = normalize_with_norm(axis - n * wp.dot(n, axis))
-
-  if b_norm < 0.5:
-    if -0.5 < n[1] and n[1] < 0.5:
-      b = wp.vec3(0.0, 1.0, 0.0)
-    else:
-      b = wp.vec3(0.0, 0.0, 1.0)
-
-  c = wp.cross(n, b)
-  frame = wp.mat33(n[0], n[1], n[2], b[0], b[1], b[2], c[0], c[1], c[2])
-  segment = axis * cap.size[1]
-
-  dist1, pos1 = _plane_sphere(n, plane.pos, cap.pos + segment, cap.size[0])
+  contact0 = contacts[0]
   write_contact(
     nconmax_in,
-    dist1,
-    pos1,
-    frame,
+    contact0.dist,
+    contact0.pos,
+    extract_frame(contact0),
     margin,
     gap,
     condim,
@@ -723,12 +715,13 @@ def plane_capsule(
     contact_worldid_out,
   )
 
-  dist2, pos2 = _plane_sphere(n, plane.pos, cap.pos - segment, cap.size[0])
+  # dist2, pos2 = _plane_sphere(n, plane.pos, cap.pos - segment, cap.size[0])
+  contact1 = contacts[1]
   write_contact(
     nconmax_in,
-    dist2,
-    pos2,
-    frame,
+    contact1.dist,
+    contact1.pos,
+    extract_frame(contact1),
     margin,
     gap,
     condim,
@@ -2992,5 +2985,5 @@ def primitive_narrowphase(m: Model, d: Data):
       d.contact.geom,
       d.contact.worldid,
     ],
-    block_dim=128,
+    block_dim=BLOCK_SIZE,
   )
