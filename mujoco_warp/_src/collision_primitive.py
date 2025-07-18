@@ -17,6 +17,7 @@ import warp as wp
 
 from .collision_hfield import hfield_triangle_prism
 from .collision_primitive_core import *
+from .collision_primitive_core import _plane_sphere
 from .math import closest_segment_point
 from .math import closest_segment_to_segment_points
 from .math import make_frame
@@ -214,12 +215,6 @@ def write_contact(
       contact_solimp_out[cid] = solimp_in
 
 
-@wp.func
-def _plane_sphere(plane_normal: wp.vec3, plane_pos: wp.vec3, sphere_pos: wp.vec3, sphere_radius: float):
-  dist = wp.dot(sphere_pos - plane_pos, plane_normal) - sphere_radius
-  pos = sphere_pos - plane_normal * (sphere_radius + 0.5 * dist)
-  return dist, pos
-
 
 @wp.func
 def plane_sphere(
@@ -285,35 +280,11 @@ def plane_sphere(
 
 @wp.func
 def _sphere_sphere(
-  # Data in:
-  nconmax_in: int,
   # In:
   pos1: wp.vec3,
   radius1: float,
   pos2: wp.vec3,
   radius2: float,
-  worldid: int,
-  margin: float,
-  gap: float,
-  condim: int,
-  friction: vec5,
-  solref: wp.vec2f,
-  solreffriction: wp.vec2f,
-  solimp: vec5,
-  geoms: wp.vec2i,
-  # Data out:
-  ncon_out: wp.array(dtype=int),
-  contact_dist_out: wp.array(dtype=float),
-  contact_pos_out: wp.array(dtype=wp.vec3),
-  contact_frame_out: wp.array(dtype=wp.mat33),
-  contact_includemargin_out: wp.array(dtype=float),
-  contact_friction_out: wp.array(dtype=vec5),
-  contact_solref_out: wp.array(dtype=wp.vec2),
-  contact_solreffriction_out: wp.array(dtype=wp.vec2),
-  contact_solimp_out: wp.array(dtype=vec5),
-  contact_dim_out: wp.array(dtype=int),
-  contact_geom_out: wp.array(dtype=wp.vec2i),
-  contact_worldid_out: wp.array(dtype=int),
 ):
   dir = pos2 - pos1
   dist = wp.length(dir)
@@ -324,33 +295,7 @@ def _sphere_sphere(
   dist = dist - (radius1 + radius2)
   pos = pos1 + n * (radius1 + 0.5 * dist)
 
-  write_contact(
-    nconmax_in,
-    dist,
-    pos,
-    make_frame(n),
-    margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    worldid,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
-  )
+  return pack_contact_auto_tangent(pos, n, dist)
 
 
 @wp.func
@@ -460,13 +405,17 @@ def sphere_sphere(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
-  _sphere_sphere(
-    nconmax_in,
+  contact = _sphere_sphere(
     sphere1.pos,
     sphere1.size[0],
     sphere2.pos,
     sphere2.size[0],
-    worldid,
+  )
+  write_contact(
+    nconmax_in,
+    contact.dist,
+    contact.pos,
+    extract_frame(contact),
     margin,
     gap,
     condim,
@@ -475,6 +424,7 @@ def sphere_sphere(
     solreffriction,
     solimp,
     geoms,
+    worldid,
     ncon_out,
     contact_dist_out,
     contact_pos_out,
@@ -530,13 +480,17 @@ def sphere_capsule(
   pt = closest_segment_point(cap.pos - segment, cap.pos + segment, sphere.pos)
 
   # Treat as sphere-sphere collision between sphere and closest point
-  _sphere_sphere(
-    nconmax_in,
+  contact = _sphere_sphere(
     sphere.pos,
     sphere.size[0],
     pt,
     cap.size[0],
-    worldid,
+  )
+  write_contact(
+    nconmax_in,
+    contact.dist,
+    contact.pos,
+    extract_frame(contact),
     margin,
     gap,
     condim,
@@ -545,6 +499,7 @@ def sphere_capsule(
     solreffriction,
     solimp,
     geoms,
+    worldid,
     ncon_out,
     contact_dist_out,
     contact_pos_out,
@@ -605,13 +560,17 @@ def capsule_capsule(
     cap2.pos + seg2,
   )
 
-  _sphere_sphere(
-    nconmax_in,
+  contact = _sphere_sphere(
     pt1,
     cap1.size[0],
     pt2,
     cap2.size[0],
-    worldid,
+  )
+  write_contact(
+    nconmax_in,
+    contact.dist,
+    contact.pos,
+    extract_frame(contact),
     margin,
     gap,
     condim,
@@ -620,6 +579,7 @@ def capsule_capsule(
     solreffriction,
     solimp,
     geoms,
+    worldid,
     ncon_out,
     contact_dist_out,
     contact_pos_out,
@@ -633,16 +593,6 @@ def capsule_capsule(
     contact_geom_out,
     contact_worldid_out,
   )
-
-
-
-
-
-
-
-
-
-
 
 
 @wp.func
