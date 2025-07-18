@@ -220,7 +220,7 @@ def write_contact(
 
 @wp.func
 def plane_sphere(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -284,7 +284,7 @@ def plane_sphere(
 
 @wp.func
 def sphere_sphere(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -350,7 +350,7 @@ def sphere_sphere(
 
 @wp.func
 def sphere_capsule(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -425,7 +425,7 @@ def sphere_capsule(
 
 @wp.func
 def capsule_capsule(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -505,7 +505,7 @@ def capsule_capsule(
 
 @wp.func
 def plane_capsule(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -535,8 +535,6 @@ def plane_capsule(
   contact_worldid_out: wp.array(dtype=int),
 ):
   """Calculates two contacts between a capsule and a plane."""
-
-  contacts = wp.array(ptr=get_shared_memory_array(tid), shape=(8,), dtype=ContactPoint)
 
   num_contacts = plane_capsule_core(
     __geom_core_from_geom(plane),
@@ -577,7 +575,7 @@ def plane_capsule(
 
 @wp.func
 def plane_ellipsoid(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -606,43 +604,45 @@ def plane_ellipsoid(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
-  sphere_support = -wp.normalize(wp.cw_mul(wp.transpose(ellipsoid.rot) @ plane.normal, ellipsoid.size))
-  pos = ellipsoid.pos + ellipsoid.rot @ wp.cw_mul(sphere_support, ellipsoid.size)
-  dist = wp.dot(plane.normal, pos - plane.pos)
-  pos = pos - plane.normal * dist * 0.5
-
-  write_contact(
-    nconmax_in,
-    dist,
-    pos,
-    make_frame(plane.normal),
-    margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    worldid,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
+  num_contacts = plane_ellipsoid_core(
+    __geom_core_from_geom(plane),
+    __geom_core_from_geom(ellipsoid),
+    contacts,
   )
+  for i in range(num_contacts):
+    contact = contacts[i]
+    write_contact(
+      nconmax_in,
+      contact.dist,
+      contact.pos,
+      extract_frame(contact),
+      margin,
+      gap,
+      condim,
+      friction,
+      solref,
+      solreffriction,
+      solimp,
+      geoms,
+      worldid,
+      ncon_out,
+      contact_dist_out,
+      contact_pos_out,
+      contact_frame_out,
+      contact_includemargin_out,
+      contact_friction_out,
+      contact_solref_out,
+      contact_solreffriction_out,
+      contact_solimp_out,
+      contact_dim_out,
+      contact_geom_out,
+      contact_worldid_out,
+    )
 
 
 @wp.func
 def plane_box(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -671,7 +671,6 @@ def plane_box(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
-  contacts = wp.array(ptr=get_shared_memory_array(tid), shape=(8,), dtype=ContactPoint)
   num_contacts = plane_box_core(
     __geom_core_from_geom(plane),
     __geom_core_from_geom(box),
@@ -715,7 +714,7 @@ _HUGE_VAL = 1e6
 
 @wp.func
 def plane_convex(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -989,7 +988,7 @@ def plane_convex(
 
 @wp.func
 def sphere_cylinder(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -1174,7 +1173,7 @@ def sphere_cylinder(
 
 @wp.func
 def plane_cylinder(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -1502,7 +1501,7 @@ def _sphere_box(
 
 @wp.func
 def sphere_box(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -1572,7 +1571,7 @@ def sphere_box(
 
 @wp.func
 def capsule_box(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -2006,7 +2005,7 @@ def _compute_rotmore(face_idx: int) -> wp.mat33:
 
 @wp.func
 def box_box(
-  tid: int,
+  contacts: wp.array(dtype=ContactPoint),
   # Data in:
   nconmax_in: int,
   # In:
@@ -2666,13 +2665,15 @@ def _primitive_narrowphase_builder(m: Model):
       hftri_index,
     )
 
+    contacts = wp.array(ptr=get_shared_memory_array(tid), shape=(8,), dtype=ContactPoint)
+
     for i in range(wp.static(len(_primitive_collisions_func))):
       collision_type1 = wp.static(_primitive_collisions_types[i][0])
       collision_type2 = wp.static(_primitive_collisions_types[i][1])
 
       if collision_type1 == type1 and collision_type2 == type2:
         wp.static(_primitive_collisions_func[i])(
-          tid,
+          contacts,
           nconmax_in,
           geom1,
           geom2,
