@@ -1933,25 +1933,38 @@ def box_box(
     normal = wp.where(inv, -1.0, 1.0) * rw @ rnorm
 
   frame = make_frame(normal)
-  coff = wp.atomic_add(ncon_out, 0, n)
 
-  for i in range(min(nconmax_in - coff, n)):
+  for i in range(n):
     points[i, 2] += hz
     pos = rw @ points[i] + pw
 
-    cid = coff + i
-
-    contact_dist_out[cid] = depth[i]
-    contact_pos_out[cid] = pos
-    contact_frame_out[cid] = frame
-    contact_geom_out[cid] = geoms
-    contact_worldid_out[cid] = worldid
-    contact_includemargin_out[cid] = margin - gap
-    contact_dim_out[cid] = condim
-    contact_friction_out[cid] = friction
-    contact_solref_out[cid] = solref
-    contact_solreffriction_out[cid] = solreffriction
-    contact_solimp_out[cid] = solimp
+    write_contact(
+      nconmax_in,
+      depth[i],
+      pos,
+      frame,
+      margin,
+      gap,
+      condim,
+      friction,
+      solref,
+      solreffriction,
+      solimp,
+      geoms,
+      worldid,
+      ncon_out,
+      contact_dist_out,
+      contact_pos_out,
+      contact_frame_out,
+      contact_includemargin_out,
+      contact_friction_out,
+      contact_solref_out,
+      contact_solreffriction_out,
+      contact_solimp_out,
+      contact_dim_out,
+      contact_geom_out,
+      contact_worldid_out
+    )
 
 
 _PRIMITIVE_COLLISIONS = {
