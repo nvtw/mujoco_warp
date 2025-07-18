@@ -243,6 +243,85 @@ def capsule_capsule_core(
 
 
 @wp.func
+def sphere_cylinder_core(
+  sphere: GeomCore,
+  cylinder: GeomCore,
+  contacts: wp.array(dtype=ContactPoint),
+) -> int:
+  """Calculates one contact between a sphere and a cylinder."""
+  axis = wp.vec3(
+    cylinder.rot[0, 2],
+    cylinder.rot[1, 2],
+    cylinder.rot[2, 2],
+  )
+
+  vec = sphere.pos - cylinder.pos
+  x = wp.dot(vec, axis)
+
+  a_proj = axis * x
+  p_proj = vec - a_proj
+  p_proj_sqr = wp.dot(p_proj, p_proj)
+
+  collide_side = wp.abs(x) < cylinder.size[1]
+  collide_cap = p_proj_sqr < (cylinder.size[0] * cylinder.size[0])
+
+  if collide_side and collide_cap:
+    dist_cap = cylinder.size[1] - wp.abs(x)
+    dist_radius = cylinder.size[0] - wp.sqrt(p_proj_sqr)
+
+    if dist_cap < dist_radius:
+      collide_side = False
+    else:
+      collide_cap = False
+
+  # Side collision
+  if collide_side:
+    pos_target = cylinder.pos + a_proj
+    contacts[0] = _sphere_sphere_ext(
+      sphere.pos,
+      sphere.size[0],
+      pos_target,
+      cylinder.size[0],
+      sphere.rot,
+      cylinder.rot,
+    )
+    return 1
+
+  # Cap collision
+  if collide_cap:
+    if x > 0.0:
+      # top cap
+      pos_cap = cylinder.pos + axis * cylinder.size[1]
+      plane_normal = axis
+    else:
+      # bottom cap
+      pos_cap = cylinder.pos - axis * cylinder.size[1]
+      plane_normal = -axis
+
+    dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere.pos, sphere.size[0])
+    plane_normal = -plane_normal  # Flip normal after position calculation
+    contacts[0] = pack_contact_auto_tangent(pos_contact, plane_normal, dist)
+    return 1
+
+  # Corner collision
+  inv_len = 1.0 / wp.sqrt(p_proj_sqr)
+  p_proj = p_proj * (cylinder.size[0] * inv_len)
+
+  cap_offset = axis * (wp.sign(x) * cylinder.size[1])
+  pos_corner = cylinder.pos + cap_offset + p_proj
+
+  contacts[0] = _sphere_sphere_ext(
+    sphere.pos,
+    sphere.size[0],
+    pos_corner,
+    0.0,
+    sphere.rot,
+    cylinder.rot,
+  )
+  return 1
+
+
+@wp.func
 def plane_box_core(
   plane: GeomCore,
   box: GeomCore,
