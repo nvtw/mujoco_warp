@@ -300,37 +300,13 @@ def _sphere_sphere(
 
 @wp.func
 def _sphere_sphere_ext(
-  # Data in:
-  nconmax_in: int,
   # In:
   pos1: wp.vec3,
   radius1: float,
   pos2: wp.vec3,
   radius2: float,
-  worldid: int,
-  margin: float,
-  gap: float,
-  condim: int,
-  friction: vec5,
-  solref: wp.vec2f,
-  solreffriction: wp.vec2f,
-  solimp: vec5,
-  geoms: wp.vec2i,
   mat1: wp.mat33,
   mat2: wp.mat33,
-  # Data out:
-  ncon_out: wp.array(dtype=int),
-  contact_dist_out: wp.array(dtype=float),
-  contact_pos_out: wp.array(dtype=wp.vec3),
-  contact_frame_out: wp.array(dtype=wp.mat33),
-  contact_includemargin_out: wp.array(dtype=float),
-  contact_friction_out: wp.array(dtype=vec5),
-  contact_solref_out: wp.array(dtype=wp.vec2),
-  contact_solreffriction_out: wp.array(dtype=wp.vec2),
-  contact_solimp_out: wp.array(dtype=vec5),
-  contact_dim_out: wp.array(dtype=int),
-  contact_geom_out: wp.array(dtype=wp.vec2i),
-  contact_worldid_out: wp.array(dtype=int),
 ):
   dir = pos2 - pos1
   dist = wp.length(dir)
@@ -345,33 +321,7 @@ def _sphere_sphere_ext(
   dist = dist - (radius1 + radius2)
   pos = pos1 + n * (radius1 + 0.5 * dist)
 
-  write_contact(
-    nconmax_in,
-    dist,
-    pos,
-    make_frame(n),
-    margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    worldid,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
-  )
+  return pack_contact_auto_tangent(pos, n, dist)
 
 
 @wp.func
@@ -1139,13 +1089,19 @@ def sphere_cylinder(
   if collide_side:
     pos_target = cylinder.pos + a_proj
 
-    _sphere_sphere_ext(
-      nconmax_in,
+    contact = _sphere_sphere_ext(
       sphere.pos,
       sphere.size[0],
       pos_target,
       cylinder.size[0],
-      worldid,
+      sphere.rot,
+      cylinder.rot,
+    )
+    write_contact(
+      nconmax_in,
+      contact.dist,
+      contact.pos,
+      extract_frame(contact),
       margin,
       gap,
       condim,
@@ -1154,8 +1110,7 @@ def sphere_cylinder(
       solreffriction,
       solimp,
       geoms,
-      sphere.rot,
-      cylinder.rot,
+      worldid,
       ncon_out,
       contact_dist_out,
       contact_pos_out,
@@ -1222,13 +1177,19 @@ def sphere_cylinder(
   cap_offset = axis * (wp.sign(x) * cylinder.size[1])
   pos_corner = cylinder.pos + cap_offset + p_proj
 
-  _sphere_sphere_ext(
-    nconmax_in,
+  contact = _sphere_sphere_ext(
     sphere.pos,
     sphere.size[0],
     pos_corner,
     0.0,
-    worldid,
+    sphere.rot,
+    cylinder.rot,
+  )
+  write_contact(
+    nconmax_in,
+    contact.dist,
+    contact.pos,
+    extract_frame(contact),
     margin,
     gap,
     condim,
@@ -1237,8 +1198,7 @@ def sphere_cylinder(
     solreffriction,
     solimp,
     geoms,
-    sphere.rot,
-    cylinder.rot,
+    worldid,
     ncon_out,
     contact_dist_out,
     contact_pos_out,
