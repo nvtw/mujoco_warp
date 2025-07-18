@@ -1325,52 +1325,6 @@ def contact_params(
 
 
 @wp.func
-def _sphere_box(
-  # In:
-  sphere_pos: wp.vec3,
-  sphere_size: float,
-  box_pos: wp.vec3,
-  box_rot: wp.mat33,
-  box_size: wp.vec3,
-  margin: float,
-):
-  center = wp.transpose(box_rot) @ (sphere_pos - box_pos)
-
-  clamped = wp.max(-box_size, wp.min(box_size, center))
-  clamped_dir, dist = normalize_with_norm(clamped - center)
-
-  if dist - sphere_size > margin:
-    return ContactPoint(), False
-
-  # sphere center inside box
-  if dist <= MJ_MINVAL:
-    closest = 2.0 * (box_size[0] + box_size[1] + box_size[2])
-    k = wp.int32(0)
-    for i in range(6):
-      face_dist = wp.abs(wp.where(i % 2, 1.0, -1.0) * box_size[i // 2] - center[i // 2])
-      if closest > face_dist:
-        closest = face_dist
-        k = i
-
-    nearest = wp.vec3(0.0)
-    nearest[k // 2] = wp.where(k % 2, -1.0, 1.0)
-    pos = center + nearest * (sphere_size - closest) / 2.0
-    contact_normal = box_rot @ nearest
-    contact_dist = -closest - sphere_size
-
-  else:
-    deepest = center + clamped_dir * sphere_size
-    pos = 0.5 * (clamped + deepest)
-    contact_normal = box_rot @ clamped_dir
-    contact_dist = dist - sphere_size
-
-  contact_pos = box_pos + box_rot @ pos
-  contact = pack_contact_auto_tangent(contact_pos, contact_normal, contact_dist)
-
-  return contact, True
-
-
-@wp.func
 def sphere_box(
   contacts: wp.array(dtype=ContactPoint),
   # Data in:
@@ -1401,16 +1355,15 @@ def sphere_box(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
-  contact, found = _sphere_box(
-    sphere.pos,
-    sphere.size[0],
-    box.pos,
-    box.rot,
-    box.size,
+  num_contacts = sphere_box_core(
+    __geom_core_from_geom(sphere),
+    __geom_core_from_geom(box),
+    contacts,
     margin,
   )
 
-  if found:
+  for i in range(num_contacts):
+    contact = contacts[i]
     write_contact(
       nconmax_in,
       contact.dist,

@@ -426,6 +426,31 @@ def _sphere_box(
 
 
 @wp.func
+def sphere_box_core(
+  sphere: GeomCore,
+  box: GeomCore,
+  contacts: wp.array(dtype=ContactPoint),
+  margin: float,
+) -> int:
+  """Calculates one contact between a sphere and a box."""
+  contact, found = _sphere_box(
+    sphere.pos,
+    sphere.size[0],
+    box.pos,
+    box.rot,
+    box.size,
+    margin,
+  )
+
+  num_contacts = 0
+  if found:
+    contacts[0] = contact
+    num_contacts = 1
+
+  return num_contacts
+
+
+@wp.func
 def capsule_box_core(
   cap: GeomCore,
   box: GeomCore,
