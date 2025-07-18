@@ -454,53 +454,41 @@ def capsule_capsule(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
-  axis1 = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
-  axis2 = wp.vec3(cap2.rot[0, 2], cap2.rot[1, 2], cap2.rot[2, 2])
-  length1 = cap1.size[1]
-  length2 = cap2.size[1]
-  seg1 = axis1 * length1
-  seg2 = axis2 * length2
-
-  pt1, pt2 = closest_segment_to_segment_points(
-    cap1.pos - seg1,
-    cap1.pos + seg1,
-    cap2.pos - seg2,
-    cap2.pos + seg2,
+  num_contacts = capsule_capsule_core(
+    __geom_core_from_geom(cap1),
+    __geom_core_from_geom(cap2),
+    contacts,
   )
 
-  contact = _sphere_sphere(
-    pt1,
-    cap1.size[0],
-    pt2,
-    cap2.size[0],
-  )
-  write_contact(
-    nconmax_in,
-    contact.dist,
-    contact.pos,
-    extract_frame(contact),
-    margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    worldid,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
-  )
+  for i in range(num_contacts):
+    contact = contacts[i]
+    write_contact(
+      nconmax_in,
+      contact.dist,
+      contact.pos,
+      extract_frame(contact),
+      margin,
+      gap,
+      condim,
+      friction,
+      solref,
+      solreffriction,
+      solimp,
+      geoms,
+      worldid,
+      ncon_out,
+      contact_dist_out,
+      contact_pos_out,
+      contact_frame_out,
+      contact_includemargin_out,
+      contact_friction_out,
+      contact_solref_out,
+      contact_solreffriction_out,
+      contact_solimp_out,
+      contact_dim_out,
+      contact_geom_out,
+      contact_worldid_out,
+    )
 
 
 @wp.func

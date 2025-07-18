@@ -16,6 +16,7 @@
 import warp as wp
 from typing import Any, Tuple
 from .math import normalize_with_norm
+from .math import closest_segment_to_segment_points
 
 wp.set_module_options({"enable_backward": False})
 
@@ -208,6 +209,36 @@ def plane_ellipsoid_core(
   contact_pos = pos - plane_normal * dist * 0.5
 
   contacts[0] = pack_contact_auto_tangent(contact_pos, plane_normal, dist)
+  return 1
+
+
+@wp.func
+def capsule_capsule_core(
+  cap1: GeomCore,
+  cap2: GeomCore,
+  contacts: wp.array(dtype=ContactPoint),
+) -> int:
+  """Calculates one contact between two capsules."""
+  axis1 = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
+  axis2 = wp.vec3(cap2.rot[0, 2], cap2.rot[1, 2], cap2.rot[2, 2])
+  length1 = cap1.size[1]
+  length2 = cap2.size[1]
+  seg1 = axis1 * length1
+  seg2 = axis2 * length2
+
+  pt1, pt2 = closest_segment_to_segment_points(
+    cap1.pos - seg1,
+    cap1.pos + seg1,
+    cap2.pos - seg2,
+    cap2.pos + seg2,
+  )
+
+  contacts[0] = _sphere_sphere(
+    pt1,
+    cap1.size[0],
+    pt2,
+    cap2.size[0],
+  )
   return 1
 
 
