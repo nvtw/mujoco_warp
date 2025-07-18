@@ -669,6 +669,7 @@ def _primitive_narrowphase_builder(m: Model):
     )
 
     contacts = wp.array(ptr=get_shared_memory_array(tid), shape=(8,), dtype=ContactPoint)
+    # contacts = wp.Zeros(shape=(8,), dtype=ContactPoint)
 
     for i in range(wp.static(len(_primitive_collisions_func))):
       collision_type1 = wp.static(_primitive_collisions_types[i][0])
