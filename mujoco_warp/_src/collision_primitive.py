@@ -224,42 +224,12 @@ def plane_sphere(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
-  num_contacts = plane_sphere_core(
+) -> int:
+  return plane_sphere_core(
     __geom_core_from_geom(plane),
     __geom_core_from_geom(sphere),
     contacts,
   )
-
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
 
 
 @wp.func
@@ -292,42 +262,12 @@ def sphere_sphere(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
-  num_contacts = sphere_sphere_core(
+) -> int:
+  return sphere_sphere_core(
     __geom_core_from_geom(sphere1),
     __geom_core_from_geom(sphere2),
     contacts,
   )
-
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
 
 
 @wp.func
@@ -360,43 +300,13 @@ def sphere_capsule(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
+) -> int:
   """Calculates one contact between a sphere and a capsule."""
-  num_contacts = sphere_capsule_core(
+  return sphere_capsule_core(
     __geom_core_from_geom(sphere),
     __geom_core_from_geom(cap),
     contacts,
   )
-
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
 
 
 @wp.func
@@ -429,42 +339,12 @@ def capsule_capsule(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
-  num_contacts = capsule_capsule_core(
+) -> int:
+  return capsule_capsule_core(
     __geom_core_from_geom(cap1),
     __geom_core_from_geom(cap2),
     contacts,
   )
-
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
 
 
 @wp.func
@@ -497,44 +377,14 @@ def plane_capsule(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
+) -> int:
   """Calculates two contacts between a capsule and a plane."""
 
-  num_contacts = plane_capsule_core(
+  return plane_capsule_core(
     __geom_core_from_geom(plane),
     __geom_core_from_geom(cap),
     contacts,
   )
-
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
 
 
 @wp.func
@@ -567,41 +417,12 @@ def plane_ellipsoid(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
-  num_contacts = plane_ellipsoid_core(
+) -> int:
+  return plane_ellipsoid_core(
     __geom_core_from_geom(plane),
     __geom_core_from_geom(ellipsoid),
     contacts,
   )
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
 
 
 @wp.func
@@ -634,43 +455,13 @@ def plane_box(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
-  num_contacts = plane_box_core(
+) -> int:
+  return plane_box_core(
     __geom_core_from_geom(plane),
     __geom_core_from_geom(box),
     contacts,
     margin,
   )
-
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
 
 
 @wp.func
@@ -703,44 +494,14 @@ def plane_convex(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
+) -> int:
   """Calculates contacts between a plane and a convex object."""
 
-  num_contacts = plane_convex_core(
+  return plane_convex_core(
     plane,
     convex,
     contacts,
   )
-
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
 
 
 @wp.func
@@ -774,41 +535,11 @@ def sphere_cylinder(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
-  num_contacts = sphere_cylinder_core(
+  return sphere_cylinder_core(
     __geom_core_from_geom(sphere),
     __geom_core_from_geom(cylinder),
     contacts,
   )
-
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
 
 
 @wp.func
@@ -841,43 +572,13 @@ def plane_cylinder(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
+) -> int:
   """Calculates contacts between a cylinder and a plane."""
-  num_contacts = plane_cylinder_core(
+  return plane_cylinder_core(
     __geom_core_from_geom(plane),
     __geom_core_from_geom(cylinder),
     contacts,
   )
-
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
 
 
 @wp.func
@@ -990,43 +691,13 @@ def sphere_box(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
-  num_contacts = sphere_box_core(
+) -> int:
+  return sphere_box_core(
     __geom_core_from_geom(sphere),
     __geom_core_from_geom(box),
     contacts,
     margin,
   )
-
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
 
 
 @wp.func
@@ -1059,75 +730,13 @@ def capsule_box(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
-  num_contacts = capsule_box_core(
+) -> int:
+  return capsule_box_core(
     __geom_core_from_geom(cap),
     __geom_core_from_geom(box),
     contacts,
     margin,
   )
-
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
-
-
-@wp.func
-def _compute_rotmore(face_idx: int) -> wp.mat33:
-  rotmore = wp.mat33(0.0)
-
-  if face_idx == 0:
-    rotmore[0, 2] = -1.0
-    rotmore[1, 1] = +1.0
-    rotmore[2, 0] = +1.0
-  elif face_idx == 1:
-    rotmore[0, 0] = +1.0
-    rotmore[1, 2] = -1.0
-    rotmore[2, 1] = +1.0
-  elif face_idx == 2:
-    rotmore[0, 0] = +1.0
-    rotmore[1, 1] = +1.0
-    rotmore[2, 2] = +1.0
-  elif face_idx == 3:
-    rotmore[0, 2] = +1.0
-    rotmore[1, 1] = +1.0
-    rotmore[2, 0] = -1.0
-  elif face_idx == 4:
-    rotmore[0, 0] = +1.0
-    rotmore[1, 2] = +1.0
-    rotmore[2, 1] = -1.0
-  elif face_idx == 5:
-    rotmore[0, 0] = -1.0
-    rotmore[1, 1] = +1.0
-    rotmore[2, 2] = -1.0
-
-  return rotmore
 
 
 @wp.func
@@ -1160,43 +769,13 @@ def box_box(
   contact_dim_out: wp.array(dtype=int),
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
-):
-  num_contacts = box_box_core(
+) -> int:
+  return box_box_core(
     __geom_core_from_geom(box1),
     __geom_core_from_geom(box2),
     contacts,
     margin,
   )
-
-  for i in range(num_contacts):
-    contact = contacts[i]
-    write_contact(
-      nconmax_in,
-      contact.dist,
-      contact.pos,
-      extract_frame(contact),
-      margin,
-      gap,
-      condim,
-      friction,
-      solref,
-      solreffriction,
-      solimp,
-      geoms,
-      worldid,
-      ncon_out,
-      contact_dist_out,
-      contact_pos_out,
-      contact_frame_out,
-      contact_includemargin_out,
-      contact_friction_out,
-      contact_solref_out,
-      contact_solreffriction_out,
-      contact_solimp_out,
-      contact_dim_out,
-      contact_geom_out,
-      contact_worldid_out,
-    )
 
 
 _PRIMITIVE_COLLISIONS = {
@@ -1408,7 +987,7 @@ def _primitive_narrowphase_builder(m: Model):
       collision_type2 = wp.static(_primitive_collisions_types[i][1])
 
       if collision_type1 == type1 and collision_type2 == type2:
-        wp.static(_primitive_collisions_func[i])(
+        num_contacts = wp.static(_primitive_collisions_func[i])(
           contacts,
           nconmax_in,
           geom1,
@@ -1435,6 +1014,36 @@ def _primitive_narrowphase_builder(m: Model):
           contact_geom_out,
           contact_worldid_out,
         )
+
+        for j in range(num_contacts):
+          contact = contacts[j]
+          write_contact(
+            nconmax_in,
+            contact.dist,
+            contact.pos,
+            extract_frame(contact),
+            margin,
+            gap,
+            condim,
+            friction,
+            solref,
+            solreffriction,
+            solimp,
+            geoms,
+            worldid,
+            ncon_out,
+            contact_dist_out,
+            contact_pos_out,
+            contact_frame_out,
+            contact_includemargin_out,
+            contact_friction_out,
+            contact_solref_out,
+            contact_solreffriction_out,
+            contact_solimp_out,
+            contact_dim_out,
+            contact_geom_out,
+            contact_worldid_out,
+          )
 
   return _primitive_narrowphase
 
