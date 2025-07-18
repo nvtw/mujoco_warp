@@ -165,6 +165,54 @@ def plane_ellipsoid_core(
 
 
 @wp.func
+def plane_box_core(
+  plane: GeomCore,
+  box: GeomCore,
+  contacts: wp.array(dtype=ContactPoint),
+  margin: float,
+) -> int:
+  """Calculates contacts between a plane and a box.
+
+  Can generate up to 4 contact points for the penetrating corners.
+
+  Returns:
+      int: Number of contacts generated (0-4)
+  """
+  num_contacts = int(0)
+  plane_normal = get_plane_normal(plane.rot)
+  corner = wp.vec3()
+  dist = wp.dot(box.pos - plane.pos, plane_normal)
+
+  # test all corners, pick bottom 4
+  for i in range(8):
+    # get corner in local coordinates
+    corner.x = wp.where(i & 1, box.size.x, -box.size.x)
+    corner.y = wp.where(i & 2, box.size.y, -box.size.y)
+    corner.z = wp.where(i & 4, box.size.z, -box.size.z)
+
+    # get corner in global coordinates relative to box center
+    corner = box.rot @ corner
+
+    # compute distance to plane, skip if too far or pointing up
+    ldist = wp.dot(plane_normal, corner)
+    if dist + ldist > margin or ldist > 0:
+      continue
+
+    cdist = dist + ldist
+    contact_pos = corner + box.pos - plane_normal * (cdist * 0.5)
+
+    contacts[num_contacts] = pack_contact_auto_tangent(
+      contact_pos, plane_normal, cdist
+    )
+    num_contacts += 1
+
+    if num_contacts >= 4:
+      break
+
+  return num_contacts
+
+
+@wp.func
 def plane_cylinder_core(
   plane: GeomCore,
   cylinder: GeomCore,

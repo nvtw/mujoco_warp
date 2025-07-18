@@ -680,70 +680,41 @@ def plane_capsule(
 
   contacts = wp.array(ptr=get_shared_memory_array(tid), shape=(8,), dtype=ContactPoint)
 
-  plane_capsule_core(
+  num_contacts = plane_capsule_core(
     __geom_core_from_geom(plane),
     __geom_core_from_geom(cap),
     contacts,
   )
 
-  contact0 = contacts[0]
-  write_contact(
-    nconmax_in,
-    contact0.dist,
-    contact0.pos,
-    extract_frame(contact0),
-    margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    worldid,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
-  )
-
-  # dist2, pos2 = _plane_sphere(n, plane.pos, cap.pos - segment, cap.size[0])
-  contact1 = contacts[1]
-  write_contact(
-    nconmax_in,
-    contact1.dist,
-    contact1.pos,
-    extract_frame(contact1),
-    margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    worldid,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
-  )
+  for i in range(num_contacts):
+    contact = contacts[i]
+    write_contact(
+      nconmax_in,
+      contact.dist,
+      contact.pos,
+      extract_frame(contact),
+      margin,
+      gap,
+      condim,
+      friction,
+      solref,
+      solreffriction,
+      solimp,
+      geoms,
+      worldid,
+      ncon_out,
+      contact_dist_out,
+      contact_pos_out,
+      contact_frame_out,
+      contact_includemargin_out,
+      contact_friction_out,
+      contact_solref_out,
+      contact_solreffriction_out,
+      contact_solimp_out,
+      contact_dim_out,
+      contact_geom_out,
+      contact_worldid_out,
+    )
 
 
 @wp.func
@@ -842,33 +813,21 @@ def plane_box(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
-  count = int(0)
-  corner = wp.vec3()
-  dist = wp.dot(box.pos - plane.pos, plane.normal)
+  contacts = wp.array(ptr=get_shared_memory_array(tid), shape=(8,), dtype=ContactPoint)
+  num_contacts = plane_box_core(
+    __geom_core_from_geom(plane),
+    __geom_core_from_geom(box),
+    contacts,
+    margin,
+  )
 
-  # test all corners, pick bottom 4
-  for i in range(8):
-    # get corner in local coordinates
-    corner.x = wp.where(i & 1, box.size.x, -box.size.x)
-    corner.y = wp.where(i & 2, box.size.y, -box.size.y)
-    corner.z = wp.where(i & 4, box.size.z, -box.size.z)
-
-    # get corner in global coordinates relative to box center
-    corner = box.rot * corner
-
-    # compute distance to plane, skip if too far or pointing up
-    ldist = wp.dot(plane.normal, corner)
-    if dist + ldist > margin or ldist > 0:
-      continue
-
-    cdist = dist + ldist
-    frame = make_frame(plane.normal)
-    pos = corner + box.pos + (plane.normal * cdist / -2.0)
+  for i in range(num_contacts):
+    contact = contacts[i]
     write_contact(
       nconmax_in,
-      cdist,
-      pos,
-      frame,
+      contact.dist,
+      contact.pos,
+      extract_frame(contact),
       margin,
       gap,
       condim,
@@ -891,9 +850,6 @@ def plane_box(
       contact_geom_out,
       contact_worldid_out,
     )
-    count += 1
-    if count >= 4:
-      break
 
 
 _HUGE_VAL = 1e6
