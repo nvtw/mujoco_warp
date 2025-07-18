@@ -202,6 +202,7 @@ def _plane_sphere(plane_normal: wp.vec3, plane_pos: wp.vec3, sphere_pos: wp.vec3
 
 @wp.func
 def plane_sphere(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -409,6 +410,7 @@ def _sphere_sphere_ext(
 
 @wp.func
 def sphere_sphere(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -469,6 +471,7 @@ def sphere_sphere(
 
 @wp.func
 def sphere_capsule(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -538,6 +541,7 @@ def sphere_capsule(
 
 @wp.func
 def capsule_capsule(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -610,8 +614,38 @@ def capsule_capsule(
   )
 
 
+
+@wp.struct
+class ContactPoint:
+  pos: wp.vec3
+  normal: wp.vec3
+  tangent: wp.vec3
+  dist: float
+
+
+
+
+
+snippet_struct = f"""
+        constexpr int array_size = 8;
+        constexpr int multiplier = 10;
+        __shared__ int s[128*array_size*multiplier];
+
+        auto ptr = &s[tid * array_size * multiplier];
+        return (uint64_t)ptr;
+        """
+
+@wp.func_native(snippet_struct)
+def get_shared_memory_array(tid: int) -> wp.uint64: ...
+
+
+
+
+
+
 @wp.func
 def plane_capsule(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -641,6 +675,10 @@ def plane_capsule(
   contact_worldid_out: wp.array(dtype=int),
 ):
   """Calculates two contacts between a capsule and a plane."""
+
+  contacts = wp.array(ptr=get_shared_memory_array(tid), shape=(8,), dtype=ContactPoint)
+
+
   n = plane.normal
   axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
   # align contact frames with capsule axis
@@ -717,6 +755,7 @@ def plane_capsule(
 
 @wp.func
 def plane_ellipsoid(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -781,6 +820,7 @@ def plane_ellipsoid(
 
 @wp.func
 def plane_box(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -868,6 +908,7 @@ _HUGE_VAL = 1e6
 
 @wp.func
 def plane_convex(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -1141,6 +1182,7 @@ def plane_convex(
 
 @wp.func
 def sphere_cylinder(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -1315,6 +1357,7 @@ def sphere_cylinder(
 
 @wp.func
 def plane_cylinder(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -1689,6 +1732,7 @@ def _sphere_box(
 
 @wp.func
 def sphere_box(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -1750,6 +1794,7 @@ def sphere_box(
 
 @wp.func
 def capsule_box(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -2169,6 +2214,7 @@ def _compute_rotmore(face_idx: int) -> wp.mat33:
 
 @wp.func
 def box_box(
+  tid: int,
   # Data in:
   nconmax_in: int,
   # In:
@@ -2834,6 +2880,7 @@ def _primitive_narrowphase_builder(m: Model):
 
       if collision_type1 == type1 and collision_type2 == type2:
         wp.static(_primitive_collisions_func[i])(
+          tid,
           nconmax_in,
           geom1,
           geom2,
@@ -2945,4 +2992,5 @@ def primitive_narrowphase(m: Model, d: Data):
       d.contact.geom,
       d.contact.worldid,
     ],
+    block_dim=128,
   )
