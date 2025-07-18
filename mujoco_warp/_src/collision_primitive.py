@@ -1588,36 +1588,13 @@ def contact_params(
 
 @wp.func
 def _sphere_box(
-  # Data in:
-  nconmax_in: int,
   # In:
   sphere_pos: wp.vec3,
   sphere_size: float,
   box_pos: wp.vec3,
   box_rot: wp.mat33,
   box_size: wp.vec3,
-  worldid: int,
   margin: float,
-  gap: float,
-  condim: int,
-  friction: vec5,
-  solref: wp.vec2f,
-  solreffriction: wp.vec2f,
-  solimp: vec5,
-  geoms: wp.vec2i,
-  # Data out:
-  ncon_out: wp.array(dtype=int),
-  contact_dist_out: wp.array(dtype=float),
-  contact_pos_out: wp.array(dtype=wp.vec3),
-  contact_frame_out: wp.array(dtype=wp.mat33),
-  contact_includemargin_out: wp.array(dtype=float),
-  contact_friction_out: wp.array(dtype=vec5),
-  contact_solref_out: wp.array(dtype=wp.vec2),
-  contact_solreffriction_out: wp.array(dtype=wp.vec2),
-  contact_solimp_out: wp.array(dtype=vec5),
-  contact_dim_out: wp.array(dtype=int),
-  contact_geom_out: wp.array(dtype=wp.vec2i),
-  contact_worldid_out: wp.array(dtype=int),
 ):
   center = wp.transpose(box_rot) @ (sphere_pos - box_pos)
 
@@ -1625,20 +1602,20 @@ def _sphere_box(
   clamped_dir, dist = normalize_with_norm(clamped - center)
 
   if dist - sphere_size > margin:
-    return
+    return ContactPoint(), False
 
   # sphere center inside box
   if dist <= MJ_MINVAL:
     closest = 2.0 * (box_size[0] + box_size[1] + box_size[2])
     k = wp.int32(0)
     for i in range(6):
-      face_dist = wp.abs(wp.where(i % 2, 1.0, -1.0) * box_size[i / 2] - center[i / 2])
+      face_dist = wp.abs(wp.where(i % 2, 1.0, -1.0) * box_size[i // 2] - center[i // 2])
       if closest > face_dist:
         closest = face_dist
         k = i
 
     nearest = wp.vec3(0.0)
-    nearest[k / 2] = wp.where(k % 2, -1.0, 1.0)
+    nearest[k // 2] = wp.where(k % 2, -1.0, 1.0)
     pos = center + nearest * (sphere_size - closest) / 2.0
     contact_normal = box_rot @ nearest
     contact_dist = -closest - sphere_size
@@ -1650,33 +1627,9 @@ def _sphere_box(
     contact_dist = dist - sphere_size
 
   contact_pos = box_pos + box_rot @ pos
-  write_contact(
-    nconmax_in,
-    contact_dist,
-    contact_pos,
-    make_frame(contact_normal),
-    margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    worldid,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
-  )
+  contact = pack_contact_auto_tangent(contact_pos, contact_normal, contact_dist)
+
+  return contact, True
 
 
 @wp.func
@@ -1710,35 +1663,43 @@ def sphere_box(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
-  _sphere_box(
-    nconmax_in,
+  contact, found = _sphere_box(
     sphere.pos,
     sphere.size[0],
     box.pos,
     box.rot,
     box.size,
-    worldid,
     margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
   )
+
+  if found:
+    write_contact(
+      nconmax_in,
+      contact.dist,
+      contact.pos,
+      extract_frame(contact),
+      margin,
+      gap,
+      condim,
+      friction,
+      solref,
+      solreffriction,
+      solimp,
+      geoms,
+      worldid,
+      ncon_out,
+      contact_dist_out,
+      contact_pos_out,
+      contact_frame_out,
+      contact_includemargin_out,
+      contact_friction_out,
+      contact_solref_out,
+      contact_solreffriction_out,
+      contact_solimp_out,
+      contact_dim_out,
+      contact_geom_out,
+      contact_worldid_out,
+    )
 
 
 @wp.func
@@ -2065,47 +2026,20 @@ def capsule_box(
   s1_pos_g = box.rot @ s1_pos_l + box.pos
 
   # collide with sphere
-  _sphere_box(
-    nconmax_in,
+  contact, found = _sphere_box(
     s1_pos_g,
     cap.size[0],
     box.pos,
     box.rot,
     box.size,
-    worldid,
     margin,
-    gap,
-    condim,
-    friction,
-    solref,
-    solreffriction,
-    solimp,
-    geoms,
-    ncon_out,
-    contact_dist_out,
-    contact_pos_out,
-    contact_frame_out,
-    contact_includemargin_out,
-    contact_friction_out,
-    contact_solref_out,
-    contact_solreffriction_out,
-    contact_solimp_out,
-    contact_dim_out,
-    contact_geom_out,
-    contact_worldid_out,
   )
-
-  if secondpos > -3:  # secondpos was modified
-    s2_pos_l = pos + halfaxis * (secondpos + bestsegmentpos)
-    s2_pos_g = box.rot @ s2_pos_l + box.pos
-    _sphere_box(
+  if found:
+    write_contact(
       nconmax_in,
-      s2_pos_g,
-      cap.size[0],
-      box.pos,
-      box.rot,
-      box.size,
-      worldid,
+      contact.dist,
+      contact.pos,
+      extract_frame(contact),
       margin,
       gap,
       condim,
@@ -2114,6 +2048,7 @@ def capsule_box(
       solreffriction,
       solimp,
       geoms,
+      worldid,
       ncon_out,
       contact_dist_out,
       contact_pos_out,
@@ -2127,6 +2062,46 @@ def capsule_box(
       contact_geom_out,
       contact_worldid_out,
     )
+
+  if secondpos > -3:  # secondpos was modified
+    s2_pos_l = pos + halfaxis * (secondpos + bestsegmentpos)
+    s2_pos_g = box.rot @ s2_pos_l + box.pos
+    contact, found = _sphere_box(
+      s2_pos_g,
+      cap.size[0],
+      box.pos,
+      box.rot,
+      box.size,
+      margin,
+    )
+    if found:
+      write_contact(
+        nconmax_in,
+        contact.dist,
+        contact.pos,
+        extract_frame(contact),
+        margin,
+        gap,
+        condim,
+        friction,
+        solref,
+        solreffriction,
+        solimp,
+        geoms,
+        worldid,
+        ncon_out,
+        contact_dist_out,
+        contact_pos_out,
+        contact_frame_out,
+        contact_includemargin_out,
+        contact_friction_out,
+        contact_solref_out,
+        contact_solreffriction_out,
+        contact_solimp_out,
+        contact_dim_out,
+        contact_geom_out,
+        contact_worldid_out,
+      )
 
 
 @wp.func
