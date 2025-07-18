@@ -18,6 +18,8 @@ import warp as wp
 from .collision_hfield import hfield_triangle_prism
 from .collision_primitive_core import *
 from .collision_primitive_core import _plane_sphere
+from .collision_primitive_core import _sphere_sphere
+from .collision_primitive_core import _sphere_sphere_ext
 from .math import closest_segment_point
 from .math import closest_segment_to_segment_points
 from .math import make_frame
@@ -278,50 +280,6 @@ def plane_sphere(
   )
 
 
-@wp.func
-def _sphere_sphere(
-  # In:
-  pos1: wp.vec3,
-  radius1: float,
-  pos2: wp.vec3,
-  radius2: float,
-):
-  dir = pos2 - pos1
-  dist = wp.length(dir)
-  if dist == 0.0:
-    n = wp.vec3(1.0, 0.0, 0.0)
-  else:
-    n = dir / dist
-  dist = dist - (radius1 + radius2)
-  pos = pos1 + n * (radius1 + 0.5 * dist)
-
-  return pack_contact_auto_tangent(pos, n, dist)
-
-
-@wp.func
-def _sphere_sphere_ext(
-  # In:
-  pos1: wp.vec3,
-  radius1: float,
-  pos2: wp.vec3,
-  radius2: float,
-  mat1: wp.mat33,
-  mat2: wp.mat33,
-):
-  dir = pos2 - pos1
-  dist = wp.length(dir)
-  if dist == 0.0:
-    # Use cross product of z axes like MuJoCo
-    axis1 = wp.vec3(mat1[0, 2], mat1[1, 2], mat1[2, 2])
-    axis2 = wp.vec3(mat2[0, 2], mat2[1, 2], mat2[2, 2])
-    n = wp.cross(axis1, axis2)
-    n = wp.normalize(n)
-  else:
-    n = dir / dist
-  dist = dist - (radius1 + radius2)
-  pos = pos1 + n * (radius1 + 0.5 * dist)
-
-  return pack_contact_auto_tangent(pos, n, dist)
 
 
 @wp.func
