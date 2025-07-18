@@ -15,16 +15,9 @@
 
 import warp as wp
 from typing import Any, Tuple
+from .math import normalize_with_norm
 
 wp.set_module_options({"enable_backward": False})
-
-
-@wp.func
-def normalize_with_norm(x: Any):
-  norm = wp.length(x)
-  if norm == 0.0:
-    return x, 0.0
-  return x / norm, norm
 
 
 @wp.func
@@ -74,6 +67,10 @@ def extract_frame(c: ContactPoint) -> wp.mat33:
   tangent2 = wp.cross(normal, tangent)
   return wp.mat33(normal[0], normal[1], normal[2], tangent[0], tangent[1], tangent[2], tangent2[0], tangent2[1], tangent2[2])
 
+
+@wp.func
+def get_tangent(frame: wp.mat33) -> wp.vec3:
+  return wp.vec3(frame[0, 1], frame[1, 1], frame[2, 1])
 
 @wp.struct
 class GeomCore:
@@ -154,7 +151,8 @@ def plane_capsule_core(
 def plane_ellipsoid_core(
   plane: GeomCore,
   ellipsoid: GeomCore,
-) -> ContactPoint:
+  contacts: wp.array(dtype=ContactPoint),
+) -> int:
   """Calculates one contact between a plane and an ellipsoid."""
   plane_normal = get_plane_normal(plane.rot)
   sphere_support = -wp.normalize(wp.cw_mul(wp.transpose(ellipsoid.rot) @ plane_normal, ellipsoid.size))
@@ -162,15 +160,105 @@ def plane_ellipsoid_core(
   dist = wp.dot(plane_normal, pos - plane.pos)
   contact_pos = pos - plane_normal * dist * 0.5
 
-  return pack_contact_auto_tangent(contact_pos, plane_normal, dist)
+  contacts[0] = pack_contact_auto_tangent(contact_pos, plane_normal, dist)
+  return 1
+
+
+@wp.func
+def plane_cylinder_core(
+  plane: GeomCore,
+  cylinder: GeomCore,
+  contacts: wp.array(dtype=ContactPoint),
+  margin: float,
+) -> int:
+  """Calculates contacts between a cylinder and a plane.
+  
+  Can generate up to 4 contact points depending on the cylinder's orientation and distance.
+  
+  Returns:
+      int: Number of contacts generated (0-4)
+  """
+  # Extract plane normal and cylinder axis
+  n = get_plane_normal(plane.rot)
+  axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
+
+  # Project, make sure axis points toward plane
+  prjaxis = wp.dot(n, axis)
+  if prjaxis > 0:
+    axis = -axis
+    prjaxis = -prjaxis
+
+  # Compute normal distance from plane to cylinder center
+  dist0 = wp.dot(cylinder.pos - plane.pos, n)
+
+  # Remove component of -normal along cylinder axis
+  vec = axis * prjaxis - n
+  len_sqr = wp.dot(vec, vec)
+
+  # If vector is nondegenerate, normalize and scale by radius
+  # Otherwise use cylinder's x-axis scaled by radius
+  vec = wp.where(
+    len_sqr >= 1e-12,
+    vec * (cylinder.size[0] / wp.sqrt(len_sqr)),
+    wp.vec3(cylinder.rot[0, 0], cylinder.rot[1, 0], cylinder.rot[2, 0]) * cylinder.size[0],
+  )
+
+  # Project scaled vector on normal
+  prjvec = wp.dot(vec, n)
+
+  # Scale cylinder axis by half-length
+  axis = axis * cylinder.size[1]
+  prjaxis = prjaxis * cylinder.size[1]
+
+  frame = make_frame(n)
+
+  num_contacts = 0
+
+  # First contact point (end cap closer to plane)
+  dist1 = dist0 + prjaxis + prjvec
+  if dist1 <= margin:
+    pos1 = cylinder.pos + vec + axis - n * (dist1 * 0.5)
+    contacts[num_contacts] = pack_contact(pos1, n, get_tangent(frame), dist1)
+    num_contacts += 1
+  else:
+    # If nearest point is above margin, no contacts
+    return 0
+
+  # Second contact point (end cap farther from plane)
+  dist2 = dist0 - prjaxis + prjvec
+  if dist2 <= margin:
+    pos2 = cylinder.pos + vec - axis - n * (dist2 * 0.5)
+    contacts[num_contacts] = pack_contact(pos2, n, get_tangent(frame), dist2)
+    num_contacts += 1
+
+  # Try triangle contact points on side closer to plane
+  prjvec1 = -prjvec * 0.5
+  dist3 = dist0 + prjaxis + prjvec1
+  if dist3 <= margin:
+    # Compute sideways vector scaled by radius*sqrt(3)/2
+    vec1 = wp.cross(vec, axis)
+    vec1 = wp.normalize(vec1) * (cylinder.size[0] * wp.sqrt(3.0) * 0.5)
+
+    # Add contact point A - adjust to closest side
+    pos3 = cylinder.pos + vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
+    contacts[num_contacts] = pack_contact(pos3, n, get_tangent(frame), dist3)
+    num_contacts += 1
+
+    # Add contact point B - adjust to closest side
+    pos4 = cylinder.pos - vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
+    contacts[num_contacts] = pack_contact(pos4, n, get_tangent(frame), dist3)
+    num_contacts += 1
+
+  return num_contacts
 
 
 @wp.kernel
 def dummy_test(a: GeomCore, b: GeomCore):
   contacts = wp.zeros(shape=(8,), dtype=ContactPoint)
 
-  c = plane_ellipsoid_core(a, b)
-  num_contacts = plane_capsule_core(a, b, contacts)
+  num_ellipsoid_contacts = plane_ellipsoid_core(a, b, contacts)
+  num_capsule_contacts = plane_capsule_core(a, b, contacts)
+  num_cylinder_contacts = plane_cylinder_core(a, b, contacts, 1.0)
 
 
 def test():

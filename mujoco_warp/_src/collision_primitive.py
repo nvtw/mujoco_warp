@@ -1457,7 +1457,7 @@ def plane_cylinder(
       nconmax_in,
       dist2,
       pos2,
-      make_frame(plane.normal),
+      frame,
       margin,
       gap,
       condim,
