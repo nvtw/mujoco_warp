@@ -121,67 +121,15 @@ def get_tangent(frame: wp.mat33) -> wp.vec3:
   return wp.vec3(frame[0, 1], frame[1, 1], frame[2, 1])
 
 
-@wp.struct
-class GeomCore:
-  pos: wp.vec3
-  rot: wp.mat33
-  size: wp.vec3
-
-
-@wp.struct
-class Geom:
-  pos: wp.vec3
-  rot: wp.mat33
-  normal: wp.vec3
-  size: wp.vec3
-  hfprism: wp.mat33
-  vertadr: int
-  vertnum: int
-  vert: wp.array(dtype=wp.vec3)
-  graphadr: int
-  graph: wp.array(dtype=int)
-  mesh_polynum: int
-  mesh_polyadr: int
-  mesh_polynormal: wp.array(dtype=wp.vec3)
-  mesh_polyvertadr: wp.array(dtype=int)
-  mesh_polyvertnum: wp.array(dtype=int)
-  mesh_polyvert: wp.array(dtype=int)
-  mesh_polymapadr: wp.array(dtype=int)
-  mesh_polymapnum: wp.array(dtype=int)
-  mesh_polymap: wp.array(dtype=int)
-  index: int
-
-
-@wp.func
-def get_plane_normal(rot: wp.mat33) -> wp.vec3:
-  return wp.vec3(rot[0, 2], rot[1, 2], rot[2, 2])
-
-
-@wp.func
-def geom_core(
-  # Data in:
-  geom_xpos_in: wp.array2d(dtype=wp.vec3),
-  geom_xmat_in: wp.array2d(dtype=wp.mat33),
-  geom_size: wp.array2d(dtype=wp.vec3),
-  # In:
-  worldid: int,
-  gid: int,
-) -> GeomCore:
-  geom = GeomCore()
-  geom.pos = geom_xpos_in[worldid, gid]
-  rot = geom_xmat_in[worldid, gid]
-  geom.rot = rot
-  geom.size = geom_size[worldid, gid]
-  return geom
-
-
 _HUGE_VAL = 1e6
 
 
 @wp.func
 def plane_convex_core(
-  plane: GeomCore,
-  convex: GeomCore,
+  plane_normal: wp.vec3,
+  plane_pos: wp.vec3,
+  convex_pos: wp.vec3,
+  convex_rot: wp.mat33,
   contacts: wp.array(dtype=ContactPoint),
   convex_vert: wp.array(dtype=wp.vec3),
   convex_vertadr: int,
@@ -191,11 +139,9 @@ def plane_convex_core(
 ) -> int:
   """Calculates contacts between a plane and a convex object."""
 
-  plane_normal = get_plane_normal(plane.rot)
-
   # get points in the convex frame
-  plane_pos = wp.transpose(convex.rot) @ (plane.pos - convex.pos)
-  n = wp.transpose(convex.rot) @ plane_normal
+  plane_pos_local = wp.transpose(convex_rot) @ (plane_pos - convex_pos)
+  n = wp.transpose(convex_rot) @ plane_normal
 
   # Store indices in vec4
   indices = wp.vec4i(-1, -1, -1, -1)
@@ -205,14 +151,14 @@ def plane_convex_core(
     # Find support points
     max_support = wp.float32(-_HUGE_VAL)
     for i in range(convex_vertnum):
-      support = wp.dot(plane_pos - convex_vert[convex_vertadr + i], n)
+      support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
       max_support = wp.max(support, max_support)
 
     threshold = wp.max(0.0, max_support - 1e-3)
     # Find point a (first support point)
     a_dist = wp.float32(-_HUGE_VAL)
     for i in range(convex_vertnum):
-      support = wp.dot(plane_pos - convex_vert[convex_vertadr + i], n)
+      support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
       dist = wp.where(support > threshold, 0.0, -_HUGE_VAL)
       if dist > a_dist:
         indices[0] = i
@@ -222,7 +168,7 @@ def plane_convex_core(
     # Find point b (furthest from a)
     b_dist = wp.float32(-_HUGE_VAL)
     for i in range(convex_vertnum):
-      support = wp.dot(plane_pos - convex_vert[convex_vertadr + i], n)
+      support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
       dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
       dist = wp.length_sq(a - convex_vert[convex_vertadr + i]) + dist_mask
       if dist > b_dist:
@@ -234,7 +180,7 @@ def plane_convex_core(
     ab = wp.cross(n, a - b)
     c_dist = wp.float32(-_HUGE_VAL)
     for i in range(convex_vertnum):
-      support = wp.dot(plane_pos - convex_vert[convex_vertadr + i], n)
+      support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
       dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
       dist = wp.length_sq(ab - convex_vert[convex_vertadr + i]) + dist_mask
       if dist > c_dist:
@@ -247,7 +193,7 @@ def plane_convex_core(
     bc = wp.cross(n, b - c)
     d_dist = wp.float32(-_HUGE_VAL)
     for i in range(convex_vertnum):
-      support = wp.dot(plane_pos - convex_vert[convex_vertadr + i], n)
+      support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
       dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
       ap = ac - convex_vert[convex_vertadr + i]
       bp = bc - convex_vert[convex_vertadr + i]
@@ -276,7 +222,7 @@ def plane_convex_core(
       while convex_graph[edge_localid + i] >= 0:
         subidx = convex_graph[edge_localid + i]
         idx = convex_graph[vert_globalid + subidx]
-        support = wp.dot(plane_pos - convex_vert[convex_vertadr + idx], n)
+        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
         if support > max_support:
           max_support = support
           imax = int(subidx)
@@ -297,7 +243,7 @@ def plane_convex_core(
       while convex_graph[edge_localid + i] >= 0:
         subidx = convex_graph[edge_localid + i]
         idx = convex_graph[vert_globalid + subidx]
-        support = wp.dot(plane_pos - convex_vert[convex_vertadr + idx], n)
+        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
         dist = wp.where(support > threshold, 0.0, -_HUGE_VAL)
         if dist > a_dist:
           a_dist = dist
@@ -321,7 +267,7 @@ def plane_convex_core(
       while convex_graph[edge_localid + i] >= 0:
         subidx = convex_graph[edge_localid + i]
         idx = convex_graph[vert_globalid + subidx]
-        support = wp.dot(plane_pos - convex_vert[convex_vertadr + idx], n)
+        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
         dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
         dist = wp.length_sq(a - convex_vert[convex_vertadr + idx]) + dist_mask
         if dist > b_dist:
@@ -347,7 +293,7 @@ def plane_convex_core(
       while convex_graph[edge_localid + i] >= 0:
         subidx = convex_graph[edge_localid + i]
         idx = convex_graph[vert_globalid + subidx]
-        support = wp.dot(plane_pos - convex_vert[convex_vertadr + idx], n)
+        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
         dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
         dist = wp.length_sq(ab - convex_vert[convex_vertadr + idx]) + dist_mask
         if dist > c_dist:
@@ -374,7 +320,7 @@ def plane_convex_core(
       while convex_graph[edge_localid + i] >= 0:
         subidx = convex_graph[edge_localid + i]
         idx = convex_graph[vert_globalid + subidx]
-        support = wp.dot(plane_pos - convex_vert[convex_vertadr + idx], n)
+        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
         dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
         ap = ac - convex_vert[convex_vertadr + idx]
         bp = bc - convex_vert[convex_vertadr + idx]
@@ -402,8 +348,8 @@ def plane_convex_core(
     # Check if the index is unique (appears exactly once)
     if count == 1:
       pos = convex_vert[convex_vertadr + idx]
-      pos = convex.pos + convex.rot @ pos
-      support = wp.dot(plane_pos - convex_vert[convex_vertadr + idx], n)
+      pos = convex_pos + convex_rot @ pos
+      support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
       dist = -support
       pos = pos - 0.5 * dist * plane_normal
       contacts[num_contacts] = pack_contact(pos, plane_normal, get_tangent(frame), dist)
@@ -421,13 +367,14 @@ def _plane_sphere(plane_normal: wp.vec3, plane_pos: wp.vec3, sphere_pos: wp.vec3
 
 @wp.func
 def plane_sphere_core(
-  plane: GeomCore,
-  sphere: GeomCore,
+  plane_normal: wp.vec3,
+  plane_pos: wp.vec3,
+  sphere_center: wp.vec3,
+  sphere_radius: float,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a plane and a sphere."""
-  plane_normal = get_plane_normal(plane.rot)
-  dist, pos = _plane_sphere(plane_normal, plane.pos, sphere.pos, sphere.size[0])
+  dist, pos = _plane_sphere(plane_normal, plane_pos, sphere_center, sphere_radius)
   contacts[0] = pack_contact_auto_tangent(pos, plane_normal, dist)
   return 1
 
@@ -480,16 +427,18 @@ def _sphere_sphere_ext(
 
 @wp.func
 def sphere_sphere_core(
-  sphere1: GeomCore,
-  sphere2: GeomCore,
+  sphere1_center: wp.vec3,
+  sphere1_radius: float,
+  sphere2_center: wp.vec3,
+  sphere2_radius: float,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between two spheres."""
   contact = _sphere_sphere(
-    sphere1.pos,
-    sphere1.size[0],
-    sphere2.pos,
-    sphere2.size[0],
+    sphere1_center,
+    sphere1_radius,
+    sphere2_center,
+    sphere2_radius,
   )
   contacts[0] = contact
   return 1
@@ -497,26 +446,30 @@ def sphere_sphere_core(
 
 @wp.func
 def sphere_capsule_core(
-  sphere: GeomCore,
-  cap: GeomCore,
+  sphere_center: wp.vec3,
+  sphere_radius: float,
+  sphere_rot: wp.mat33,
+  cap_center: wp.vec3,
+  cap_axis: wp.vec3,
+  cap_radius: float,
+  cap_half_length: float,
+  cap_rot: wp.mat33,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a sphere and a capsule."""
-  axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  length = cap.size[1]
-  segment = axis * length
+  segment = cap_axis * cap_half_length
 
   # Find closest point on capsule centerline to sphere center
-  pt = closest_segment_point(cap.pos - segment, cap.pos + segment, sphere.pos)
+  pt = closest_segment_point(cap_center - segment, cap_center + segment, sphere_center)
 
   # Treat as sphere-sphere collision between sphere and closest point
   contact = _sphere_sphere_ext(
-    sphere.pos,
-    sphere.size[0],
+    sphere_center,
+    sphere_radius,
     pt,
-    cap.size[0],
-    sphere.rot,
-    cap.rot,
+    cap_radius,
+    sphere_rot,
+    cap_rot,
   )
   contacts[0] = contact
   return 1
@@ -524,8 +477,12 @@ def sphere_capsule_core(
 
 @wp.func
 def plane_capsule_core(
-  plane: GeomCore,
-  cap: GeomCore,
+  plane_normal: wp.vec3,
+  plane_pos: wp.vec3,
+  cap_center: wp.vec3,
+  cap_axis: wp.vec3,
+  cap_radius: float,
+  cap_half_length: float,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates two contacts between a capsule and a plane.
@@ -536,10 +493,9 @@ def plane_capsule_core(
   Returns:
       int: Always returns 2 since there are two contact points (one at each end)
   """
-  n = get_plane_normal(plane.rot)
-  axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
+  n = plane_normal
   # align contact frames with capsule axis
-  b, b_norm = normalize_with_norm(axis - n * wp.dot(n, axis))
+  b, b_norm = normalize_with_norm(cap_axis - n * wp.dot(n, cap_axis))
 
   if b_norm < 0.5:
     if -0.5 < n[1] and n[1] < 0.5:
@@ -549,12 +505,12 @@ def plane_capsule_core(
 
   # c = wp.cross(n, b)
   # frame = wp.mat33(n[0], n[1], n[2], b[0], b[1], b[2], c[0], c[1], c[2])
-  segment = axis * cap.size[1]
+  segment = cap_axis * cap_half_length
 
-  dist1, pos1 = _plane_sphere(n, plane.pos, cap.pos + segment, cap.size[0])
+  dist1, pos1 = _plane_sphere(n, plane_pos, cap_center + segment, cap_radius)
   contacts[0] = pack_contact(pos1, n, b, dist1)
 
-  dist2, pos2 = _plane_sphere(n, plane.pos, cap.pos - segment, cap.size[0])
+  dist2, pos2 = _plane_sphere(n, plane_pos, cap_center - segment, cap_radius)
   contacts[1] = pack_contact(pos2, n, b, dist2)
 
   return 2
@@ -562,15 +518,17 @@ def plane_capsule_core(
 
 @wp.func
 def plane_ellipsoid_core(
-  plane: GeomCore,
-  ellipsoid: GeomCore,
+  plane_normal: wp.vec3,
+  plane_pos: wp.vec3,
+  ellipsoid_center: wp.vec3,
+  ellipsoid_rot: wp.mat33,
+  ellipsoid_radii: wp.vec3,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a plane and an ellipsoid."""
-  plane_normal = get_plane_normal(plane.rot)
-  sphere_support = -wp.normalize(wp.cw_mul(wp.transpose(ellipsoid.rot) @ plane_normal, ellipsoid.size))
-  pos = ellipsoid.pos + ellipsoid.rot @ wp.cw_mul(sphere_support, ellipsoid.size)
-  dist = wp.dot(plane_normal, pos - plane.pos)
+  sphere_support = -wp.normalize(wp.cw_mul(wp.transpose(ellipsoid_rot) @ plane_normal, ellipsoid_radii))
+  pos = ellipsoid_center + ellipsoid_rot @ wp.cw_mul(sphere_support, ellipsoid_radii)
+  dist = wp.dot(plane_normal, pos - plane_pos)
   contact_pos = pos - plane_normal * dist * 0.5
 
   contacts[0] = pack_contact_auto_tangent(contact_pos, plane_normal, dist)
@@ -579,60 +537,62 @@ def plane_ellipsoid_core(
 
 @wp.func
 def capsule_capsule_core(
-  cap1: GeomCore,
-  cap2: GeomCore,
+  cap1_center: wp.vec3,
+  cap1_axis: wp.vec3,
+  cap1_radius: float,
+  cap1_half_length: float,
+  cap2_center: wp.vec3,
+  cap2_axis: wp.vec3,
+  cap2_radius: float,
+  cap2_half_length: float,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between two capsules."""
-  axis1 = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
-  axis2 = wp.vec3(cap2.rot[0, 2], cap2.rot[1, 2], cap2.rot[2, 2])
-  length1 = cap1.size[1]
-  length2 = cap2.size[1]
-  seg1 = axis1 * length1
-  seg2 = axis2 * length2
+  seg1 = cap1_axis * cap1_half_length
+  seg2 = cap2_axis * cap2_half_length
 
   pt1, pt2 = closest_segment_to_segment_points(
-    cap1.pos - seg1,
-    cap1.pos + seg1,
-    cap2.pos - seg2,
-    cap2.pos + seg2,
+    cap1_center - seg1,
+    cap1_center + seg1,
+    cap2_center - seg2,
+    cap2_center + seg2,
   )
 
   contacts[0] = _sphere_sphere(
     pt1,
-    cap1.size[0],
+    cap1_radius,
     pt2,
-    cap2.size[0],
+    cap2_radius,
   )
   return 1
 
 
 @wp.func
 def sphere_cylinder_core(
-  sphere: GeomCore,
-  cylinder: GeomCore,
+  sphere_center: wp.vec3,
+  sphere_radius: float,
+  sphere_rot: wp.mat33,
+  cylinder_center: wp.vec3,
+  cylinder_axis: wp.vec3,
+  cylinder_radius: float,
+  cylinder_half_height: float,
+  cylinder_rot: wp.mat33,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a sphere and a cylinder."""
-  axis = wp.vec3(
-    cylinder.rot[0, 2],
-    cylinder.rot[1, 2],
-    cylinder.rot[2, 2],
-  )
+  vec = sphere_center - cylinder_center
+  x = wp.dot(vec, cylinder_axis)
 
-  vec = sphere.pos - cylinder.pos
-  x = wp.dot(vec, axis)
-
-  a_proj = axis * x
+  a_proj = cylinder_axis * x
   p_proj = vec - a_proj
   p_proj_sqr = wp.dot(p_proj, p_proj)
 
-  collide_side = wp.abs(x) < cylinder.size[1]
-  collide_cap = p_proj_sqr < (cylinder.size[0] * cylinder.size[0])
+  collide_side = wp.abs(x) < cylinder_half_height
+  collide_cap = p_proj_sqr < (cylinder_radius * cylinder_radius)
 
   if collide_side and collide_cap:
-    dist_cap = cylinder.size[1] - wp.abs(x)
-    dist_radius = cylinder.size[0] - wp.sqrt(p_proj_sqr)
+    dist_cap = cylinder_half_height - wp.abs(x)
+    dist_radius = cylinder_radius - wp.sqrt(p_proj_sqr)
 
     if dist_cap < dist_radius:
       collide_side = False
@@ -641,14 +601,14 @@ def sphere_cylinder_core(
 
   # Side collision
   if collide_side:
-    pos_target = cylinder.pos + a_proj
+    pos_target = cylinder_center + a_proj
     contacts[0] = _sphere_sphere_ext(
-      sphere.pos,
-      sphere.size[0],
+      sphere_center,
+      sphere_radius,
       pos_target,
-      cylinder.size[0],
-      sphere.rot,
-      cylinder.rot,
+      cylinder_radius,
+      sphere_rot,
+      cylinder_rot,
     )
     return 1
 
@@ -656,32 +616,32 @@ def sphere_cylinder_core(
   if collide_cap:
     if x > 0.0:
       # top cap
-      pos_cap = cylinder.pos + axis * cylinder.size[1]
-      plane_normal = axis
+      pos_cap = cylinder_center + cylinder_axis * cylinder_half_height
+      plane_normal = cylinder_axis
     else:
       # bottom cap
-      pos_cap = cylinder.pos - axis * cylinder.size[1]
-      plane_normal = -axis
+      pos_cap = cylinder_center - cylinder_axis * cylinder_half_height
+      plane_normal = -cylinder_axis
 
-    dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere.pos, sphere.size[0])
+    dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere_center, sphere_radius)
     plane_normal = -plane_normal  # Flip normal after position calculation
     contacts[0] = pack_contact_auto_tangent(pos_contact, plane_normal, dist)
     return 1
 
   # Corner collision
   inv_len = 1.0 / wp.sqrt(p_proj_sqr)
-  p_proj = p_proj * (cylinder.size[0] * inv_len)
+  p_proj = p_proj * (cylinder_radius * inv_len)
 
-  cap_offset = axis * (wp.sign(x) * cylinder.size[1])
-  pos_corner = cylinder.pos + cap_offset + p_proj
+  cap_offset = cylinder_axis * (wp.sign(x) * cylinder_half_height)
+  pos_corner = cylinder_center + cap_offset + p_proj
 
   contacts[0] = _sphere_sphere_ext(
-    sphere.pos,
-    sphere.size[0],
+    sphere_center,
+    sphere_radius,
     pos_corner,
     0.0,
-    sphere.rot,
-    cylinder.rot,
+    sphere_rot,
+    cylinder_rot,
   )
   return 1
 
@@ -734,18 +694,21 @@ def _sphere_box(
 
 @wp.func
 def sphere_box_core(
-  sphere: GeomCore,
-  box: GeomCore,
+  sphere_center: wp.vec3,
+  sphere_radius: float,
+  box_center: wp.vec3,
+  box_rot: wp.mat33,
+  box_half_sizes: wp.vec3,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
 ) -> int:
   """Calculates one contact between a sphere and a box."""
   contact, found = _sphere_box(
-    sphere.pos,
-    sphere.size[0],
-    box.pos,
-    box.rot,
-    box.size,
+    sphere_center,
+    sphere_radius,
+    box_center,
+    box_rot,
+    box_half_sizes,
     margin,
   )
 
@@ -759,20 +722,26 @@ def sphere_box_core(
 
 @wp.func
 def capsule_box_core(
-  cap: GeomCore,
-  box: GeomCore,
+  cap_center: wp.vec3,
+  cap_axis: wp.vec3,
+  cap_radius: float,
+  cap_half_length: float,
+  cap_rot: wp.mat33,
+  box_center: wp.vec3,
+  box_rot: wp.mat33,
+  box_half_sizes: wp.vec3,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
 ) -> int:
   """Calculates contacts between a capsule and a box."""
   # Based on the mjc implementation
-  boxmatT = wp.transpose(box.rot)
-  pos = boxmatT @ (cap.pos - box.pos)
-  axis = boxmatT @ wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  halfaxis = axis * cap.size[1]  # halfaxis is the capsule direction
+  boxmatT = wp.transpose(box_rot)
+  pos = boxmatT @ (cap_center - box_center)
+  axis = boxmatT @ cap_axis
+  halfaxis = axis * cap_half_length  # halfaxis is the capsule direction
   axisdir = wp.int32(halfaxis[0] > 0.0) + 2 * wp.int32(halfaxis[1] > 0.0) + 4 * wp.int32(halfaxis[2] > 0.0)
 
-  bestdistmax = margin + 2.0 * (cap.size[0] + cap.size[1] + box.size[0] + box.size[1] + box.size[2])
+  bestdistmax = margin + 2.0 * (cap_radius + cap_half_length + box_half_sizes[0] + box_half_sizes[1] + box_half_sizes[2])
 
   # keep track of closest point
   bestdist = wp.float32(bestdistmax)
@@ -801,14 +770,14 @@ def capsule_box_core(
     ax_out = wp.int32(-1)
 
     for j in range(3):
-      if boxPoint[j] < -box.size[j]:
+      if boxPoint[j] < -box_half_sizes[j]:
         n_out += 1
         ax_out = j
-        boxPoint[j] = -box.size[j]
-      elif boxPoint[j] > box.size[j]:
+        boxPoint[j] = -box_half_sizes[j]
+      elif boxPoint[j] > box_half_sizes[j]:
         n_out += 1
         ax_out = j
-        boxPoint[j] = box.size[j]
+        boxPoint[j] = box_half_sizes[j]
 
     if n_out > 1:
       continue
@@ -840,18 +809,18 @@ def capsule_box_core(
           wp.where(i & 2, 1.0, -1.0),
           wp.where(i & 4, 1.0, -1.0),
         ),
-        box.size,
+        box_half_sizes,
       )
       box_pt[j] = 0.0
 
       # find closest point between capsule and the edge
       dif = box_pt - pos
 
-      u = -box.size[j] * dif[j]
+      u = -box_half_sizes[j] * dif[j]
       v = wp.dot(halfaxis, dif)
-      ma = box.size[j] * box.size[j]
-      mb = -box.size[j] * halfaxis[j]
-      mc = cap.size[1] * cap.size[1]
+      ma = box_half_sizes[j] * box_half_sizes[j]
+      mb = -box_half_sizes[j] * halfaxis[j]
+      mc = cap_half_length * cap_half_length
       det = ma * mc - mb * mb
       if wp.abs(det) < MJ_MINVAL:
         continue
@@ -893,7 +862,7 @@ def capsule_box_core(
           s1 = 0
 
       dif -= halfaxis * x2
-      dif[j] += box.size[j] * x1
+      dif[j] += box_half_sizes[j] * x1
 
       # encode relative positions of the closest points
       ct = s1 * 3 + s2
@@ -914,7 +883,7 @@ def capsule_box_core(
 
   p = wp.vec2(pos.x, pos.y)
   dd = wp.vec2(halfaxis.x, halfaxis.y)
-  s = wp.vec2(box.size.x, box.size.y)
+  s = wp.vec2(box_half_sizes.x, box_half_sizes.y)
   secondpos = wp.float32(-4.0)
 
   uu = dd.x * s.y
@@ -967,13 +936,13 @@ def capsule_box_core(
         ax2 = 1
 
       if axis[ax] * axis[ax] > 0.5:  # second point along the edge of the box
-        m = 2.0 * box.size[ax] / wp.abs(halfaxis[ax])
+        m = 2.0 * box_half_sizes[ax] / wp.abs(halfaxis[ax])
         secondpos = min(1.0 - wp.float32(mul) * bestsegmentpos, m)
       else:  # second point along a face of the box
         # check for overshoot again
         m = 2.0 * min(
-          box.size[ax1] / wp.abs(halfaxis[ax1]),
-          box.size[ax2] / wp.abs(halfaxis[ax2]),
+          box_half_sizes[ax1] / wp.abs(halfaxis[ax1]),
+          box_half_sizes[ax2] / wp.abs(halfaxis[ax2]),
         )
         secondpos = -min(1.0 + wp.float32(mul) * bestsegmentpos, m)
       secondpos *= wp.float32(mul)
@@ -1014,7 +983,7 @@ def capsule_box_core(
       # now find out whether we point towards the opposite side or towards one of the sides
       # and also find the farthest point along the capsule that is above the box
 
-      e1 = 2.0 * box.size[ax2] / wp.abs(halfaxis[ax2])
+      e1 = 2.0 * box_half_sizes[ax2] / wp.abs(halfaxis[ax2])
       secondpos = min(e1, secondpos)
 
       if ((axisdir & (1 << ax)) != 0) == ((c1 & (1 << ax2)) != 0):
@@ -1022,7 +991,7 @@ def capsule_box_core(
       else:
         e2 = 1.0 + bestboxpos
 
-      e1 = box.size[ax] * e2 / wp.abs(halfaxis[ax])
+      e1 = box_half_sizes[ax] * e2 / wp.abs(halfaxis[ax])
 
       secondpos = min(e1, secondpos)
       secondpos *= wp.float32(mul)
@@ -1042,11 +1011,11 @@ def capsule_box_core(
       for i in range(3):
         if i != clface:
           ha_r = wp.float32(mul) / halfaxis[i]
-          e1 = (box.size[i] - tmp1[i]) * ha_r
+          e1 = (box_half_sizes[i] - tmp1[i]) * ha_r
           if 0 < e1 and e1 < secondpos:
             secondpos = e1
 
-          e1 = (-box.size[i] - tmp1[i]) * ha_r
+          e1 = (-box_half_sizes[i] - tmp1[i]) * ha_r
           if 0 < e1 and e1 < secondpos:
             secondpos = e1
 
@@ -1055,15 +1024,15 @@ def capsule_box_core(
   num_contacts = 0
   # create sphere in original orientation at first contact point
   s1_pos_l = pos + halfaxis * bestsegmentpos
-  s1_pos_g = box.rot @ s1_pos_l + box.pos
+  s1_pos_g = box_rot @ s1_pos_l + box_center
 
   # collide with sphere
   contact, found = _sphere_box(
     s1_pos_g,
-    cap.size[0],
-    box.pos,
-    box.rot,
-    box.size,
+    cap_radius,
+    box_center,
+    box_rot,
+    box_half_sizes,
     margin,
   )
   if found:
@@ -1072,13 +1041,13 @@ def capsule_box_core(
 
   if secondpos > -3:  # secondpos was modified
     s2_pos_l = pos + halfaxis * (secondpos + bestsegmentpos)
-    s2_pos_g = box.rot @ s2_pos_l + box.pos
+    s2_pos_g = box_rot @ s2_pos_l + box_center
     contact, found = _sphere_box(
       s2_pos_g,
-      cap.size[0],
-      box.pos,
-      box.rot,
-      box.size,
+      cap_radius,
+      box_center,
+      box_rot,
+      box_half_sizes,
       margin,
     )
     if found:
@@ -1090,8 +1059,11 @@ def capsule_box_core(
 
 @wp.func
 def plane_box_core(
-  plane: GeomCore,
-  box: GeomCore,
+  plane_normal: wp.vec3,
+  plane_pos: wp.vec3,
+  box_center: wp.vec3,
+  box_rot: wp.mat33,
+  box_half_sizes: wp.vec3,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
 ) -> int:
@@ -1103,19 +1075,18 @@ def plane_box_core(
       int: Number of contacts generated (0-4)
   """
   num_contacts = int(0)
-  plane_normal = get_plane_normal(plane.rot)
   corner = wp.vec3()
-  dist = wp.dot(box.pos - plane.pos, plane_normal)
+  dist = wp.dot(box_center - plane_pos, plane_normal)
 
   # test all corners, pick bottom 4
   for i in range(8):
     # get corner in local coordinates
-    corner.x = wp.where(i & 1, box.size.x, -box.size.x)
-    corner.y = wp.where(i & 2, box.size.y, -box.size.y)
-    corner.z = wp.where(i & 4, box.size.z, -box.size.z)
+    corner.x = wp.where(i & 1, box_half_sizes.x, -box_half_sizes.x)
+    corner.y = wp.where(i & 2, box_half_sizes.y, -box_half_sizes.y)
+    corner.z = wp.where(i & 4, box_half_sizes.z, -box_half_sizes.z)
 
     # get corner in global coordinates relative to box center
-    corner = box.rot @ corner
+    corner = box_rot @ corner
 
     # compute distance to plane, skip if too far or pointing up
     ldist = wp.dot(plane_normal, corner)
@@ -1123,7 +1094,7 @@ def plane_box_core(
       continue
 
     cdist = dist + ldist
-    contact_pos = corner + box.pos - plane_normal * (cdist * 0.5)
+    contact_pos = corner + box_center - plane_normal * (cdist * 0.5)
 
     contacts[num_contacts] = pack_contact_auto_tangent(contact_pos, plane_normal, cdist)
     num_contacts += 1
@@ -1136,36 +1107,40 @@ def plane_box_core(
 
 @wp.func
 def box_box_core(
-  box1: GeomCore,
-  box2: GeomCore,
+  box1_center: wp.vec3,
+  box1_rot: wp.mat33,
+  box1_half_sizes: wp.vec3,
+  box2_center: wp.vec3,
+  box2_rot: wp.mat33,
+  box2_half_sizes: wp.vec3,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
 ) -> int:
   """Calculates contacts between two boxes."""
   # Compute transforms between box's frames
 
-  pos21 = wp.transpose(box1.rot) @ (box2.pos - box1.pos)
-  pos12 = wp.transpose(box2.rot) @ (box1.pos - box2.pos)
+  pos21 = wp.transpose(box1_rot) @ (box2_center - box1_center)
+  pos12 = wp.transpose(box2_rot) @ (box1_center - box2_center)
 
-  rot21 = wp.transpose(box1.rot) @ box2.rot
+  rot21 = wp.transpose(box1_rot) @ box2_rot
   rot12 = wp.transpose(rot21)
 
   rot21abs = wp.matrix_from_rows(wp.abs(rot21[0]), wp.abs(rot21[1]), wp.abs(rot21[2]))
   rot12abs = wp.transpose(rot21abs)
 
-  plen2 = rot21abs @ box2.size
-  plen1 = rot12abs @ box1.size
+  plen2 = rot21abs @ box2_half_sizes
+  plen1 = rot12abs @ box1_half_sizes
 
   # Compute axis of maximum separation
-  s_sum_3 = 3.0 * (box1.size + box2.size)
+  s_sum_3 = 3.0 * (box1_half_sizes + box2_half_sizes)
   separation = wp.float32(margin + s_sum_3[0] + s_sum_3[1] + s_sum_3[2])
   axis_code = wp.int32(-1)
 
   # First test: consider boxes' face normals
   for i in range(3):
-    c1 = -wp.abs(pos21[i]) + box1.size[i] + plen2[i]
+    c1 = -wp.abs(pos21[i]) + box1_half_sizes[i] + plen2[i]
 
-    c2 = -wp.abs(pos12[i]) + box2.size[i] + plen1[i]
+    c2 = -wp.abs(pos12[i]) + box2_half_sizes[i] + plen1[i]
 
     if c1 < -margin or c2 < -margin:
       return 0
@@ -1205,9 +1180,9 @@ def box_box_core(
       # Project box half-sizes onto the potential separating axis
       for k in range(3):
         if k != i:
-          c3 += box1.size[k] * wp.abs(cross_axis[k])
+          c3 += box1_half_sizes[k] * wp.abs(cross_axis[k])
         if k != j:
-          c3 += box2.size[k] * rot21abs[i, 3 - k - j] / cross_length
+          c3 += box2_half_sizes[k] * rot21abs[i, 3 - k - j] / cross_length
 
       c3 -= wp.abs(box_dist)
 
@@ -1250,8 +1225,8 @@ def box_box_core(
 
     r = rotmore @ wp.where(box_idx, rot12, rot21)
     p = rotmore @ wp.where(box_idx, pos12, pos21)
-    ss = wp.abs(rotmore @ wp.where(box_idx, box2.size, box1.size))
-    s = wp.where(box_idx, box1.size, box2.size)
+    ss = wp.abs(rotmore @ wp.where(box_idx, box2_half_sizes, box1_half_sizes))
+    s = wp.where(box_idx, box1_half_sizes, box2_half_sizes)
     rt = wp.transpose(r)
 
     lx, ly, hz = ss[0], ss[1], ss[2]
@@ -1349,8 +1324,8 @@ def box_box_core(
       n += 1
 
     # Set up contact frame
-    rw = wp.where(box_idx, box2.rot, box1.rot) @ wp.transpose(rotmore)
-    pw = wp.where(box_idx, box2.pos, box1.pos)
+    rw = wp.where(box_idx, box2_rot, box1_rot) @ wp.transpose(rotmore)
+    pw = wp.where(box_idx, box2_center, box1_center)
     normal = wp.where(box_idx, -1.0, 1.0) * wp.transpose(rw)[2]
 
   else:
@@ -1378,7 +1353,7 @@ def box_box_core(
     rnorm = rotmore @ clnorm
     r = rotmore @ rot21
     rt = wp.transpose(r)
-    s = wp.abs(wp.transpose(rotmore) @ box1.size)
+    s = wp.abs(wp.transpose(rotmore) @ box1_half_sizes)
 
     lx, ly, hz = s[0], s[1], s[2]
     p[2] -= hz
@@ -1387,20 +1362,20 @@ def box_box_core(
 
     points[0] = (
       p
-      + rt[ax1] * box2.size[ax1] * wp.where(cle2 & (1 << ax1), 1.0, -1.0)
-      + rt[ax2] * box2.size[ax2] * wp.where(cle2 & (1 << ax2), 1.0, -1.0)
+      + rt[ax1] * box2_half_sizes[ax1] * wp.where(cle2 & (1 << ax1), 1.0, -1.0)
+      + rt[ax2] * box2_half_sizes[ax2] * wp.where(cle2 & (1 << ax2), 1.0, -1.0)
     )
-    points[1] = points[0] - rt[edge2] * box2.size[edge2]
-    points[0] += rt[edge2] * box2.size[edge2]
+    points[1] = points[0] - rt[edge2] * box2_half_sizes[edge2]
+    points[0] += rt[edge2] * box2_half_sizes[edge2]
 
     points[2] = (
       p
-      + rt[ax1] * box2.size[ax1] * wp.where(cle2 & (1 << ax1), -1.0, 1.0)
-      + rt[ax2] * box2.size[ax2] * wp.where(cle2 & (1 << ax2), 1.0, -1.0)
+      + rt[ax1] * box2_half_sizes[ax1] * wp.where(cle2 & (1 << ax1), -1.0, 1.0)
+      + rt[ax2] * box2_half_sizes[ax2] * wp.where(cle2 & (1 << ax2), 1.0, -1.0)
     )
 
-    points[3] = points[2] - rt[edge2] * box2.size[edge2]
-    points[2] += rt[edge2] * box2.size[edge2]
+    points[3] = points[2] - rt[edge2] * box2_half_sizes[edge2]
+    points[2] += rt[edge2] * box2_half_sizes[edge2]
 
     n = 4
 
@@ -1546,8 +1521,8 @@ def box_box_core(
       n += 1
 
     # Set up contact data for all points
-    rw = box1.rot @ wp.transpose(rotmore)
-    pw = box1.pos
+    rw = box1_rot @ wp.transpose(rotmore)
+    pw = box1_center
     normal = wp.where(inv, -1.0, 1.0) * rw @ rnorm
 
   # Create contact points
@@ -1562,14 +1537,18 @@ def box_box_core(
 
 @wp.func
 def plane_cylinder_core(
-  plane: GeomCore,
-  cylinder: GeomCore,
+  plane_normal: wp.vec3,
+  plane_pos: wp.vec3,
+  cylinder_center: wp.vec3,
+  cylinder_axis: wp.vec3,
+  cylinder_radius: float,
+  cylinder_half_height: float,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a cylinder and a plane."""
   # Extract plane normal and cylinder axis
-  n = get_plane_normal(plane.rot)
-  axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
+  n = plane_normal
+  axis = cylinder_axis
 
   # Project, make sure axis points toward plane
   prjaxis = wp.dot(n, axis)
@@ -1578,7 +1557,7 @@ def plane_cylinder_core(
     prjaxis = -prjaxis
 
   # Compute normal distance from plane to cylinder center
-  dist0 = wp.dot(cylinder.pos - plane.pos, n)
+  dist0 = wp.dot(cylinder_center - plane_pos, n)
 
   # Remove component of -normal along cylinder axis
   vec = axis * prjaxis - n
@@ -1588,16 +1567,16 @@ def plane_cylinder_core(
   # Otherwise use cylinder's x-axis scaled by radius
   vec = wp.where(
     len_sqr >= 1e-12,
-    vec * (cylinder.size[0] / wp.sqrt(len_sqr)),
-    wp.vec3(cylinder.rot[0, 0], cylinder.rot[1, 0], cylinder.rot[2, 0]) * cylinder.size[0],
+    vec * (cylinder_radius / wp.sqrt(len_sqr)),
+    wp.vec3(1.0, 0.0, 0.0) * cylinder_radius,  # Default x-axis when cylinder axis is parallel to plane normal
   )
 
   # Project scaled vector on normal
   prjvec = wp.dot(vec, n)
 
   # Scale cylinder axis by half-length
-  axis = axis * cylinder.size[1]
-  prjaxis = prjaxis * cylinder.size[1]
+  axis = axis * cylinder_half_height
+  prjaxis = prjaxis * cylinder_half_height
 
   # Align contact frames with plane normal
   b, c = orthogonals(n)
@@ -1606,13 +1585,13 @@ def plane_cylinder_core(
 
   # First contact point (end cap closer to plane)
   dist1 = dist0 + prjaxis + prjvec
-  pos1 = cylinder.pos + vec + axis - n * (dist1 * 0.5)
+  pos1 = cylinder_center + vec + axis - n * (dist1 * 0.5)
   contacts[num_contacts] = pack_contact(pos1, n, b, dist1)
   num_contacts += 1
 
   # Second contact point (end cap farther from plane)
   dist2 = dist0 - prjaxis + prjvec
-  pos2 = cylinder.pos + vec - axis - n * (dist2 * 0.5)
+  pos2 = cylinder_center + vec - axis - n * (dist2 * 0.5)
   contacts[num_contacts] = pack_contact(pos2, n, b, dist2)
   num_contacts += 1
 
@@ -1622,45 +1601,16 @@ def plane_cylinder_core(
 
   # Compute sideways vector scaled by radius*sqrt(3)/2
   vec1 = wp.cross(vec, axis)
-  vec1 = wp.normalize(vec1) * (cylinder.size[0] * wp.sqrt(3.0) * 0.5)
+  vec1 = wp.normalize(vec1) * (cylinder_radius * wp.sqrt(3.0) * 0.5)
 
   # Add contact point A - adjust to closest side
-  pos3 = cylinder.pos + vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
+  pos3 = cylinder_center + vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
   contacts[num_contacts] = pack_contact(pos3, n, b, dist3)
   num_contacts += 1
 
   # Add contact point B - adjust to closest side
-  pos4 = cylinder.pos - vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
+  pos4 = cylinder_center - vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
   contacts[num_contacts] = pack_contact(pos4, n, b, dist3)
   num_contacts += 1
 
   return num_contacts
-
-
-@wp.kernel
-def dummy_test(a: GeomCore, b: GeomCore):
-  contacts = wp.zeros(shape=(8,), dtype=ContactPoint)
-
-  num_ellipsoid_contacts = plane_ellipsoid_core(a, b, contacts)
-  num_capsule_contacts = plane_capsule_core(a, b, contacts)
-  num_cylinder_contacts = plane_cylinder_core(a, b, contacts)
-
-
-def test():
-  # Create dummy geoms
-  plane = GeomCore()
-  plane.pos = wp.vec3(0.0, 0.0, 0.0)
-  plane.rot = wp.mat33(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-  plane.size = wp.vec3(1.0, 1.0, 1.0)
-
-  ellipsoid = GeomCore()
-  ellipsoid.pos = wp.vec3(0.0, 0.0, 1.0)
-  ellipsoid.rot = wp.mat33(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-  ellipsoid.size = wp.vec3(0.5, 0.5, 0.5)
-
-  # Launch kernel
-  wp.launch(kernel=dummy_test, dim=1, inputs=[plane, ellipsoid])
-
-
-if __name__ == "__main__":
-  test()

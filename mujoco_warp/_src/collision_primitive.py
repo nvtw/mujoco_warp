@@ -64,8 +64,62 @@ snippet_struct = f"""
 def get_shared_memory_array(tid: int) -> wp.uint64: ...
 
 
+@wp.struct
+class GeomCore:
+  pos: wp.vec3
+  rot: wp.mat33
+  size: wp.vec3
+
+
 @wp.func
-def __geom_core_from_geom(geom: Geom) -> GeomCore:
+def get_plane_normal(rot: wp.mat33) -> wp.vec3:
+  return wp.vec3(rot[0, 2], rot[1, 2], rot[2, 2])
+
+
+@wp.func
+def geom_core(
+  # Data in:
+  geom_xpos_in: wp.array2d(dtype=wp.vec3),
+  geom_xmat_in: wp.array2d(dtype=wp.mat33),
+  geom_size: wp.array2d(dtype=wp.vec3),
+  # In:
+  worldid: int,
+  gid: int,
+) -> GeomCore:
+  geom = GeomCore()
+  geom.pos = geom_xpos_in[worldid, gid]
+  rot = geom_xmat_in[worldid, gid]
+  geom.rot = rot
+  geom.size = geom_size[worldid, gid]
+  return geom
+
+
+@wp.struct
+class Geom:
+  pos: wp.vec3
+  rot: wp.mat33
+  normal: wp.vec3
+  size: wp.vec3
+  hfprism: wp.mat33
+  vertadr: int
+  vertnum: int
+  vert: wp.array(dtype=wp.vec3)
+  graphadr: int
+  graph: wp.array(dtype=int)
+  mesh_polynum: int
+  mesh_polyadr: int
+  mesh_polynormal: wp.array(dtype=wp.vec3)
+  mesh_polyvertadr: wp.array(dtype=int)
+  mesh_polyvertnum: wp.array(dtype=int)
+  mesh_polyvert: wp.array(dtype=int)
+  mesh_polymapadr: wp.array(dtype=int)
+  mesh_polymapnum: wp.array(dtype=int)
+  mesh_polymap: wp.array(dtype=int)
+  index: int
+
+
+@wp.func
+def _geom_core_from_geom(geom: Geom) -> GeomCore:
   return GeomCore(pos=geom.pos, rot=geom.rot, size=geom.size)
 
 
@@ -206,9 +260,12 @@ def plane_sphere(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  plane_normal = get_plane_normal(plane.rot)
   return plane_sphere_core(
-    plane,
-    sphere,
+    plane_normal,
+    plane.pos,
+    sphere.pos,
+    sphere.size[0],
     contacts,
   )
 
@@ -226,8 +283,10 @@ def sphere_sphere(
   _graphadr: int,
 ) -> int:
   return sphere_sphere_core(
-    sphere1,
-    sphere2,
+    sphere1.pos,
+    sphere1.size[0],
+    sphere2.pos,
+    sphere2.size[0],
     contacts,
   )
 
@@ -245,9 +304,16 @@ def sphere_capsule(
   _graphadr: int,
 ) -> int:
   """Calculates one contact between a sphere and a capsule."""
+  cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
   return sphere_capsule_core(
-    sphere,
-    cap,
+    sphere.pos,
+    sphere.size[0],
+    sphere.rot,
+    cap.pos,
+    cap_axis,
+    cap.size[0],
+    cap.size[1],
+    cap.rot,
     contacts,
   )
 
@@ -264,9 +330,17 @@ def capsule_capsule(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  cap1_axis = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
+  cap2_axis = wp.vec3(cap2.rot[0, 2], cap2.rot[1, 2], cap2.rot[2, 2])
   return capsule_capsule_core(
-    cap1,
-    cap2,
+    cap1.pos,
+    cap1_axis,
+    cap1.size[0],
+    cap1.size[1],
+    cap2.pos,
+    cap2_axis,
+    cap2.size[0],
+    cap2.size[1],
     contacts,
   )
 
@@ -284,10 +358,15 @@ def plane_capsule(
   _graphadr: int,
 ) -> int:
   """Calculates two contacts between a capsule and a plane."""
-
+  plane_normal = get_plane_normal(plane.rot)
+  cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
   return plane_capsule_core(
-    plane,
-    cap,
+    plane_normal,
+    plane.pos,
+    cap.pos,
+    cap_axis,
+    cap.size[0],
+    cap.size[1],
     contacts,
   )
 
@@ -304,9 +383,13 @@ def plane_ellipsoid(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  plane_normal = get_plane_normal(plane.rot)
   return plane_ellipsoid_core(
-    plane,
-    ellipsoid,
+    plane_normal,
+    plane.pos,
+    ellipsoid.pos,
+    ellipsoid.rot,
+    ellipsoid.size,
     contacts,
   )
 
@@ -323,9 +406,13 @@ def plane_box(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  plane_normal = get_plane_normal(plane.rot)
   return plane_box_core(
-    plane,
-    box,
+    plane_normal,
+    plane.pos,
+    box.pos,
+    box.rot,
+    box.size,
     contacts,
     margin,
   )
@@ -344,10 +431,12 @@ def plane_convex(
   graphadr: int,
 ) -> int:
   """Calculates contacts between a plane and a convex object."""
-
+  plane_normal = get_plane_normal(plane.rot)
   return plane_convex_core(
-    plane,
-    convex,
+    plane_normal,
+    plane.pos,
+    convex.pos,
+    convex.rot,
     contacts,
     vert,
     vertadr,
@@ -369,9 +458,16 @@ def sphere_cylinder(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ):
+  cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
   return sphere_cylinder_core(
-    sphere,
-    cylinder,
+    sphere.pos,
+    sphere.size[0],
+    sphere.rot,
+    cylinder.pos,
+    cylinder_axis,
+    cylinder.size[0],
+    cylinder.size[1],
+    cylinder.rot,
     contacts,
   )
 
@@ -389,9 +485,15 @@ def plane_cylinder(
   _graphadr: int,
 ) -> int:
   """Calculates contacts between a cylinder and a plane."""
+  plane_normal = get_plane_normal(plane.rot)
+  cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
   return plane_cylinder_core(
-    plane,
-    cylinder,
+    plane_normal,
+    plane.pos,
+    cylinder.pos,
+    cylinder_axis,
+    cylinder.size[0],
+    cylinder.size[1],
     contacts,
   )
 
@@ -489,8 +591,11 @@ def sphere_box(
   _graphadr: int,
 ) -> int:
   return sphere_box_core(
-    sphere,
-    box,
+    sphere.pos,
+    sphere.size[0],
+    box.pos,
+    box.rot,
+    box.size,
     contacts,
     margin,
   )
@@ -508,9 +613,16 @@ def capsule_box(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
   return capsule_box_core(
-    cap,
-    box,
+    cap.pos,
+    cap_axis,
+    cap.size[0],
+    cap.size[1],
+    cap.rot,
+    box.pos,
+    box.rot,
+    box.size,
     contacts,
     margin,
   )
@@ -529,8 +641,12 @@ def box_box(
   _graphadr: int,
 ) -> int:
   return box_box_core(
-    box1,
-    box2,
+    box1.pos,
+    box1.rot,
+    box1.size,
+    box2.pos,
+    box2.rot,
+    box2.size,
     contacts,
     margin,
   )
