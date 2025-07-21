@@ -252,13 +252,13 @@ def write_contact(
 def plane_sphere_wrapper(
   plane: GeomCore,
   sphere: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a plane and a sphere."""
   plane_normal = get_plane_normal(plane.rot)
@@ -275,13 +275,13 @@ def plane_sphere_wrapper(
 def sphere_sphere_wrapper(
   sphere1: GeomCore,
   sphere2: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between two spheres."""
   return sphere_sphere(
@@ -297,13 +297,13 @@ def sphere_sphere_wrapper(
 def sphere_capsule_wrapper(
   sphere: GeomCore,
   cap: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a sphere and a capsule."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
@@ -324,13 +324,13 @@ def sphere_capsule_wrapper(
 def capsule_capsule_wrapper(
   cap1: GeomCore,
   cap2: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between two capsules."""
   cap1_axis = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
@@ -352,13 +352,13 @@ def capsule_capsule_wrapper(
 def plane_capsule_wrapper(
   plane: GeomCore,
   cap: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates two contacts between a capsule and a plane."""
   plane_normal = get_plane_normal(plane.rot)
@@ -378,13 +378,13 @@ def plane_capsule_wrapper(
 def plane_ellipsoid_wrapper(
   plane: GeomCore,
   ellipsoid: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a plane and an ellipsoid."""
   plane_normal = get_plane_normal(plane.rot)
@@ -402,13 +402,13 @@ def plane_ellipsoid_wrapper(
 def plane_box_wrapper(
   plane: GeomCore,
   box: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a plane and a box."""
   plane_normal = get_plane_normal(plane.rot)
@@ -427,13 +427,13 @@ def plane_box_wrapper(
 def plane_convex_wrapper(
   plane: GeomCore,
   convex: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   vert: wp.array(dtype=wp.vec3),
   vertadr: int,
   vertnum: int,
   graph: wp.array(dtype=int),
   graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a plane and a convex object."""
   plane_normal = get_plane_normal(plane.rot)
@@ -455,13 +455,13 @@ def plane_convex_wrapper(
 def sphere_cylinder_wrapper(
   sphere: GeomCore,
   cylinder: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ):
   """Calculates one contact between a sphere and a cylinder."""
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
@@ -482,13 +482,13 @@ def sphere_cylinder_wrapper(
 def plane_cylinder_wrapper(
   plane: GeomCore,
   cylinder: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a cylinder and a plane."""
   plane_normal = get_plane_normal(plane.rot)
@@ -588,13 +588,13 @@ def contact_params(
 def sphere_box_wrapper(
   sphere: GeomCore,
   box: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a sphere and a box."""
   return sphere_box(
@@ -612,13 +612,13 @@ def sphere_box_wrapper(
 def capsule_box_wrapper(
   cap: GeomCore,
   box: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a capsule and a box."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
@@ -640,13 +640,13 @@ def capsule_box_wrapper(
 def box_box_wrapper(
   box1: GeomCore,
   box2: GeomCore,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between two boxes."""
   return box_box(
@@ -840,13 +840,13 @@ def _primitive_narrowphase_builder(m: Model):
         num_contacts = wp.static(_primitive_collisions_func[i])(
           geom1,
           geom2,
-          contacts,
           margin,
           mesh_vert,
           vertadr,
           vertnum,
           mesh_graph,
           graphadr,
+          contacts,
         )
 
         for j in range(num_contacts):
