@@ -125,7 +125,7 @@ _HUGE_VAL = 1e6
 
 
 @wp.func
-def plane_convex_core(
+def plane_convex(
   plane_normal: wp.vec3,
   plane_pos: wp.vec3,
   convex_pos: wp.vec3,
@@ -366,7 +366,7 @@ def _plane_sphere(plane_normal: wp.vec3, plane_pos: wp.vec3, sphere_pos: wp.vec3
 
 
 @wp.func
-def plane_sphere_core(
+def plane_sphere(
   plane_normal: wp.vec3,
   plane_pos: wp.vec3,
   sphere_center: wp.vec3,
@@ -426,7 +426,7 @@ def _sphere_sphere_ext(
 
 
 @wp.func
-def sphere_sphere_core(
+def sphere_sphere(
   sphere1_center: wp.vec3,
   sphere1_radius: float,
   sphere2_center: wp.vec3,
@@ -445,7 +445,7 @@ def sphere_sphere_core(
 
 
 @wp.func
-def sphere_capsule_core(
+def sphere_capsule(
   sphere_center: wp.vec3,
   sphere_radius: float,
   sphere_rot: wp.mat33,
@@ -476,7 +476,7 @@ def sphere_capsule_core(
 
 
 @wp.func
-def plane_capsule_core(
+def plane_capsule(
   plane_normal: wp.vec3,
   plane_pos: wp.vec3,
   cap_center: wp.vec3,
@@ -517,7 +517,7 @@ def plane_capsule_core(
 
 
 @wp.func
-def plane_ellipsoid_core(
+def plane_ellipsoid(
   plane_normal: wp.vec3,
   plane_pos: wp.vec3,
   ellipsoid_center: wp.vec3,
@@ -536,7 +536,7 @@ def plane_ellipsoid_core(
 
 
 @wp.func
-def capsule_capsule_core(
+def capsule_capsule(
   cap1_center: wp.vec3,
   cap1_axis: wp.vec3,
   cap1_radius: float,
@@ -568,7 +568,7 @@ def capsule_capsule_core(
 
 
 @wp.func
-def sphere_cylinder_core(
+def sphere_cylinder(
   sphere_center: wp.vec3,
   sphere_radius: float,
   sphere_rot: wp.mat33,
@@ -693,7 +693,7 @@ def _sphere_box(
 
 
 @wp.func
-def sphere_box_core(
+def sphere_box(
   sphere_center: wp.vec3,
   sphere_radius: float,
   box_center: wp.vec3,
@@ -721,7 +721,7 @@ def sphere_box_core(
 
 
 @wp.func
-def capsule_box_core(
+def capsule_box(
   cap_center: wp.vec3,
   cap_axis: wp.vec3,
   cap_radius: float,
@@ -1058,7 +1058,7 @@ def capsule_box_core(
 
 
 @wp.func
-def plane_box_core(
+def plane_box(
   plane_normal: wp.vec3,
   plane_pos: wp.vec3,
   box_center: wp.vec3,
@@ -1106,7 +1106,7 @@ def plane_box_core(
 
 
 @wp.func
-def box_box_core(
+def box_box(
   box1_center: wp.vec3,
   box1_rot: wp.mat33,
   box1_half_sizes: wp.vec3,
@@ -1536,7 +1536,7 @@ def box_box_core(
 
 
 @wp.func
-def plane_cylinder_core(
+def plane_cylinder(
   plane_normal: wp.vec3,
   plane_pos: wp.vec3,
   cylinder_center: wp.vec3,

@@ -77,7 +77,7 @@ def get_plane_normal(rot: wp.mat33) -> wp.vec3:
 
 
 @wp.func
-def geom_core(
+def geom(
   # Data in:
   geom_xpos_in: wp.array2d(dtype=wp.vec3),
   geom_xmat_in: wp.array2d(dtype=wp.mat33),
@@ -249,7 +249,7 @@ def write_contact(
 
 
 @wp.func
-def plane_sphere(
+def plane_sphere_wrapper(
   plane: GeomCore,
   sphere: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -261,7 +261,7 @@ def plane_sphere(
   _graphadr: int,
 ) -> int:
   plane_normal = get_plane_normal(plane.rot)
-  return plane_sphere_core(
+  return plane_sphere(
     plane_normal,
     plane.pos,
     sphere.pos,
@@ -271,7 +271,7 @@ def plane_sphere(
 
 
 @wp.func
-def sphere_sphere(
+def sphere_sphere_wrapper(
   sphere1: GeomCore,
   sphere2: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -282,7 +282,7 @@ def sphere_sphere(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
-  return sphere_sphere_core(
+  return sphere_sphere(
     sphere1.pos,
     sphere1.size[0],
     sphere2.pos,
@@ -292,7 +292,7 @@ def sphere_sphere(
 
 
 @wp.func
-def sphere_capsule(
+def sphere_capsule_wrapper(
   sphere: GeomCore,
   cap: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -305,7 +305,7 @@ def sphere_capsule(
 ) -> int:
   """Calculates one contact between a sphere and a capsule."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  return sphere_capsule_core(
+  return sphere_capsule(
     sphere.pos,
     sphere.size[0],
     sphere.rot,
@@ -319,7 +319,7 @@ def sphere_capsule(
 
 
 @wp.func
-def capsule_capsule(
+def capsule_capsule_wrapper(
   cap1: GeomCore,
   cap2: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -332,7 +332,7 @@ def capsule_capsule(
 ) -> int:
   cap1_axis = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
   cap2_axis = wp.vec3(cap2.rot[0, 2], cap2.rot[1, 2], cap2.rot[2, 2])
-  return capsule_capsule_core(
+  return capsule_capsule(
     cap1.pos,
     cap1_axis,
     cap1.size[0],
@@ -346,7 +346,7 @@ def capsule_capsule(
 
 
 @wp.func
-def plane_capsule(
+def plane_capsule_wrapper(
   plane: GeomCore,
   cap: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -360,7 +360,7 @@ def plane_capsule(
   """Calculates two contacts between a capsule and a plane."""
   plane_normal = get_plane_normal(plane.rot)
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  return plane_capsule_core(
+  return plane_capsule(
     plane_normal,
     plane.pos,
     cap.pos,
@@ -372,7 +372,7 @@ def plane_capsule(
 
 
 @wp.func
-def plane_ellipsoid(
+def plane_ellipsoid_wrapper(
   plane: GeomCore,
   ellipsoid: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -384,7 +384,7 @@ def plane_ellipsoid(
   _graphadr: int,
 ) -> int:
   plane_normal = get_plane_normal(plane.rot)
-  return plane_ellipsoid_core(
+  return plane_ellipsoid(
     plane_normal,
     plane.pos,
     ellipsoid.pos,
@@ -395,7 +395,7 @@ def plane_ellipsoid(
 
 
 @wp.func
-def plane_box(
+def plane_box_wrapper(
   plane: GeomCore,
   box: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -407,7 +407,7 @@ def plane_box(
   _graphadr: int,
 ) -> int:
   plane_normal = get_plane_normal(plane.rot)
-  return plane_box_core(
+  return plane_box(
     plane_normal,
     plane.pos,
     box.pos,
@@ -419,7 +419,7 @@ def plane_box(
 
 
 @wp.func
-def plane_convex(
+def plane_convex_wrapper(
   plane: GeomCore,
   convex: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -432,7 +432,7 @@ def plane_convex(
 ) -> int:
   """Calculates contacts between a plane and a convex object."""
   plane_normal = get_plane_normal(plane.rot)
-  return plane_convex_core(
+  return plane_convex(
     plane_normal,
     plane.pos,
     convex.pos,
@@ -447,7 +447,7 @@ def plane_convex(
 
 
 @wp.func
-def sphere_cylinder(
+def sphere_cylinder_wrapper(
   sphere: GeomCore,
   cylinder: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -459,7 +459,7 @@ def sphere_cylinder(
   _graphadr: int,
 ):
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
-  return sphere_cylinder_core(
+  return sphere_cylinder(
     sphere.pos,
     sphere.size[0],
     sphere.rot,
@@ -473,7 +473,7 @@ def sphere_cylinder(
 
 
 @wp.func
-def plane_cylinder(
+def plane_cylinder_wrapper(
   plane: GeomCore,
   cylinder: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -487,7 +487,7 @@ def plane_cylinder(
   """Calculates contacts between a cylinder and a plane."""
   plane_normal = get_plane_normal(plane.rot)
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
-  return plane_cylinder_core(
+  return plane_cylinder(
     plane_normal,
     plane.pos,
     cylinder.pos,
@@ -579,7 +579,7 @@ def contact_params(
 
 
 @wp.func
-def sphere_box(
+def sphere_box_wrapper(
   sphere: GeomCore,
   box: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -590,7 +590,7 @@ def sphere_box(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
-  return sphere_box_core(
+  return sphere_box(
     sphere.pos,
     sphere.size[0],
     box.pos,
@@ -602,7 +602,7 @@ def sphere_box(
 
 
 @wp.func
-def capsule_box(
+def capsule_box_wrapper(
   cap: GeomCore,
   box: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -614,7 +614,7 @@ def capsule_box(
   _graphadr: int,
 ) -> int:
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  return capsule_box_core(
+  return capsule_box(
     cap.pos,
     cap_axis,
     cap.size[0],
@@ -629,7 +629,7 @@ def capsule_box(
 
 
 @wp.func
-def box_box(
+def box_box_wrapper(
   box1: GeomCore,
   box2: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
@@ -640,7 +640,7 @@ def box_box(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
-  return box_box_core(
+  return box_box(
     box1.pos,
     box1.rot,
     box1.size,
@@ -653,19 +653,19 @@ def box_box(
 
 
 _PRIMITIVE_COLLISIONS = {
-  (GeomType.PLANE.value, GeomType.SPHERE.value): plane_sphere,
-  (GeomType.PLANE.value, GeomType.CAPSULE.value): plane_capsule,
-  (GeomType.PLANE.value, GeomType.ELLIPSOID.value): plane_ellipsoid,
-  (GeomType.PLANE.value, GeomType.CYLINDER.value): plane_cylinder,
-  (GeomType.PLANE.value, GeomType.BOX.value): plane_box,
-  (GeomType.PLANE.value, GeomType.MESH.value): plane_convex,
-  (GeomType.SPHERE.value, GeomType.SPHERE.value): sphere_sphere,
-  (GeomType.SPHERE.value, GeomType.CAPSULE.value): sphere_capsule,
-  (GeomType.SPHERE.value, GeomType.CYLINDER.value): sphere_cylinder,
-  (GeomType.SPHERE.value, GeomType.BOX.value): sphere_box,
-  (GeomType.CAPSULE.value, GeomType.CAPSULE.value): capsule_capsule,
-  (GeomType.CAPSULE.value, GeomType.BOX.value): capsule_box,
-  (GeomType.BOX.value, GeomType.BOX.value): box_box,
+  (GeomType.PLANE.value, GeomType.SPHERE.value): plane_sphere_wrapper,
+  (GeomType.PLANE.value, GeomType.CAPSULE.value): plane_capsule_wrapper,
+  (GeomType.PLANE.value, GeomType.ELLIPSOID.value): plane_ellipsoid_wrapper,
+  (GeomType.PLANE.value, GeomType.CYLINDER.value): plane_cylinder_wrapper,
+  (GeomType.PLANE.value, GeomType.BOX.value): plane_box_wrapper,
+  (GeomType.PLANE.value, GeomType.MESH.value): plane_convex_wrapper,
+  (GeomType.SPHERE.value, GeomType.SPHERE.value): sphere_sphere_wrapper,
+  (GeomType.SPHERE.value, GeomType.CAPSULE.value): sphere_capsule_wrapper,
+  (GeomType.SPHERE.value, GeomType.CYLINDER.value): sphere_cylinder_wrapper,
+  (GeomType.SPHERE.value, GeomType.BOX.value): sphere_box_wrapper,
+  (GeomType.CAPSULE.value, GeomType.CAPSULE.value): capsule_capsule_wrapper,
+  (GeomType.CAPSULE.value, GeomType.BOX.value): capsule_box_wrapper,
+  (GeomType.BOX.value, GeomType.BOX.value): box_box_wrapper,
 }
 
 
@@ -794,7 +794,7 @@ def _primitive_narrowphase_builder(m: Model):
 
     hftri_index = collision_hftri_index_in[tid]
 
-    geom1 = geom_core(
+    geom1 = geom(
       geom_xpos_in,
       geom_xmat_in,
       geom_size,
@@ -802,7 +802,7 @@ def _primitive_narrowphase_builder(m: Model):
       g1,
     )
 
-    geom2 = geom_core(
+    geom2 = geom(
       geom_xpos_in,
       geom_xmat_in,
       geom_size,
