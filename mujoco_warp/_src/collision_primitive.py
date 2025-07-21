@@ -306,9 +306,14 @@ def plane_convex(
   """Calculates contacts between a plane and a convex object."""
 
   return plane_convex_core(
-    plane,
-    convex,
+    __geom_core_from_geom(plane),
+    __geom_core_from_geom(convex),
     contacts,
+    convex.vert,
+    convex.vertadr,
+    convex.vertnum,
+    convex.graph,
+    convex.graphadr,
   )
 
 
