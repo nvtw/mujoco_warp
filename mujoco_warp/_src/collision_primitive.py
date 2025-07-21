@@ -260,6 +260,7 @@ def plane_sphere_wrapper(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  """Calculates one contact between a plane and a sphere."""
   plane_normal = get_plane_normal(plane.rot)
   return plane_sphere(
     plane_normal,
@@ -282,6 +283,7 @@ def sphere_sphere_wrapper(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  """Calculates one contact between two spheres."""
   return sphere_sphere(
     sphere1.pos,
     sphere1.size[0],
@@ -330,6 +332,7 @@ def capsule_capsule_wrapper(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  """Calculates one contact between two capsules."""
   cap1_axis = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
   cap2_axis = wp.vec3(cap2.rot[0, 2], cap2.rot[1, 2], cap2.rot[2, 2])
   return capsule_capsule(
@@ -383,6 +386,7 @@ def plane_ellipsoid_wrapper(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  """Calculates one contact between a plane and an ellipsoid."""
   plane_normal = get_plane_normal(plane.rot)
   return plane_ellipsoid(
     plane_normal,
@@ -406,6 +410,7 @@ def plane_box_wrapper(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  """Calculates contacts between a plane and a box."""
   plane_normal = get_plane_normal(plane.rot)
   return plane_box(
     plane_normal,
@@ -458,6 +463,7 @@ def sphere_cylinder_wrapper(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ):
+  """Calculates one contact between a sphere and a cylinder."""
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
   return sphere_cylinder(
     sphere.pos,
@@ -590,6 +596,7 @@ def sphere_box_wrapper(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  """Calculates one contact between a sphere and a box."""
   return sphere_box(
     sphere.pos,
     sphere.size[0],
@@ -613,6 +620,7 @@ def capsule_box_wrapper(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  """Calculates contacts between a capsule and a box."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
   return capsule_box(
     cap.pos,
@@ -640,6 +648,7 @@ def box_box_wrapper(
   _graph: wp.array(dtype=int),
   _graphadr: int,
 ) -> int:
+  """Calculates contacts between two boxes."""
   return box_box(
     box1.pos,
     box1.rot,
