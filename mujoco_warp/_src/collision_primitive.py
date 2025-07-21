@@ -17,13 +17,6 @@ import warp as wp
 
 from .collision_hfield import hfield_triangle_prism
 from .collision_primitive_core import *
-from .collision_primitive_core import _plane_sphere
-from .collision_primitive_core import _sphere_sphere
-from .collision_primitive_core import _sphere_sphere_ext
-from .math import closest_segment_point
-from .math import closest_segment_to_segment_points
-from .math import make_frame
-from .math import normalize_with_norm
 from .math import upper_trid_index
 from .types import MJ_MINMU
 from .types import MJ_MINVAL
