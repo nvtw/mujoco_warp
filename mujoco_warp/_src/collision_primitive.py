@@ -196,101 +196,136 @@ def write_contact(
 
 @wp.func
 def plane_sphere(
-  plane: Geom,
-  sphere: Geom,
+  plane: GeomCore,
+  sphere: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  _vert: wp.array(dtype=wp.vec3),
+  _vertadr: int,
+  _vertnum: int,
+  _graph: wp.array(dtype=int),
+  _graphadr: int,
 ) -> int:
   return plane_sphere_core(
-    __geom_core_from_geom(plane),
-    __geom_core_from_geom(sphere),
+    plane,
+    sphere,
     contacts,
   )
 
 
 @wp.func
 def sphere_sphere(
-  sphere1: Geom,
-  sphere2: Geom,
+  sphere1: GeomCore,
+  sphere2: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  _vert: wp.array(dtype=wp.vec3),
+  _vertadr: int,
+  _vertnum: int,
+  _graph: wp.array(dtype=int),
+  _graphadr: int,
 ) -> int:
   return sphere_sphere_core(
-    __geom_core_from_geom(sphere1),
-    __geom_core_from_geom(sphere2),
+    sphere1,
+    sphere2,
     contacts,
   )
 
 
 @wp.func
 def sphere_capsule(
-  sphere: Geom,
-  cap: Geom,
+  sphere: GeomCore,
+  cap: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  _vert: wp.array(dtype=wp.vec3),
+  _vertadr: int,
+  _vertnum: int,
+  _graph: wp.array(dtype=int),
+  _graphadr: int,
 ) -> int:
   """Calculates one contact between a sphere and a capsule."""
   return sphere_capsule_core(
-    __geom_core_from_geom(sphere),
-    __geom_core_from_geom(cap),
+    sphere,
+    cap,
     contacts,
   )
 
 
 @wp.func
 def capsule_capsule(
-  cap1: Geom,
-  cap2: Geom,
+  cap1: GeomCore,
+  cap2: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  _vert: wp.array(dtype=wp.vec3),
+  _vertadr: int,
+  _vertnum: int,
+  _graph: wp.array(dtype=int),
+  _graphadr: int,
 ) -> int:
   return capsule_capsule_core(
-    __geom_core_from_geom(cap1),
-    __geom_core_from_geom(cap2),
+    cap1,
+    cap2,
     contacts,
   )
 
 
 @wp.func
 def plane_capsule(
-  plane: Geom,
-  cap: Geom,
+  plane: GeomCore,
+  cap: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  _vert: wp.array(dtype=wp.vec3),
+  _vertadr: int,
+  _vertnum: int,
+  _graph: wp.array(dtype=int),
+  _graphadr: int,
 ) -> int:
   """Calculates two contacts between a capsule and a plane."""
 
   return plane_capsule_core(
-    __geom_core_from_geom(plane),
-    __geom_core_from_geom(cap),
+    plane,
+    cap,
     contacts,
   )
 
 
 @wp.func
 def plane_ellipsoid(
-  plane: Geom,
-  ellipsoid: Geom,
+  plane: GeomCore,
+  ellipsoid: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  _vert: wp.array(dtype=wp.vec3),
+  _vertadr: int,
+  _vertnum: int,
+  _graph: wp.array(dtype=int),
+  _graphadr: int,
 ) -> int:
   return plane_ellipsoid_core(
-    __geom_core_from_geom(plane),
-    __geom_core_from_geom(ellipsoid),
+    plane,
+    ellipsoid,
     contacts,
   )
 
 
 @wp.func
 def plane_box(
-  plane: Geom,
-  box: Geom,
+  plane: GeomCore,
+  box: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  _vert: wp.array(dtype=wp.vec3),
+  _vertadr: int,
+  _vertnum: int,
+  _graph: wp.array(dtype=int),
+  _graphadr: int,
 ) -> int:
   return plane_box_core(
-    __geom_core_from_geom(plane),
-    __geom_core_from_geom(box),
+    plane,
+    box,
     contacts,
     margin,
   )
@@ -298,50 +333,65 @@ def plane_box(
 
 @wp.func
 def plane_convex(
-  plane: Geom,
-  convex: Geom,
+  plane: GeomCore,
+  convex: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  vert: wp.array(dtype=wp.vec3),
+  vertadr: int,
+  vertnum: int,
+  graph: wp.array(dtype=int),
+  graphadr: int,
 ) -> int:
   """Calculates contacts between a plane and a convex object."""
 
   return plane_convex_core(
-    __geom_core_from_geom(plane),
-    __geom_core_from_geom(convex),
+    plane,
+    convex,
     contacts,
-    convex.vert,
-    convex.vertadr,
-    convex.vertnum,
-    convex.graph,
-    convex.graphadr,
+    vert,
+    vertadr,
+    vertnum,
+    graph,
+    graphadr,
   )
 
 
 @wp.func
 def sphere_cylinder(
-  sphere: Geom,
-  cylinder: Geom,
+  sphere: GeomCore,
+  cylinder: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  _vert: wp.array(dtype=wp.vec3),
+  _vertadr: int,
+  _vertnum: int,
+  _graph: wp.array(dtype=int),
+  _graphadr: int,
 ):
   return sphere_cylinder_core(
-    __geom_core_from_geom(sphere),
-    __geom_core_from_geom(cylinder),
+    sphere,
+    cylinder,
     contacts,
   )
 
 
 @wp.func
 def plane_cylinder(
-  plane: Geom,
-  cylinder: Geom,
+  plane: GeomCore,
+  cylinder: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  _vert: wp.array(dtype=wp.vec3),
+  _vertadr: int,
+  _vertnum: int,
+  _graph: wp.array(dtype=int),
+  _graphadr: int,
 ) -> int:
   """Calculates contacts between a cylinder and a plane."""
   return plane_cylinder_core(
-    __geom_core_from_geom(plane),
-    __geom_core_from_geom(cylinder),
+    plane,
+    cylinder,
     contacts,
   )
 
@@ -428,14 +478,19 @@ def contact_params(
 
 @wp.func
 def sphere_box(
-  sphere: Geom,
-  box: Geom,
+  sphere: GeomCore,
+  box: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  _vert: wp.array(dtype=wp.vec3),
+  _vertadr: int,
+  _vertnum: int,
+  _graph: wp.array(dtype=int),
+  _graphadr: int,
 ) -> int:
   return sphere_box_core(
-    __geom_core_from_geom(sphere),
-    __geom_core_from_geom(box),
+    sphere,
+    box,
     contacts,
     margin,
   )
@@ -443,14 +498,19 @@ def sphere_box(
 
 @wp.func
 def capsule_box(
-  cap: Geom,
-  box: Geom,
+  cap: GeomCore,
+  box: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  _vert: wp.array(dtype=wp.vec3),
+  _vertadr: int,
+  _vertnum: int,
+  _graph: wp.array(dtype=int),
+  _graphadr: int,
 ) -> int:
   return capsule_box_core(
-    __geom_core_from_geom(cap),
-    __geom_core_from_geom(box),
+    cap,
+    box,
     contacts,
     margin,
   )
@@ -458,14 +518,19 @@ def capsule_box(
 
 @wp.func
 def box_box(
-  box1: Geom,
-  box2: Geom,
+  box1: GeomCore,
+  box2: GeomCore,
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  _vert: wp.array(dtype=wp.vec3),
+  _vertadr: int,
+  _vertnum: int,
+  _graph: wp.array(dtype=int),
+  _graphadr: int,
 ) -> int:
   return box_box_core(
-    __geom_core_from_geom(box1),
-    __geom_core_from_geom(box2),
+    box1,
+    box2,
     contacts,
     margin,
   )
@@ -673,6 +738,9 @@ def _primitive_narrowphase_builder(m: Model):
       hftri_index,
     )
 
+    core1 = __geom_core_from_geom(geom1)
+    core2 = __geom_core_from_geom(geom2)
+
     contacts = wp.array(ptr=get_shared_memory_array(tid), shape=(8,), dtype=ContactPoint)
     # contacts = wp.zeros(shape=(8,), dtype=ContactPoint)
 
@@ -682,11 +750,17 @@ def _primitive_narrowphase_builder(m: Model):
 
       if collision_type1 == type1 and collision_type2 == type2:
         num_contacts = wp.static(_primitive_collisions_func[i])(
-          geom1,
-          geom2,
+          core1,
+          core2,
           contacts,
           margin,
+          geom2.vert,
+          geom2.vertadr,
+          geom2.vertnum,
+          geom2.graph,
+          geom2.graphadr,
         )
+
 
         for j in range(num_contacts):
           contact = contacts[j]
