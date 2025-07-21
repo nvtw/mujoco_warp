@@ -77,7 +77,7 @@ def get_plane_normal(rot: wp.mat33) -> wp.vec3:
 
 
 @wp.func
-def geom(
+def geom_core(
   # Data in:
   geom_xpos_in: wp.array2d(dtype=wp.vec3),
   geom_xmat_in: wp.array2d(dtype=wp.mat33),
@@ -794,7 +794,7 @@ def _primitive_narrowphase_builder(m: Model):
 
     hftri_index = collision_hftri_index_in[tid]
 
-    geom1 = geom(
+    geom1 = geom_core(
       geom_xpos_in,
       geom_xmat_in,
       geom_size,
@@ -802,7 +802,7 @@ def _primitive_narrowphase_builder(m: Model):
       g1,
     )
 
-    geom2 = geom(
+    geom2 = geom_core(
       geom_xpos_in,
       geom_xmat_in,
       geom_size,

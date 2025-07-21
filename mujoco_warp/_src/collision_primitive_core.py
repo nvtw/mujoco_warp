@@ -137,7 +137,23 @@ def plane_convex(
   convex_graph: wp.array(dtype=int),
   convex_graphadr: int,
 ) -> int:
-  """Calculates contacts between a plane and a convex object."""
+  """Calculates contacts between a plane and a convex object.
+
+  Args:
+    plane_normal: Normal vector of the plane.
+    plane_pos: A point on the plane.
+    convex_pos: Position of the convex object.
+    convex_rot: Rotation matrix of the convex object.
+    contacts: An array to store the resulting contact points.
+    convex_vert: An array of vertices for the convex object.
+    convex_vertadr: Starting address of the convex object's vertices in `convex_vert`.
+    convex_vertnum: Number of vertices for the convex object.
+    convex_graph: Graph representation of the convex object for adjacency information.
+    convex_graphadr: Starting address of the convex object's graph in `convex_graph`.
+
+  Returns:
+      int: Number of contacts generated.
+  """
 
   # get points in the convex frame
   plane_pos_local = wp.transpose(convex_rot) @ (plane_pos - convex_pos)
@@ -373,7 +389,18 @@ def plane_sphere(
   sphere_radius: float,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
-  """Calculates one contact between a plane and a sphere."""
+  """Calculates one contact between a plane and a sphere.
+
+  Args:
+    plane_normal: Normal vector of the plane.
+    plane_pos: A point on the plane.
+    sphere_center: Center of the sphere.
+    sphere_radius: Radius of the sphere.
+    contacts: An array to store the resulting contact point.
+
+  Returns:
+      int: Always returns 1.
+  """
   dist, pos = _plane_sphere(plane_normal, plane_pos, sphere_center, sphere_radius)
   contacts[0] = pack_contact_auto_tangent(pos, plane_normal, dist)
   return 1
@@ -433,7 +460,18 @@ def sphere_sphere(
   sphere2_radius: float,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
-  """Calculates one contact between two spheres."""
+  """Calculates one contact between two spheres.
+
+  Args:
+    sphere1_center: Center of the first sphere.
+    sphere1_radius: Radius of the first sphere.
+    sphere2_center: Center of the second sphere.
+    sphere2_radius: Radius of the second sphere.
+    contacts: An array to store the resulting contact point.
+
+  Returns:
+      int: Always returns 1.
+  """
   contact = _sphere_sphere(
     sphere1_center,
     sphere1_radius,
@@ -456,7 +494,22 @@ def sphere_capsule(
   cap_rot: wp.mat33,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
-  """Calculates one contact between a sphere and a capsule."""
+  """Calculates one contact between a sphere and a capsule.
+
+  Args:
+    sphere_center: Center of the sphere.
+    sphere_radius: Radius of the sphere.
+    sphere_rot: Rotation matrix of the sphere (used for contact normal calculation).
+    cap_center: Center of the capsule.
+    cap_axis: Axis of the capsule.
+    cap_radius: Radius of the capsule.
+    cap_half_length: Half-length of the capsule's cylindrical body.
+    cap_rot: Rotation matrix of the capsule (used for contact normal calculation).
+    contacts: An array to store the resulting contact point.
+
+  Returns:
+      int: Always returns 1.
+  """
   segment = cap_axis * cap_half_length
 
   # Find closest point on capsule centerline to sphere center
@@ -489,6 +542,15 @@ def plane_capsule(
 
   Finds contact points at both ends of the capsule where they intersect with the plane.
   The contact normal is aligned with the plane normal.
+
+  Args:
+    plane_normal: Normal vector of the plane.
+    plane_pos: A point on the plane.
+    cap_center: Center of the capsule.
+    cap_axis: Axis of the capsule.
+    cap_radius: Radius of the capsule.
+    cap_half_length: Half-length of the capsule's cylindrical body.
+    contacts: An array to store the resulting contact points.
 
   Returns:
       int: Always returns 2 since there are two contact points (one at each end)
@@ -525,7 +587,19 @@ def plane_ellipsoid(
   ellipsoid_radii: wp.vec3,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
-  """Calculates one contact between a plane and an ellipsoid."""
+  """Calculates one contact between a plane and an ellipsoid.
+
+  Args:
+    plane_normal: Normal vector of the plane.
+    plane_pos: A point on the plane.
+    ellipsoid_center: Center of the ellipsoid.
+    ellipsoid_rot: Rotation matrix of the ellipsoid.
+    ellipsoid_radii: Radii of the ellipsoid along its axes.
+    contacts: An array to store the resulting contact point.
+
+  Returns:
+      int: Always returns 1.
+  """
   sphere_support = -wp.normalize(wp.cw_mul(wp.transpose(ellipsoid_rot) @ plane_normal, ellipsoid_radii))
   pos = ellipsoid_center + ellipsoid_rot @ wp.cw_mul(sphere_support, ellipsoid_radii)
   dist = wp.dot(plane_normal, pos - plane_pos)
@@ -547,7 +621,22 @@ def capsule_capsule(
   cap2_half_length: float,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
-  """Calculates one contact between two capsules."""
+  """Calculates one contact between two capsules.
+
+  Args:
+    cap1_center: Center of the first capsule.
+    cap1_axis: Axis of the first capsule.
+    cap1_radius: Radius of the first capsule.
+    cap1_half_length: Half-length of the first capsule's cylindrical body.
+    cap2_center: Center of the second capsule.
+    cap2_axis: Axis of the second capsule.
+    cap2_radius: Radius of the second capsule.
+    cap2_half_length: Half-length of the second capsule's cylindrical body.
+    contacts: An array to store the resulting contact point.
+
+  Returns:
+      int: Always returns 1.
+  """
   seg1 = cap1_axis * cap1_half_length
   seg2 = cap2_axis * cap2_half_length
 
@@ -579,7 +668,22 @@ def sphere_cylinder(
   cylinder_rot: wp.mat33,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
-  """Calculates one contact between a sphere and a cylinder."""
+  """Calculates one contact between a sphere and a cylinder.
+
+  Args:
+    sphere_center: Center of the sphere.
+    sphere_radius: Radius of the sphere.
+    sphere_rot: Rotation matrix of the sphere (used for contact normal calculation).
+    cylinder_center: Center of the cylinder.
+    cylinder_axis: Axis of the cylinder.
+    cylinder_radius: Radius of the cylinder.
+    cylinder_half_height: Half-height of the cylinder.
+    cylinder_rot: Rotation matrix of the cylinder (used for contact normal calculation).
+    contacts: An array to store the resulting contact point.
+
+  Returns:
+      int: Always returns 1.
+  """
   vec = sphere_center - cylinder_center
   x = wp.dot(vec, cylinder_axis)
 
@@ -702,7 +806,20 @@ def sphere_box(
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
 ) -> int:
-  """Calculates one contact between a sphere and a box."""
+  """Calculates one contact between a sphere and a box.
+
+  Args:
+    sphere_center: Center of the sphere.
+    sphere_radius: Radius of the sphere.
+    box_center: Center of the box.
+    box_rot: Rotation matrix of the box.
+    box_half_sizes: Half-sizes of the box.
+    contacts: An array to store the resulting contact point.
+    margin: Collision margin.
+
+  Returns:
+      int: Number of contacts generated (0 or 1).
+  """
   contact, found = _sphere_box(
     sphere_center,
     sphere_radius,
@@ -733,7 +850,23 @@ def capsule_box(
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
 ) -> int:
-  """Calculates contacts between a capsule and a box."""
+  """Calculates contacts between a capsule and a box.
+
+  Args:
+    cap_center: Center of the capsule.
+    cap_axis: Axis of the capsule.
+    cap_radius: Radius of the capsule.
+    cap_half_length: Half-length of the capsule's cylindrical body.
+    cap_rot: Rotation matrix of the capsule.
+    box_center: Center of the box.
+    box_rot: Rotation matrix of the box.
+    box_half_sizes: Half-sizes of the box.
+    contacts: An array to store the resulting contact points.
+    margin: Collision margin.
+
+  Returns:
+      int: Number of contacts generated.
+  """
   # Based on the mjc implementation
   boxmatT = wp.transpose(box_rot)
   pos = boxmatT @ (cap_center - box_center)
@@ -1071,6 +1204,15 @@ def plane_box(
 
   Can generate up to 4 contact points for the penetrating corners.
 
+  Args:
+    plane_normal: Normal vector of the plane.
+    plane_pos: A point on the plane.
+    box_center: Center of the box.
+    box_rot: Rotation matrix of the box.
+    box_half_sizes: Half-sizes of the box.
+    contacts: An array to store the resulting contact points.
+    margin: Collision margin.
+
   Returns:
       int: Number of contacts generated (0-4)
   """
@@ -1116,7 +1258,21 @@ def box_box(
   contacts: wp.array(dtype=ContactPoint),
   margin: float,
 ) -> int:
-  """Calculates contacts between two boxes."""
+  """Calculates contacts between two boxes.
+
+  Args:
+    box1_center: Center of the first box.
+    box1_rot: Rotation matrix of the first box.
+    box1_half_sizes: Half-sizes of the first box.
+    box2_center: Center of the second box.
+    box2_rot: Rotation matrix of the second box.
+    box2_half_sizes: Half-sizes of the second box.
+    contacts: An array to store the resulting contact points.
+    margin: Collision margin.
+
+  Returns:
+      int: Number of contacts generated.
+  """
   # Compute transforms between box's frames
 
   pos21 = wp.transpose(box1_rot) @ (box2_center - box1_center)
@@ -1545,7 +1701,20 @@ def plane_cylinder(
   cylinder_half_height: float,
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
-  """Calculates contacts between a cylinder and a plane."""
+  """Calculates contacts between a cylinder and a plane.
+
+  Args:
+    plane_normal: Normal vector of the plane.
+    plane_pos: A point on the plane.
+    cylinder_center: Center of the cylinder.
+    cylinder_axis: Axis of the cylinder.
+    cylinder_radius: Radius of the cylinder.
+    cylinder_half_height: Half-height of the cylinder.
+    contacts: An array to store the resulting contact points.
+
+  Returns:
+      int: Number of contacts generated.
+  """
   # Extract plane normal and cylinder axis
   n = plane_normal
   axis = cylinder_axis
