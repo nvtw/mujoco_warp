@@ -418,8 +418,8 @@ def plane_box_wrapper(
     box.pos,
     box.rot,
     box.size,
-    contacts,
     margin,
+    contacts,
   )
 
 
@@ -442,12 +442,12 @@ def plane_convex_wrapper(
     plane.pos,
     convex.pos,
     convex.rot,
-    contacts,
     vert,
     vertadr,
     vertnum,
     graph,
     graphadr,
+    contacts,
   )
 
 
@@ -603,8 +603,8 @@ def sphere_box_wrapper(
     box.pos,
     box.rot,
     box.size,
-    contacts,
     margin,
+    contacts,
   )
 
 
@@ -631,8 +631,8 @@ def capsule_box_wrapper(
     box.pos,
     box.rot,
     box.size,
-    contacts,
     margin,
+    contacts,
   )
 
 
@@ -656,8 +656,8 @@ def box_box_wrapper(
     box2.pos,
     box2.rot,
     box2.size,
-    contacts,
     margin,
+    contacts,
   )
 
 

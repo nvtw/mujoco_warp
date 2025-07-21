@@ -130,12 +130,12 @@ def plane_convex(
   plane_pos: wp.vec3,
   convex_pos: wp.vec3,
   convex_rot: wp.mat33,
-  contacts: wp.array(dtype=ContactPoint),
   convex_vert: wp.array(dtype=wp.vec3),
   convex_vertadr: int,
   convex_vertnum: int,
   convex_graph: wp.array(dtype=int),
   convex_graphadr: int,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a plane and a convex object.
 
@@ -803,8 +803,8 @@ def sphere_box(
   box_center: wp.vec3,
   box_rot: wp.mat33,
   box_half_sizes: wp.vec3,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a sphere and a box.
 
@@ -847,8 +847,8 @@ def capsule_box(
   box_center: wp.vec3,
   box_rot: wp.mat33,
   box_half_sizes: wp.vec3,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a capsule and a box.
 
@@ -1197,8 +1197,8 @@ def plane_box(
   box_center: wp.vec3,
   box_rot: wp.mat33,
   box_half_sizes: wp.vec3,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a plane and a box.
 
@@ -1255,8 +1255,8 @@ def box_box(
   box2_center: wp.vec3,
   box2_rot: wp.mat33,
   box2_half_sizes: wp.vec3,
-  contacts: wp.array(dtype=ContactPoint),
   margin: float,
+  contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between two boxes.
 
