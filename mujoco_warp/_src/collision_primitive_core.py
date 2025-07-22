@@ -13,13 +13,15 @@
 # limitations under the License.
 # ==============================================================================
 
-import warp as wp
 from typing import Any, Tuple
-from .math import normalize_with_norm
-from .math import closest_segment_to_segment_points
-from .types import MJ_MINVAL
+
+import warp as wp
+
 from .math import closest_segment_point
+from .math import closest_segment_to_segment_points
 from .math import make_frame
+from .math import normalize_with_norm
+from .types import MJ_MINVAL
 
 wp.set_module_options({"enable_backward": False})
 
