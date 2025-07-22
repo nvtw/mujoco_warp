@@ -21,6 +21,7 @@ from .math import closest_segment_point
 from .math import closest_segment_to_segment_points
 from .math import make_frame
 from .math import normalize_with_norm
+from .math import orthogonals
 from .types import MJ_MINVAL
 
 wp.set_module_options({"enable_backward": False})
@@ -71,20 +72,6 @@ def _compute_rotmore(face_idx: int) -> wp.mat33:
 
 
 @wp.func
-def orthogonals(a: wp.vec3):
-  y = wp.vec3(0.0, 1.0, 0.0)
-  z = wp.vec3(0.0, 0.0, 1.0)
-  b = wp.where((-0.5 < a[1]) and (a[1] < 0.5), y, z)
-  b = b - a * wp.dot(a, b)
-  b = wp.normalize(b)
-  if wp.length(a) == 0.0:
-    b = wp.vec3(0.0, 0.0, 0.0)
-  c = wp.cross(a, b)
-
-  return b, c
-
-
-@wp.func
 def make_tangent(a: wp.vec3):
   a = wp.normalize(a)
   b, c = orthogonals(a)
@@ -128,6 +115,7 @@ _HUGE_VAL = 1e6
 
 @wp.func
 def plane_convex(
+  # In:
   plane_normal: wp.vec3,
   plane_pos: wp.vec3,
   convex_pos: wp.vec3,
@@ -137,6 +125,7 @@ def plane_convex(
   convex_vertnum: int,
   convex_graph: wp.array(dtype=int),
   convex_graphadr: int,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a plane and a convex object.
@@ -385,10 +374,12 @@ def _plane_sphere(plane_normal: wp.vec3, plane_pos: wp.vec3, sphere_pos: wp.vec3
 
 @wp.func
 def plane_sphere(
+  # In:
   plane_normal: wp.vec3,
   plane_pos: wp.vec3,
   sphere_center: wp.vec3,
   sphere_radius: float,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a plane and a sphere.
@@ -456,10 +447,12 @@ def _sphere_sphere_ext(
 
 @wp.func
 def sphere_sphere(
+  # In:
   sphere1_center: wp.vec3,
   sphere1_radius: float,
   sphere2_center: wp.vec3,
   sphere2_radius: float,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between two spheres.
@@ -486,6 +479,7 @@ def sphere_sphere(
 
 @wp.func
 def sphere_capsule(
+  # In:
   sphere_center: wp.vec3,
   sphere_radius: float,
   sphere_rot: wp.mat33,
@@ -494,6 +488,7 @@ def sphere_capsule(
   cap_radius: float,
   cap_half_length: float,
   cap_rot: wp.mat33,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a sphere and a capsule.
@@ -532,12 +527,14 @@ def sphere_capsule(
 
 @wp.func
 def plane_capsule(
+  # In:
   plane_normal: wp.vec3,
   plane_pos: wp.vec3,
   cap_center: wp.vec3,
   cap_axis: wp.vec3,
   cap_radius: float,
   cap_half_length: float,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates two contacts between a capsule and a plane.
@@ -582,11 +579,13 @@ def plane_capsule(
 
 @wp.func
 def plane_ellipsoid(
+  # In:
   plane_normal: wp.vec3,
   plane_pos: wp.vec3,
   ellipsoid_center: wp.vec3,
   ellipsoid_rot: wp.mat33,
   ellipsoid_radii: wp.vec3,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a plane and an ellipsoid.
@@ -613,6 +612,7 @@ def plane_ellipsoid(
 
 @wp.func
 def capsule_capsule(
+  # In:
   cap1_center: wp.vec3,
   cap1_axis: wp.vec3,
   cap1_radius: float,
@@ -621,6 +621,7 @@ def capsule_capsule(
   cap2_axis: wp.vec3,
   cap2_radius: float,
   cap2_half_length: float,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between two capsules.
@@ -660,6 +661,7 @@ def capsule_capsule(
 
 @wp.func
 def sphere_cylinder(
+  # In:
   sphere_center: wp.vec3,
   sphere_radius: float,
   sphere_rot: wp.mat33,
@@ -668,6 +670,7 @@ def sphere_cylinder(
   cylinder_radius: float,
   cylinder_half_height: float,
   cylinder_rot: wp.mat33,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a sphere and a cylinder.
@@ -800,12 +803,14 @@ def _sphere_box(
 
 @wp.func
 def sphere_box(
+  # In:
   sphere_center: wp.vec3,
   sphere_radius: float,
   box_center: wp.vec3,
   box_rot: wp.mat33,
   box_half_sizes: wp.vec3,
   margin: float,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a sphere and a box.
@@ -841,15 +846,16 @@ def sphere_box(
 
 @wp.func
 def capsule_box(
+  # In:
   cap_center: wp.vec3,
   cap_axis: wp.vec3,
   cap_radius: float,
   cap_half_length: float,
-  cap_rot: wp.mat33,
   box_center: wp.vec3,
   box_rot: wp.mat33,
   box_half_sizes: wp.vec3,
   margin: float,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a capsule and a box.
@@ -1194,12 +1200,14 @@ def capsule_box(
 
 @wp.func
 def plane_box(
+  # In:
   plane_normal: wp.vec3,
   plane_pos: wp.vec3,
   box_center: wp.vec3,
   box_rot: wp.mat33,
   box_half_sizes: wp.vec3,
   margin: float,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a plane and a box.
@@ -1251,6 +1259,7 @@ def plane_box(
 
 @wp.func
 def box_box(
+  # In:
   box1_center: wp.vec3,
   box1_rot: wp.mat33,
   box1_half_sizes: wp.vec3,
@@ -1258,6 +1267,7 @@ def box_box(
   box2_rot: wp.mat33,
   box2_half_sizes: wp.vec3,
   margin: float,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between two boxes.
@@ -1696,12 +1706,14 @@ def box_box(
 
 @wp.func
 def plane_cylinder(
+  # In:
   plane_normal: wp.vec3,
   plane_pos: wp.vec3,
   cylinder_center: wp.vec3,
   cylinder_axis: wp.vec3,
   cylinder_radius: float,
   cylinder_half_height: float,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a cylinder and a plane.

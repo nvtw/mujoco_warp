@@ -620,7 +620,6 @@ def capsule_box_wrapper(
     cap_axis,
     cap.size[0],
     cap.size[1],
-    cap.rot,
     box.pos,
     box.rot,
     box.size,
