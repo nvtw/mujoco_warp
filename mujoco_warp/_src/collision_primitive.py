@@ -650,6 +650,7 @@ def capsule_box_wrapper(
 
 @wp.func
 def box_box_wrapper(
+  # In:
   box1: GeomCore,
   box2: GeomCore,
   margin: float,
@@ -658,6 +659,7 @@ def box_box_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
+  # Out:
   contacts: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between two boxes."""
