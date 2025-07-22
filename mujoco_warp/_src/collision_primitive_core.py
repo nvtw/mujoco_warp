@@ -126,7 +126,7 @@ def plane_convex(
   convex_graph: wp.array(dtype=int),
   convex_graphadr: int,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a plane and a convex object.
 
@@ -135,7 +135,7 @@ def plane_convex(
     plane_pos: A point on the plane.
     convex_pos: Position of the convex object.
     convex_rot: Rotation matrix of the convex object.
-    contacts: An array to store the resulting contact points.
+    contacts_out: An array to store the resulting contact points.
     convex_vert: An array of vertices for the convex object.
     convex_vertadr: Starting address of the convex object's vertices in `convex_vert`.
     convex_vertnum: Number of vertices for the convex object.
@@ -359,7 +359,7 @@ def plane_convex(
       support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
       dist = -support
       pos = pos - 0.5 * dist * plane_normal
-      contacts[num_contacts] = pack_contact(pos, plane_normal, get_tangent(frame), dist)
+      contacts_out[num_contacts] = pack_contact(pos, plane_normal, get_tangent(frame), dist)
       num_contacts += 1
 
   return num_contacts
@@ -380,7 +380,7 @@ def plane_sphere(
   sphere_center: wp.vec3,
   sphere_radius: float,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a plane and a sphere.
 
@@ -389,13 +389,13 @@ def plane_sphere(
     plane_pos: A point on the plane.
     sphere_center: Center of the sphere.
     sphere_radius: Radius of the sphere.
-    contacts: An array to store the resulting contact point.
+    contacts_out: An array to store the resulting contact point.
 
   Returns:
       int: Always returns 1.
   """
   dist, pos = _plane_sphere(plane_normal, plane_pos, sphere_center, sphere_radius)
-  contacts[0] = pack_contact_auto_tangent(pos, plane_normal, dist)
+  contacts_out[0] = pack_contact_auto_tangent(pos, plane_normal, dist)
   return 1
 
 
@@ -453,7 +453,7 @@ def sphere_sphere(
   sphere2_center: wp.vec3,
   sphere2_radius: float,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between two spheres.
 
@@ -462,7 +462,7 @@ def sphere_sphere(
     sphere1_radius: Radius of the first sphere.
     sphere2_center: Center of the second sphere.
     sphere2_radius: Radius of the second sphere.
-    contacts: An array to store the resulting contact point.
+    contacts_out: An array to store the resulting contact point.
 
   Returns:
       int: Always returns 1.
@@ -473,7 +473,7 @@ def sphere_sphere(
     sphere2_center,
     sphere2_radius,
   )
-  contacts[0] = contact
+  contacts_out[0] = contact
   return 1
 
 
@@ -489,7 +489,7 @@ def sphere_capsule(
   cap_half_length: float,
   cap_rot: wp.mat33,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a sphere and a capsule.
 
@@ -502,7 +502,7 @@ def sphere_capsule(
     cap_radius: Radius of the capsule.
     cap_half_length: Half-length of the capsule's cylindrical body.
     cap_rot: Rotation matrix of the capsule (used for contact normal calculation).
-    contacts: An array to store the resulting contact point.
+    contacts_out: An array to store the resulting contact point.
 
   Returns:
       int: Always returns 1.
@@ -521,7 +521,7 @@ def sphere_capsule(
     sphere_rot,
     cap_rot,
   )
-  contacts[0] = contact
+  contacts_out[0] = contact
   return 1
 
 
@@ -535,7 +535,7 @@ def plane_capsule(
   cap_radius: float,
   cap_half_length: float,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates two contacts between a capsule and a plane.
 
@@ -549,7 +549,7 @@ def plane_capsule(
     cap_axis: Axis of the capsule.
     cap_radius: Radius of the capsule.
     cap_half_length: Half-length of the capsule's cylindrical body.
-    contacts: An array to store the resulting contact points.
+    contacts_out: An array to store the resulting contact points.
 
   Returns:
       int: Always returns 2 since there are two contact points (one at each end)
@@ -569,10 +569,10 @@ def plane_capsule(
   segment = cap_axis * cap_half_length
 
   dist1, pos1 = _plane_sphere(n, plane_pos, cap_center + segment, cap_radius)
-  contacts[0] = pack_contact(pos1, n, b, dist1)
+  contacts_out[0] = pack_contact(pos1, n, b, dist1)
 
   dist2, pos2 = _plane_sphere(n, plane_pos, cap_center - segment, cap_radius)
-  contacts[1] = pack_contact(pos2, n, b, dist2)
+  contacts_out[1] = pack_contact(pos2, n, b, dist2)
 
   return 2
 
@@ -586,7 +586,7 @@ def plane_ellipsoid(
   ellipsoid_rot: wp.mat33,
   ellipsoid_radii: wp.vec3,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a plane and an ellipsoid.
 
@@ -596,7 +596,7 @@ def plane_ellipsoid(
     ellipsoid_center: Center of the ellipsoid.
     ellipsoid_rot: Rotation matrix of the ellipsoid.
     ellipsoid_radii: Radii of the ellipsoid along its axes.
-    contacts: An array to store the resulting contact point.
+    contacts_out: An array to store the resulting contact point.
 
   Returns:
       int: Always returns 1.
@@ -606,7 +606,7 @@ def plane_ellipsoid(
   dist = wp.dot(plane_normal, pos - plane_pos)
   contact_pos = pos - plane_normal * dist * 0.5
 
-  contacts[0] = pack_contact_auto_tangent(contact_pos, plane_normal, dist)
+  contacts_out[0] = pack_contact_auto_tangent(contact_pos, plane_normal, dist)
   return 1
 
 
@@ -622,7 +622,7 @@ def capsule_capsule(
   cap2_radius: float,
   cap2_half_length: float,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between two capsules.
 
@@ -635,7 +635,7 @@ def capsule_capsule(
     cap2_axis: Axis of the second capsule.
     cap2_radius: Radius of the second capsule.
     cap2_half_length: Half-length of the second capsule's cylindrical body.
-    contacts: An array to store the resulting contact point.
+    contacts_out: An array to store the resulting contact point.
 
   Returns:
       int: Always returns 1.
@@ -650,7 +650,7 @@ def capsule_capsule(
     cap2_center + seg2,
   )
 
-  contacts[0] = _sphere_sphere(
+  contacts_out[0] = _sphere_sphere(
     pt1,
     cap1_radius,
     pt2,
@@ -671,7 +671,7 @@ def sphere_cylinder(
   cylinder_half_height: float,
   cylinder_rot: wp.mat33,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a sphere and a cylinder.
 
@@ -684,7 +684,7 @@ def sphere_cylinder(
     cylinder_radius: Radius of the cylinder.
     cylinder_half_height: Half-height of the cylinder.
     cylinder_rot: Rotation matrix of the cylinder (used for contact normal calculation).
-    contacts: An array to store the resulting contact point.
+    contacts_out: An array to store the resulting contact point.
 
   Returns:
       int: Always returns 1.
@@ -711,7 +711,7 @@ def sphere_cylinder(
   # Side collision
   if collide_side:
     pos_target = cylinder_center + a_proj
-    contacts[0] = _sphere_sphere_ext(
+    contacts_out[0] = _sphere_sphere_ext(
       sphere_center,
       sphere_radius,
       pos_target,
@@ -734,7 +734,7 @@ def sphere_cylinder(
 
     dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere_center, sphere_radius)
     plane_normal = -plane_normal  # Flip normal after position calculation
-    contacts[0] = pack_contact_auto_tangent(pos_contact, plane_normal, dist)
+    contacts_out[0] = pack_contact_auto_tangent(pos_contact, plane_normal, dist)
     return 1
 
   # Corner collision
@@ -744,7 +744,7 @@ def sphere_cylinder(
   cap_offset = cylinder_axis * (wp.sign(x) * cylinder_half_height)
   pos_corner = cylinder_center + cap_offset + p_proj
 
-  contacts[0] = _sphere_sphere_ext(
+  contacts_out[0] = _sphere_sphere_ext(
     sphere_center,
     sphere_radius,
     pos_corner,
@@ -811,7 +811,7 @@ def sphere_box(
   box_half_sizes: wp.vec3,
   margin: float,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates one contact between a sphere and a box.
 
@@ -821,7 +821,7 @@ def sphere_box(
     box_center: Center of the box.
     box_rot: Rotation matrix of the box.
     box_half_sizes: Half-sizes of the box.
-    contacts: An array to store the resulting contact point.
+    contacts_out: An array to store the resulting contact point.
     margin: Collision margin.
 
   Returns:
@@ -838,7 +838,7 @@ def sphere_box(
 
   num_contacts = 0
   if found:
-    contacts[0] = contact
+    contacts_out[0] = contact
     num_contacts = 1
 
   return num_contacts
@@ -856,7 +856,7 @@ def capsule_box(
   box_half_sizes: wp.vec3,
   margin: float,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a capsule and a box.
 
@@ -869,7 +869,7 @@ def capsule_box(
     box_center: Center of the box.
     box_rot: Rotation matrix of the box.
     box_half_sizes: Half-sizes of the box.
-    contacts: An array to store the resulting contact points.
+    contacts_out: An array to store the resulting contact points.
     margin: Collision margin.
 
   Returns:
@@ -1177,7 +1177,7 @@ def capsule_box(
     margin,
   )
   if found:
-    contacts[num_contacts] = contact
+    contacts_out[num_contacts] = contact
     num_contacts += 1
 
   if secondpos > -3:  # secondpos was modified
@@ -1192,7 +1192,7 @@ def capsule_box(
       margin,
     )
     if found:
-      contacts[num_contacts] = contact
+      contacts_out[num_contacts] = contact
       num_contacts += 1
 
   return num_contacts
@@ -1208,7 +1208,7 @@ def plane_box(
   box_half_sizes: wp.vec3,
   margin: float,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a plane and a box.
 
@@ -1220,7 +1220,7 @@ def plane_box(
     box_center: Center of the box.
     box_rot: Rotation matrix of the box.
     box_half_sizes: Half-sizes of the box.
-    contacts: An array to store the resulting contact points.
+    contacts_out: An array to store the resulting contact points.
     margin: Collision margin.
 
   Returns:
@@ -1248,7 +1248,7 @@ def plane_box(
     cdist = dist + ldist
     contact_pos = corner + box_center - plane_normal * (cdist * 0.5)
 
-    contacts[num_contacts] = pack_contact_auto_tangent(contact_pos, plane_normal, cdist)
+    contacts_out[num_contacts] = pack_contact_auto_tangent(contact_pos, plane_normal, cdist)
     num_contacts += 1
 
     if num_contacts >= 4:
@@ -1268,7 +1268,7 @@ def box_box(
   box2_half_sizes: wp.vec3,
   margin: float,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between two boxes.
 
@@ -1279,7 +1279,7 @@ def box_box(
     box2_center: Center of the second box.
     box2_rot: Rotation matrix of the second box.
     box2_half_sizes: Half-sizes of the second box.
-    contacts: An array to store the resulting contact points.
+    contacts_out: An array to store the resulting contact points.
     margin: Collision margin.
 
   Returns:
@@ -1699,7 +1699,7 @@ def box_box(
     points[i, 2] += hz
     pos = rw @ points[i] + pw
     tangent = make_tangent(normal)
-    contacts[i] = pack_contact(pos, normal, tangent, depth[i])
+    contacts_out[i] = pack_contact(pos, normal, tangent, depth[i])
 
   return n
 
@@ -1714,7 +1714,7 @@ def plane_cylinder(
   cylinder_radius: float,
   cylinder_half_height: float,
   # Out:
-  contacts: wp.array(dtype=ContactPoint),
+  contacts_out: wp.array(dtype=ContactPoint),
 ) -> int:
   """Calculates contacts between a cylinder and a plane.
 
@@ -1725,7 +1725,7 @@ def plane_cylinder(
     cylinder_axis: Axis of the cylinder.
     cylinder_radius: Radius of the cylinder.
     cylinder_half_height: Half-height of the cylinder.
-    contacts: An array to store the resulting contact points.
+    contacts_out: An array to store the resulting contact points.
 
   Returns:
       int: Number of contacts generated.
@@ -1770,13 +1770,13 @@ def plane_cylinder(
   # First contact point (end cap closer to plane)
   dist1 = dist0 + prjaxis + prjvec
   pos1 = cylinder_center + vec + axis - n * (dist1 * 0.5)
-  contacts[num_contacts] = pack_contact(pos1, n, b, dist1)
+  contacts_out[num_contacts] = pack_contact(pos1, n, b, dist1)
   num_contacts += 1
 
   # Second contact point (end cap farther from plane)
   dist2 = dist0 - prjaxis + prjvec
   pos2 = cylinder_center + vec - axis - n * (dist2 * 0.5)
-  contacts[num_contacts] = pack_contact(pos2, n, b, dist2)
+  contacts_out[num_contacts] = pack_contact(pos2, n, b, dist2)
   num_contacts += 1
 
   # Try triangle contact points on side closer to plane
@@ -1789,12 +1789,12 @@ def plane_cylinder(
 
   # Add contact point A - adjust to closest side
   pos3 = cylinder_center + vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
-  contacts[num_contacts] = pack_contact(pos3, n, b, dist3)
+  contacts_out[num_contacts] = pack_contact(pos3, n, b, dist3)
   num_contacts += 1
 
   # Add contact point B - adjust to closest side
   pos4 = cylinder_center - vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
-  contacts[num_contacts] = pack_contact(pos4, n, b, dist3)
+  contacts_out[num_contacts] = pack_contact(pos4, n, b, dist3)
   num_contacts += 1
 
   return num_contacts
