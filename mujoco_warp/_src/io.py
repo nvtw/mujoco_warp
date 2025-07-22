@@ -811,7 +811,7 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
     mjm (mujoco.MjModel): The model containing kinematic and dynamic information (host).
     nworld (int, optional): Number of worlds. Defaults to 1.
     nconmax (int, optional): Maximum number of contacts for all worlds. Defaults to -1.
-    njmax (int, optiona): Maximum number of constraints for all worlds. Defaults to -1.
+    njmax (int, optional): Maximum number of constraints for all worlds. Defaults to -1.
 
   Returns:
     Data: The data object containing the current state and output arrays (device).
@@ -1026,11 +1026,11 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
     epa_vert2=wp.zeros(shape=(nconmax, 5 + MJ_CCD_ITERATIONS), dtype=wp.vec3),
     epa_vert_index1=wp.zeros(shape=(nconmax, 5 + MJ_CCD_ITERATIONS), dtype=int),
     epa_vert_index2=wp.zeros(shape=(nconmax, 5 + MJ_CCD_ITERATIONS), dtype=int),
-    epa_face=wp.zeros(shape=(nconmax, 6 + 3 * MJ_CCD_ITERATIONS), dtype=wp.vec3i),
-    epa_pr=wp.zeros(shape=(nconmax, 6 + 3 * MJ_CCD_ITERATIONS), dtype=wp.vec3),
-    epa_norm2=wp.zeros(shape=(nconmax, 6 + 3 * MJ_CCD_ITERATIONS), dtype=float),
-    epa_index=wp.zeros(shape=(nconmax, 6 + 3 * MJ_CCD_ITERATIONS), dtype=int),
-    epa_map=wp.zeros(shape=(nconmax, 6 + 3 * MJ_CCD_ITERATIONS), dtype=int),
+    epa_face=wp.zeros(shape=(nconmax, 6 + 6 * MJ_CCD_ITERATIONS), dtype=wp.vec3i),
+    epa_pr=wp.zeros(shape=(nconmax, 6 + 6 * MJ_CCD_ITERATIONS), dtype=wp.vec3),
+    epa_norm2=wp.zeros(shape=(nconmax, 6 + 6 * MJ_CCD_ITERATIONS), dtype=float),
+    epa_index=wp.zeros(shape=(nconmax, 6 + 6 * MJ_CCD_ITERATIONS), dtype=int),
+    epa_map=wp.zeros(shape=(nconmax, 6 + 6 * MJ_CCD_ITERATIONS), dtype=int),
     epa_horizon=wp.zeros(shape=(nconmax, 6 * MJ_CCD_ITERATIONS), dtype=int),
     # rne_postconstraint
     cacc=wp.zeros((nworld, mjm.nbody), dtype=wp.spatial_vector),
@@ -1086,7 +1086,7 @@ def put_data(
     Data: The data object containing the current state and output arrays (device).
   """
   # TODO(team): move nconmax and njmax to Model?
-  # TODO(team): decide what to do about unintialized warp-only fields created by put_data
+  # TODO(team): decide what to do about uninitialized warp-only fields created by put_data
   #             we need to ensure these are only workspace fields and don't carry state
 
   nworld = nworld or 1
@@ -1379,11 +1379,11 @@ def put_data(
     epa_vert2=wp.zeros(shape=(nconmax, 5 + MJ_CCD_ITERATIONS), dtype=wp.vec3),
     epa_vert_index1=wp.zeros(shape=(nconmax, 5 + MJ_CCD_ITERATIONS), dtype=int),
     epa_vert_index2=wp.zeros(shape=(nconmax, 5 + MJ_CCD_ITERATIONS), dtype=int),
-    epa_face=wp.zeros(shape=(nconmax, 6 + 3 * MJ_CCD_ITERATIONS), dtype=wp.vec3i),
-    epa_pr=wp.zeros(shape=(nconmax, 6 + 3 * MJ_CCD_ITERATIONS), dtype=wp.vec3),
-    epa_norm2=wp.zeros(shape=(nconmax, 6 + 3 * MJ_CCD_ITERATIONS), dtype=float),
-    epa_index=wp.zeros(shape=(nconmax, 6 + 3 * MJ_CCD_ITERATIONS), dtype=int),
-    epa_map=wp.zeros(shape=(nconmax, 6 + 3 * MJ_CCD_ITERATIONS), dtype=int),
+    epa_face=wp.zeros(shape=(nconmax, 6 + 6 * MJ_CCD_ITERATIONS), dtype=wp.vec3i),
+    epa_pr=wp.zeros(shape=(nconmax, 6 + 6 * MJ_CCD_ITERATIONS), dtype=wp.vec3),
+    epa_norm2=wp.zeros(shape=(nconmax, 6 + 6 * MJ_CCD_ITERATIONS), dtype=float),
+    epa_index=wp.zeros(shape=(nconmax, 6 + 6 * MJ_CCD_ITERATIONS), dtype=int),
+    epa_map=wp.zeros(shape=(nconmax, 6 + 6 * MJ_CCD_ITERATIONS), dtype=int),
     epa_horizon=wp.zeros(shape=(nconmax, 6 * MJ_CCD_ITERATIONS), dtype=int),
     # rne_postconstraint but also smooth
     cacc=tile(mjd.cacc, dtype=wp.spatial_vector),
