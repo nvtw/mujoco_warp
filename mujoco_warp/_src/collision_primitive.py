@@ -41,20 +41,17 @@ class mat83f(wp.types.matrix(shape=(8, 3), dtype=wp.float32)):
   pass
 
 
-BLOCK_SIZE = 128
+# Array length: 8
+# Struct size: 10 floats
+vec80 = wp.types.vector(80, dtype=wp.float32)
 
-snippet_struct = f"""
-        constexpr int array_size = 8;
-        constexpr int multiplier = 10; // The Contact struct has 10 floats
-        __shared__ int s[{BLOCK_SIZE}*array_size*multiplier];
-
-        auto ptr = &s[tid * array_size * multiplier];
-        return (uint64_t)ptr;
+snippet = """
+        return (uint64_t)(&arr.c[0]);
         """
 
 
-@wp.func_native(snippet_struct)
-def get_shared_memory_array(tid: int) -> wp.uint64: ...
+@wp.func_native(snippet)
+def get_vec_ptr(arr: vec80) -> wp.uint64: ...
 
 
 @wp.struct
@@ -843,7 +840,8 @@ def _primitive_narrowphase_builder(m: Model):
       vertnum = -1
       graphadr = -1
 
-    contacts = wp.array(ptr=get_shared_memory_array(tid), shape=(8,), dtype=ContactPoint)
+    arr = vec80()
+    contacts = wp.array(ptr=get_vec_ptr(arr), shape=(8,), dtype=ContactPoint)
     # contacts = wp.zeros(shape=(8,), dtype=ContactPoint)
 
     for i in range(wp.static(len(_primitive_collisions_func))):
@@ -978,5 +976,4 @@ def primitive_narrowphase(m: Model, d: Data):
       d.contact.geom,
       d.contact.worldid,
     ],
-    block_dim=BLOCK_SIZE,
   )
