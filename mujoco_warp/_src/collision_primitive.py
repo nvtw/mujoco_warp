@@ -256,11 +256,6 @@ def plane_sphere_wrapper(
   plane: Geom,
   sphere: Geom,
   margin: float,
-  _vert: wp.array(dtype=wp.vec3),
-  _vertadr: int,
-  _vertnum: int,
-  _graph: wp.array(dtype=int),
-  _graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a plane and a sphere."""
@@ -280,11 +275,6 @@ def sphere_sphere_wrapper(
   sphere1: Geom,
   sphere2: Geom,
   margin: float,
-  _vert: wp.array(dtype=wp.vec3),
-  _vertadr: int,
-  _vertnum: int,
-  _graph: wp.array(dtype=int),
-  _graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between two spheres."""
@@ -303,11 +293,6 @@ def sphere_capsule_wrapper(
   sphere: Geom,
   cap: Geom,
   margin: float,
-  _vert: wp.array(dtype=wp.vec3),
-  _vertadr: int,
-  _vertnum: int,
-  _graph: wp.array(dtype=int),
-  _graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a sphere and a capsule."""
@@ -331,11 +316,6 @@ def capsule_capsule_wrapper(
   cap1: Geom,
   cap2: Geom,
   margin: float,
-  _vert: wp.array(dtype=wp.vec3),
-  _vertadr: int,
-  _vertnum: int,
-  _graph: wp.array(dtype=int),
-  _graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between two capsules."""
@@ -360,11 +340,6 @@ def plane_capsule_wrapper(
   plane: Geom,
   cap: Geom,
   margin: float,
-  _vert: wp.array(dtype=wp.vec3),
-  _vertadr: int,
-  _vertnum: int,
-  _graph: wp.array(dtype=int),
-  _graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates two contacts between a capsule and a plane."""
@@ -387,11 +362,6 @@ def plane_ellipsoid_wrapper(
   plane: Geom,
   ellipsoid: Geom,
   margin: float,
-  _vert: wp.array(dtype=wp.vec3),
-  _vertadr: int,
-  _vertnum: int,
-  _graph: wp.array(dtype=int),
-  _graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a plane and an ellipsoid."""
@@ -412,11 +382,6 @@ def plane_box_wrapper(
   plane: Geom,
   box: Geom,
   margin: float,
-  _vert: wp.array(dtype=wp.vec3),
-  _vertadr: int,
-  _vertnum: int,
-  _graph: wp.array(dtype=int),
-  _graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a plane and a box."""
@@ -438,11 +403,6 @@ def plane_convex_wrapper(
   plane: Geom,
   convex: Geom,
   margin: float,
-  vert: wp.array(dtype=wp.vec3),
-  vertadr: int,
-  vertnum: int,
-  graph: wp.array(dtype=int),
-  graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a plane and a convex object."""
@@ -452,11 +412,11 @@ def plane_convex_wrapper(
     plane.pos,
     convex.pos,
     convex.rot,
-    vert,
-    vertadr,
-    vertnum,
-    graph,
-    graphadr,
+    convex.vert,
+    convex.vertadr,
+    convex.vertnum,
+    convex.graph,
+    convex.graphadr,
     write_contact_args,
   )
 
@@ -467,11 +427,6 @@ def sphere_cylinder_wrapper(
   sphere: Geom,
   cylinder: Geom,
   margin: float,
-  _vert: wp.array(dtype=wp.vec3),
-  _vertadr: int,
-  _vertnum: int,
-  _graph: wp.array(dtype=int),
-  _graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a sphere and a cylinder."""
@@ -495,11 +450,6 @@ def plane_cylinder_wrapper(
   plane: Geom,
   cylinder: Geom,
   margin: float,
-  _vert: wp.array(dtype=wp.vec3),
-  _vertadr: int,
-  _vertnum: int,
-  _graph: wp.array(dtype=int),
-  _graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a cylinder and a plane."""
@@ -602,11 +552,6 @@ def sphere_box_wrapper(
   sphere: Geom,
   box: Geom,
   margin: float,
-  _vert: wp.array(dtype=wp.vec3),
-  _vertadr: int,
-  _vertnum: int,
-  _graph: wp.array(dtype=int),
-  _graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a sphere and a box."""
@@ -627,11 +572,6 @@ def capsule_box_wrapper(
   cap: Geom,
   box: Geom,
   margin: float,
-  _vert: wp.array(dtype=wp.vec3),
-  _vertadr: int,
-  _vertnum: int,
-  _graph: wp.array(dtype=int),
-  _graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a capsule and a box."""
@@ -655,11 +595,6 @@ def box_box_wrapper(
   box1: Geom,
   box2: Geom,
   margin: float,
-  _vert: wp.array(dtype=wp.vec3),
-  _vertadr: int,
-  _vertnum: int,
-  _graph: wp.array(dtype=int),
-  _graphadr: int,
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between two boxes."""
@@ -877,16 +812,6 @@ def _primitive_narrowphase_builder(m: Model):
       hftri_index,
     )
 
-    dataid = geom_dataid[g2]
-    if dataid >= 0 and geom_type[g2] == int(GeomType.MESH.value):
-      vertadr = mesh_vertadr[dataid]
-      vertnum = mesh_vertnum[dataid]
-      graphadr = mesh_graphadr[dataid]
-    else:
-      vertadr = -1
-      vertnum = -1
-      graphadr = -1
-
     write_contact_args = WriteContactArgs()
     write_contact_args.nconmax_in = nconmax_in
     write_contact_args.margin_in = margin
@@ -920,11 +845,6 @@ def _primitive_narrowphase_builder(m: Model):
           geom1,
           geom2,
           margin,
-          mesh_vert,
-          vertadr,
-          vertnum,
-          mesh_graph,
-          graphadr,
           write_contact_args,
         )
 
