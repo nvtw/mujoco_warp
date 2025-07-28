@@ -887,9 +887,6 @@ def _primitive_narrowphase_builder(m: Model):
       vertnum = -1
       graphadr = -1
 
-    # arr = vec80()
-    # contacts = wp.array(ptr=get_vec_ptr(arr), shape=(8,), dtype=ContactPoint)
-
     write_contact_args = WriteContactArgs()
     write_contact_args.nconmax_in = nconmax_in
     write_contact_args.margin_in = margin

@@ -343,7 +343,7 @@ def get_plane_convex(contact_writer: Any):
       indices[3] = imax
 
     # Write contacts
-    frame = make_frame(plane_normal)
+    tangent = make_tangent(plane_normal)
     num_contacts = 0
     for i in range(3, -1, -1):
       idx = indices[i]
@@ -359,8 +359,7 @@ def get_plane_convex(contact_writer: Any):
         support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
         dist = -support
         pos = pos - 0.5 * dist * plane_normal
-        # contacts_out[num_contacts] = pack_contact(pos, plane_normal, get_tangent(frame), dist)
-        wp.static(contact_writer)(pack_contact(pos, plane_normal, get_tangent(frame), dist), contact_writer_args)
+        wp.static(contact_writer)(pack_contact(pos, plane_normal, tangent, dist), contact_writer_args)
         num_contacts += 1
 
     return num_contacts
@@ -1726,11 +1725,11 @@ def get_box_box(contact_writer: Any):
       pw = box1_center
       normal = wp.where(inv, -1.0, 1.0) * rw @ rnorm
 
+    tangent = make_tangent(normal)
     # Create contact points
     for i in range(n):
       points[i, 2] += hz
       pos = rw @ points[i] + pw
-      tangent = make_tangent(normal)
       contact = pack_contact(pos, normal, tangent, depth[i])
       wp.static(contact_writer)(contact, contact_writer_args)
 
