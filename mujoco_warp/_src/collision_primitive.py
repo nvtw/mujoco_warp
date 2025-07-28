@@ -42,37 +42,6 @@ class mat83f(wp.types.matrix(shape=(8, 3), dtype=wp.float32)):
 
 
 @wp.struct
-class GeomCore:
-  pos: wp.vec3
-  rot: wp.mat33
-  size: wp.vec3
-
-
-@wp.func
-def get_plane_normal(rot: wp.mat33) -> wp.vec3:
-  return wp.vec3(rot[0, 2], rot[1, 2], rot[2, 2])
-
-
-@wp.func
-def geom_core(
-  # Model:
-  geom_size: wp.array2d(dtype=wp.vec3),
-  # Data in:
-  geom_xpos_in: wp.array2d(dtype=wp.vec3),
-  geom_xmat_in: wp.array2d(dtype=wp.mat33),
-  # In:
-  worldid: int,
-  gid: int,
-) -> GeomCore:
-  geom = GeomCore()
-  geom.pos = geom_xpos_in[worldid, gid]
-  rot = geom_xmat_in[worldid, gid]
-  geom.rot = rot
-  geom.size = geom_size[worldid, gid]
-  return geom
-
-
-@wp.struct
 class Geom:
   pos: wp.vec3
   rot: wp.mat33
@@ -284,8 +253,8 @@ def contact_writer(contact: ContactPoint, args: WriteContactArgs):
 @wp.func
 def plane_sphere_wrapper(
   # In:
-  plane: GeomCore,
-  sphere: GeomCore,
+  plane: Geom,
+  sphere: Geom,
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
@@ -295,7 +264,7 @@ def plane_sphere_wrapper(
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a plane and a sphere."""
-  plane_normal = get_plane_normal(plane.rot)
+  plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   return wp.static(get_plane_sphere(contact_writer))(
     plane_normal,
     plane.pos,
@@ -308,8 +277,8 @@ def plane_sphere_wrapper(
 @wp.func
 def sphere_sphere_wrapper(
   # In:
-  sphere1: GeomCore,
-  sphere2: GeomCore,
+  sphere1: Geom,
+  sphere2: Geom,
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
@@ -331,8 +300,8 @@ def sphere_sphere_wrapper(
 @wp.func
 def sphere_capsule_wrapper(
   # In:
-  sphere: GeomCore,
-  cap: GeomCore,
+  sphere: Geom,
+  cap: Geom,
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
@@ -359,8 +328,8 @@ def sphere_capsule_wrapper(
 @wp.func
 def capsule_capsule_wrapper(
   # In:
-  cap1: GeomCore,
-  cap2: GeomCore,
+  cap1: Geom,
+  cap2: Geom,
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
@@ -388,8 +357,8 @@ def capsule_capsule_wrapper(
 @wp.func
 def plane_capsule_wrapper(
   # In:
-  plane: GeomCore,
-  cap: GeomCore,
+  plane: Geom,
+  cap: Geom,
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
@@ -399,7 +368,7 @@ def plane_capsule_wrapper(
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates two contacts between a capsule and a plane."""
-  plane_normal = get_plane_normal(plane.rot)
+  plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
   return wp.static(get_plane_capsule(contact_writer))(
     plane_normal,
@@ -415,8 +384,8 @@ def plane_capsule_wrapper(
 @wp.func
 def plane_ellipsoid_wrapper(
   # In:
-  plane: GeomCore,
-  ellipsoid: GeomCore,
+  plane: Geom,
+  ellipsoid: Geom,
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
@@ -426,7 +395,7 @@ def plane_ellipsoid_wrapper(
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a plane and an ellipsoid."""
-  plane_normal = get_plane_normal(plane.rot)
+  plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   return wp.static(get_plane_ellipsoid(contact_writer))(
     plane_normal,
     plane.pos,
@@ -440,8 +409,8 @@ def plane_ellipsoid_wrapper(
 @wp.func
 def plane_box_wrapper(
   # In:
-  plane: GeomCore,
-  box: GeomCore,
+  plane: Geom,
+  box: Geom,
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
@@ -451,7 +420,7 @@ def plane_box_wrapper(
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a plane and a box."""
-  plane_normal = get_plane_normal(plane.rot)
+  plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   return wp.static(get_plane_box(contact_writer))(
     plane_normal,
     plane.pos,
@@ -466,8 +435,8 @@ def plane_box_wrapper(
 @wp.func
 def plane_convex_wrapper(
   # In:
-  plane: GeomCore,
-  convex: GeomCore,
+  plane: Geom,
+  convex: Geom,
   margin: float,
   vert: wp.array(dtype=wp.vec3),
   vertadr: int,
@@ -477,7 +446,7 @@ def plane_convex_wrapper(
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a plane and a convex object."""
-  plane_normal = get_plane_normal(plane.rot)
+  plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   return wp.static(get_plane_convex(contact_writer))(
     plane_normal,
     plane.pos,
@@ -495,8 +464,8 @@ def plane_convex_wrapper(
 @wp.func
 def sphere_cylinder_wrapper(
   # In:
-  sphere: GeomCore,
-  cylinder: GeomCore,
+  sphere: Geom,
+  cylinder: Geom,
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
@@ -523,8 +492,8 @@ def sphere_cylinder_wrapper(
 @wp.func
 def plane_cylinder_wrapper(
   # In:
-  plane: GeomCore,
-  cylinder: GeomCore,
+  plane: Geom,
+  cylinder: Geom,
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
@@ -534,7 +503,7 @@ def plane_cylinder_wrapper(
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a cylinder and a plane."""
-  plane_normal = get_plane_normal(plane.rot)
+  plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
   return wp.static(get_plane_cylinder(contact_writer))(
     plane_normal,
@@ -630,8 +599,8 @@ def contact_params(
 @wp.func
 def sphere_box_wrapper(
   # In:
-  sphere: GeomCore,
-  box: GeomCore,
+  sphere: Geom,
+  box: Geom,
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
@@ -655,8 +624,8 @@ def sphere_box_wrapper(
 @wp.func
 def capsule_box_wrapper(
   # In:
-  cap: GeomCore,
-  box: GeomCore,
+  cap: Geom,
+  box: Geom,
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
@@ -683,8 +652,8 @@ def capsule_box_wrapper(
 @wp.func
 def box_box_wrapper(
   # In:
-  box1: GeomCore,
-  box2: GeomCore,
+  box1: Geom,
+  box2: Geom,
   margin: float,
   _vert: wp.array(dtype=wp.vec3),
   _vertadr: int,
@@ -848,20 +817,64 @@ def _primitive_narrowphase_builder(m: Model):
 
     hftri_index = collision_hftri_index_in[tid]
 
-    geom1 = geom_core(
+    geom1 = _geom(
+      geom_type,
+      geom_dataid,
       geom_size,
+      hfield_adr,
+      hfield_nrow,
+      hfield_ncol,
+      hfield_size,
+      hfield_data,
+      mesh_vertadr,
+      mesh_vertnum,
+      mesh_vert,
+      mesh_graphadr,
+      mesh_graph,
+      mesh_polynum,
+      mesh_polyadr,
+      mesh_polynormal,
+      mesh_polyvertadr,
+      mesh_polyvertnum,
+      mesh_polyvert,
+      mesh_polymapadr,
+      mesh_polymapnum,
+      mesh_polymap,
       geom_xpos_in,
       geom_xmat_in,
       worldid,
       g1,
+      hftri_index,
     )
 
-    geom2 = geom_core(
+    geom2 = _geom(
+      geom_type,
+      geom_dataid,
       geom_size,
+      hfield_adr,
+      hfield_nrow,
+      hfield_ncol,
+      hfield_size,
+      hfield_data,
+      mesh_vertadr,
+      mesh_vertnum,
+      mesh_vert,
+      mesh_graphadr,
+      mesh_graph,
+      mesh_polynum,
+      mesh_polyadr,
+      mesh_polynormal,
+      mesh_polyvertadr,
+      mesh_polyvertnum,
+      mesh_polyvert,
+      mesh_polymapadr,
+      mesh_polymapnum,
+      mesh_polymap,
       geom_xpos_in,
       geom_xmat_in,
       worldid,
       g2,
+      hftri_index,
     )
 
     dataid = geom_dataid[g2]
