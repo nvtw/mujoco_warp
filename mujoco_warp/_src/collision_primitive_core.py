@@ -19,7 +19,6 @@ import warp as wp
 
 from .math import closest_segment_point
 from .math import closest_segment_to_segment_points
-from .math import make_frame
 from .math import normalize_with_norm
 from .math import orthogonals
 from .types import MJ_MINVAL
@@ -1147,8 +1146,8 @@ def get_capsule_box(contact_writer: Any):
           mul = -1
           secondpos = 1.0 + bestsegmentpos
 
-        # now find out whether we point towards the opposite side or towards one of the sides
-        # and also find the farthest point along the capsule that is above the box
+        # now find out whether we point towards the opposite side or towards one of the
+        # sides and also find the farthest point along the capsule that is above the box
 
         e1 = 2.0 * box_half_sizes[ax2] / wp.abs(halfaxis[ax2])
         secondpos = min(e1, secondpos)

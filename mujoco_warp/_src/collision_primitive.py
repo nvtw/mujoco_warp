@@ -292,7 +292,6 @@ def plane_sphere_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a plane and a sphere."""
@@ -317,7 +316,6 @@ def sphere_sphere_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between two spheres."""
@@ -341,7 +339,6 @@ def sphere_capsule_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a sphere and a capsule."""
@@ -370,7 +367,6 @@ def capsule_capsule_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between two capsules."""
@@ -400,7 +396,6 @@ def plane_capsule_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates two contacts between a capsule and a plane."""
@@ -428,7 +423,6 @@ def plane_ellipsoid_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a plane and an ellipsoid."""
@@ -454,7 +448,6 @@ def plane_box_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a plane and a box."""
@@ -481,7 +474,6 @@ def plane_convex_wrapper(
   vertnum: int,
   graph: wp.array(dtype=int),
   graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a plane and a convex object."""
@@ -511,7 +503,6 @@ def sphere_cylinder_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a sphere and a cylinder."""
@@ -540,7 +531,6 @@ def plane_cylinder_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a cylinder and a plane."""
@@ -648,7 +638,6 @@ def sphere_box_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a sphere and a box."""
@@ -674,7 +663,6 @@ def capsule_box_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a capsule and a box."""
@@ -703,7 +691,6 @@ def box_box_wrapper(
   _vertnum: int,
   _graph: wp.array(dtype=int),
   _graphadr: int,
-  # Out:
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between two boxes."""
