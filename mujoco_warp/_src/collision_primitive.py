@@ -234,6 +234,65 @@ def write_contact(
       contact_solimp_out[cid] = solimp_in
 
 
+@wp.struct
+class WriteContactArgs:
+    # Data in:
+    nconmax_in: int
+    # In:
+    margin_in: float
+    gap_in: float
+    condim_in: int
+    friction_in: vec5
+    solref_in: wp.vec2f
+    solreffriction_in: wp.vec2f
+    solimp_in: vec5
+    geoms_in: wp.vec2i
+    worldid_in: int
+    # Data out:
+    ncon_out: wp.array(dtype=int)
+    contact_dist_out: wp.array(dtype=float)
+    contact_pos_out: wp.array(dtype=wp.vec3)
+    contact_frame_out: wp.array(dtype=wp.mat33)
+    contact_includemargin_out: wp.array(dtype=float)
+    contact_friction_out: wp.array(dtype=vec5)
+    contact_solref_out: wp.array(dtype=wp.vec2)
+    contact_solreffriction_out: wp.array(dtype=wp.vec2)
+    contact_solimp_out: wp.array(dtype=vec5)
+    contact_dim_out: wp.array(dtype=int)
+    contact_geom_out: wp.array(dtype=wp.vec2i)
+    contact_worldid_out: wp.array(dtype=int)
+
+@wp.func
+def contact_writer(contact: ContactPoint, args: WriteContactArgs):
+    write_contact(
+        args.nconmax_in,
+        contact.dist,
+        contact.pos,
+        extract_frame(contact),
+        args.margin_in,
+        args.gap_in,
+        args.condim_in,
+        args.friction_in,
+        args.solref_in,
+        args.solreffriction_in,
+        args.solimp_in,
+        args.geoms_in,
+        args.worldid_in,
+        args.ncon_out,
+        args.contact_dist_out,
+        args.contact_pos_out,
+        args.contact_frame_out,
+        args.contact_includemargin_out,
+        args.contact_friction_out,
+        args.contact_solref_out,
+        args.contact_solreffriction_out,
+        args.contact_solimp_out,
+        args.contact_dim_out,
+        args.contact_geom_out,
+        args.contact_worldid_out,
+    )
+
+
 @wp.func
 def plane_sphere_wrapper(
   # In:
@@ -247,6 +306,7 @@ def plane_sphere_wrapper(
   _graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
+  write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a plane and a sphere."""
   plane_normal = get_plane_normal(plane.rot)
@@ -272,6 +332,7 @@ def sphere_sphere_wrapper(
   _graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
+  write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between two spheres."""
   return sphere_sphere(
@@ -296,6 +357,7 @@ def sphere_capsule_wrapper(
   _graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
+  write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a sphere and a capsule."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
@@ -325,6 +387,7 @@ def capsule_capsule_wrapper(
   _graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
+  write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between two capsules."""
   cap1_axis = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
@@ -355,6 +418,7 @@ def plane_capsule_wrapper(
   _graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
+  write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates two contacts between a capsule and a plane."""
   plane_normal = get_plane_normal(plane.rot)
@@ -383,6 +447,7 @@ def plane_ellipsoid_wrapper(
   _graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
+  write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a plane and an ellipsoid."""
   plane_normal = get_plane_normal(plane.rot)
@@ -409,6 +474,7 @@ def plane_box_wrapper(
   _graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
+  write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a plane and a box."""
   plane_normal = get_plane_normal(plane.rot)
@@ -436,10 +502,11 @@ def plane_convex_wrapper(
   graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
+  write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a plane and a convex object."""
   plane_normal = get_plane_normal(plane.rot)
-  return plane_convex(
+  return wp.static(get_plane_convex(contact_writer))(
     plane_normal,
     plane.pos,
     convex.pos,
@@ -449,7 +516,7 @@ def plane_convex_wrapper(
     vertnum,
     graph,
     graphadr,
-    contacts,
+    write_contact_args,
   )
 
 
@@ -466,7 +533,8 @@ def sphere_cylinder_wrapper(
   _graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
-):
+  write_contact_args: WriteContactArgs,
+) -> int:
   """Calculates one contact between a sphere and a cylinder."""
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
   return sphere_cylinder(
@@ -495,6 +563,7 @@ def plane_cylinder_wrapper(
   _graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
+  write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a cylinder and a plane."""
   plane_normal = get_plane_normal(plane.rot)
@@ -603,6 +672,7 @@ def sphere_box_wrapper(
   _graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
+  write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a sphere and a box."""
   return sphere_box(
@@ -629,6 +699,7 @@ def capsule_box_wrapper(
   _graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
+  write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between a capsule and a box."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
@@ -658,6 +729,7 @@ def box_box_wrapper(
   _graphadr: int,
   # Out:
   contacts: wp.array(dtype=ContactPoint),
+  write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between two boxes."""
   return box_box(
@@ -840,9 +912,33 @@ def _primitive_narrowphase_builder(m: Model):
       vertnum = -1
       graphadr = -1
 
-    arr = vec80()
-    contacts = wp.array(ptr=get_vec_ptr(arr), shape=(8,), dtype=ContactPoint)
-    # contacts = wp.zeros(shape=(8,), dtype=ContactPoint)
+    # arr = vec80()
+    # contacts = wp.array(ptr=get_vec_ptr(arr), shape=(8,), dtype=ContactPoint)
+    contacts = wp.zeros(shape=(8,), dtype=ContactPoint)
+
+    write_contact_args = WriteContactArgs()
+    write_contact_args.nconmax_in = nconmax_in
+    write_contact_args.margin_in = margin
+    write_contact_args.gap_in = gap
+    write_contact_args.condim_in = condim
+    write_contact_args.friction_in = friction
+    write_contact_args.solref_in = solref
+    write_contact_args.solreffriction_in = solreffriction
+    write_contact_args.solimp_in = solimp
+    write_contact_args.geoms_in = geoms
+    write_contact_args.worldid_in = worldid
+    write_contact_args.ncon_out = ncon_out
+    write_contact_args.contact_dist_out = contact_dist_out
+    write_contact_args.contact_pos_out = contact_pos_out
+    write_contact_args.contact_frame_out = contact_frame_out
+    write_contact_args.contact_includemargin_out = contact_includemargin_out
+    write_contact_args.contact_friction_out = contact_friction_out
+    write_contact_args.contact_solref_out = contact_solref_out
+    write_contact_args.contact_solreffriction_out = contact_solreffriction_out
+    write_contact_args.contact_solimp_out = contact_solimp_out
+    write_contact_args.contact_dim_out = contact_dim_out
+    write_contact_args.contact_geom_out = contact_geom_out
+    write_contact_args.contact_worldid_out = contact_worldid_out
 
     for i in range(wp.static(len(_primitive_collisions_func))):
       collision_type1 = wp.static(_primitive_collisions_types[i][0])
@@ -859,6 +955,7 @@ def _primitive_narrowphase_builder(m: Model):
           mesh_graph,
           graphadr,
           contacts,
+          write_contact_args,
         )
 
         for j in range(num_contacts):
