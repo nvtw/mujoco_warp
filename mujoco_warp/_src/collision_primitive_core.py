@@ -469,47 +469,54 @@ def _plane_sphere(plane_normal: wp.vec3, plane_pos: wp.vec3, sphere_pos: wp.vec3
   return dist, pos
 
 
-def get_sphere_sphere(contact_writer: Any):
-  @wp.func
-  def sphere_sphere(
-    # In:
-    sphere1_center: wp.vec3,
-    sphere1_radius: float,
-    sphere2_center: wp.vec3,
-    sphere2_radius: float,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates one contact between two spheres.
+@wp.func
+def sphere_sphere(
+  # In:
+  sphere1_center: wp.vec3,
+  sphere1_radius: float,
+  sphere2_center: wp.vec3,
+  sphere2_radius: float,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  """Calculates one contact between two spheres.
 
-    Args:
-      sphere1_center: Center of the first sphere.
-      sphere1_radius: Radius of the first sphere.
-      sphere2_center: Center of the second sphere.
-      sphere2_radius: Radius of the second sphere.
-      margin: Collision margin.
-      contact_writer_args: Arguments for the contact writer.
+  Args:
+    sphere1_center: Center of the first sphere.
+    sphere1_radius: Radius of the first sphere.
+    sphere2_center: Center of the second sphere.
+    sphere2_radius: Radius of the second sphere.
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    ncon_out: Output array for contact count.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
 
-    Returns:
-        int: Number of contacts generated (0 or 1).
-    """
-    contact = _sphere_sphere(
-      sphere1_center,
-      sphere1_radius,
-      sphere2_center,
-      sphere2_radius,
-    )
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
+  contact = _sphere_sphere(
+    sphere1_center,
+    sphere1_radius,
+    sphere2_center,
+    sphere2_radius,
+  )
 
-    # Check if contact is active (within margin)
-    if (contact.dist - margin) >= 0:
-      return 0
+  # Check if contact is active (within margin)
+  if (contact.dist - margin) >= 0:
+    return 0, 0
 
-    # Reserve one contact slot
-    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
-    wp.static(contact_writer)(contact_index, contact, contact_writer_args)
-    return 1
-
-  return sphere_sphere
+  # Reserve one contact slot
+  contact_index = wp.atomic_add(ncon_out, 0, 1)
+  _write_contact(contact_index, contact, nconmax, dist_out, pos_out, normal_out, tangent_out)
+  return contact_index, contact_index + 1
 
 
 @wp.func
@@ -994,51 +1001,57 @@ def _sphere_box(
   return contact, True
 
 
-def get_sphere_box(contact_writer: Any):
-  @wp.func
-  def sphere_box(
-    # In:
-    sphere_center: wp.vec3,
-    sphere_radius: float,
-    box_center: wp.vec3,
-    box_rot: wp.mat33,
-    box_half_sizes: wp.vec3,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates one contact between a sphere and a box.
+@wp.func
+def sphere_box(
+  # In:
+  sphere_center: wp.vec3,
+  sphere_radius: float,
+  box_center: wp.vec3,
+  box_rot: wp.mat33,
+  box_half_sizes: wp.vec3,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  """Calculates one contact between a sphere and a box.
 
-    Args:
-      sphere_center: Center of the sphere.
-      sphere_radius: Radius of the sphere.
-      box_center: Center of the box.
-      box_rot: Rotation matrix of the box.
-      box_half_sizes: Half-sizes of the box.
-      contact_writer_args: Arguments for the contact writer.
-      margin: Collision margin.
+  Args:
+    sphere_center: Center of the sphere.
+    sphere_radius: Radius of the sphere.
+    box_center: Center of the box.
+    box_rot: Rotation matrix of the box.
+    box_half_sizes: Half-sizes of the box.
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    ncon_out: Output array for contact count.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
 
-    Returns:
-        int: Number of contacts generated (0 or 1).
-    """
-    contact, found = _sphere_box(
-      sphere_center,
-      sphere_radius,
-      box_center,
-      box_rot,
-      box_half_sizes,
-      margin,
-    )
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
+  contact, found = _sphere_box(
+    sphere_center,
+    sphere_radius,
+    box_center,
+    box_rot,
+    box_half_sizes,
+    margin,
+  )
 
-    num_contacts = int(0)
-    if found:
-      # Reserve one contact slot
-      contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
-      wp.static(contact_writer)(contact_index, contact, contact_writer_args)
-      num_contacts = 1
+  if found:
+    # Reserve one contact slot
+    contact_index = wp.atomic_add(ncon_out, 0, 1)
+    _write_contact(contact_index, contact, nconmax, dist_out, pos_out, normal_out, tangent_out)
+    return contact_index, contact_index + 1
 
-    return num_contacts
-
-  return sphere_box
+  return 0, 0
 
 
 @wp.func
@@ -1978,135 +1991,142 @@ def box_box(
 
 
 
-def get_plane_cylinder(contact_writer: Any):
-  @wp.func
-  def plane_cylinder(
-    # In:
-    plane_normal: wp.vec3,
-    plane_pos: wp.vec3,
-    cylinder_center: wp.vec3,
-    cylinder_axis: wp.vec3,
-    cylinder_radius: float,
-    cylinder_half_height: float,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates contacts between a cylinder and a plane.
+@wp.func
+def plane_cylinder(
+  # In:
+  plane_normal: wp.vec3,
+  plane_pos: wp.vec3,
+  cylinder_center: wp.vec3,
+  cylinder_axis: wp.vec3,
+  cylinder_radius: float,
+  cylinder_half_height: float,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  """Calculates contacts between a cylinder and a plane.
 
-    Args:
-      plane_normal: Normal vector of the plane.
-      plane_pos: A point on the plane.
-      cylinder_center: Center of the cylinder.
-      cylinder_axis: Axis of the cylinder.
-      cylinder_radius: Radius of the cylinder.
-      cylinder_half_height: Half-height of the cylinder.
-      margin: Collision margin.
-      contact_writer_args: Arguments for the contact writer.
+  Args:
+    plane_normal: Normal vector of the plane.
+    plane_pos: A point on the plane.
+    cylinder_center: Center of the cylinder.
+    cylinder_axis: Axis of the cylinder.
+    cylinder_radius: Radius of the cylinder.
+    cylinder_half_height: Half-height of the cylinder.
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    ncon_out: Output array for contact count.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
 
-    Returns:
-        int: Number of contacts generated (0-4).
-    """
-    # Extract plane normal and cylinder axis
-    n = plane_normal
-    axis = cylinder_axis
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
+  # Extract plane normal and cylinder axis
+  n = plane_normal
+  axis = cylinder_axis
 
-    # Project, make sure axis points toward plane
-    prjaxis = wp.dot(n, axis)
-    if prjaxis > 0:
-      axis = -axis
-      prjaxis = -prjaxis
+  # Project, make sure axis points toward plane
+  prjaxis = wp.dot(n, axis)
+  if prjaxis > 0:
+    axis = -axis
+    prjaxis = -prjaxis
 
-    # Compute normal distance from plane to cylinder center
-    dist0 = wp.dot(cylinder_center - plane_pos, n)
+  # Compute normal distance from plane to cylinder center
+  dist0 = wp.dot(cylinder_center - plane_pos, n)
 
-    # Remove component of -normal along cylinder axis
-    vec = axis * prjaxis - n
-    len_sqr = wp.dot(vec, vec)
+  # Remove component of -normal along cylinder axis
+  vec = axis * prjaxis - n
+  len_sqr = wp.dot(vec, vec)
 
-    # If vector is nondegenerate, normalize and scale by radius
-    # Otherwise use cylinder's x-axis scaled by radius
-    vec = wp.where(
-      len_sqr >= 1e-12,
-      vec * (cylinder_radius / wp.sqrt(len_sqr)),
-      wp.vec3(1.0, 0.0, 0.0) * cylinder_radius,  # Default x-axis when cylinder axis is parallel to plane normal
-    )
+  # If vector is nondegenerate, normalize and scale by radius
+  # Otherwise use cylinder's x-axis scaled by radius
+  vec = wp.where(
+    len_sqr >= 1e-12,
+    vec * (cylinder_radius / wp.sqrt(len_sqr)),
+    wp.vec3(1.0, 0.0, 0.0) * cylinder_radius,  # Default x-axis when cylinder axis is parallel to plane normal
+  )
 
-    # Project scaled vector on normal
-    prjvec = wp.dot(vec, n)
+  # Project scaled vector on normal
+  prjvec = wp.dot(vec, n)
 
-    # Scale cylinder axis by half-length
-    axis = axis * cylinder_half_height
-    prjaxis = prjaxis * cylinder_half_height
+  # Scale cylinder axis by half-length
+  axis = axis * cylinder_half_height
+  prjaxis = prjaxis * cylinder_half_height
 
-    # Align contact frames with plane normal
-    b, c = orthogonals(n)
+  # Align contact frames with plane normal
+  b, c = orthogonals(n)
 
-    # Calculate all contact points and their distances
-    # First contact point (end cap closer to plane)
-    dist1 = dist0 + prjaxis + prjvec
-    pos1 = cylinder_center + vec + axis - n * (dist1 * 0.5)
+  # Calculate all contact points and their distances
+  # First contact point (end cap closer to plane)
+  dist1 = dist0 + prjaxis + prjvec
+  pos1 = cylinder_center + vec + axis - n * (dist1 * 0.5)
 
-    # Second contact point (end cap farther from plane)
-    dist2 = dist0 - prjaxis + prjvec
-    pos2 = cylinder_center + vec - axis - n * (dist2 * 0.5)
+  # Second contact point (end cap farther from plane)
+  dist2 = dist0 - prjaxis + prjvec
+  pos2 = cylinder_center + vec - axis - n * (dist2 * 0.5)
 
-    # Try triangle contact points on side closer to plane
-    prjvec1 = -prjvec * 0.5
-    dist3 = dist0 + prjaxis + prjvec1
+  # Try triangle contact points on side closer to plane
+  prjvec1 = -prjvec * 0.5
+  dist3 = dist0 + prjaxis + prjvec1
 
-    # Compute sideways vector scaled by radius*sqrt(3)/2
-    vec1 = wp.cross(vec, axis)
-    vec1 = wp.normalize(vec1) * (cylinder_radius * wp.sqrt(3.0) * 0.5)
+  # Compute sideways vector scaled by radius*sqrt(3)/2
+  vec1 = wp.cross(vec, axis)
+  vec1 = wp.normalize(vec1) * (cylinder_radius * wp.sqrt(3.0) * 0.5)
 
-    # Add contact point A - adjust to closest side
-    pos3 = cylinder_center + vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
+  # Add contact point A - adjust to closest side
+  pos3 = cylinder_center + vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
 
-    # Add contact point B - adjust to closest side
-    pos4 = cylinder_center - vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
+  # Add contact point B - adjust to closest side
+  pos4 = cylinder_center - vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
 
-    # Check which contacts are active
-    active1 = (dist1 - margin) < 0
-    active2 = (dist2 - margin) < 0
-    active3 = (dist3 - margin) < 0
-    active4 = (dist3 - margin) < 0  # dist4 is same as dist3
+  # Check which contacts are active
+  active1 = (dist1 - margin) < 0
+  active2 = (dist2 - margin) < 0
+  active3 = (dist3 - margin) < 0
+  active4 = (dist3 - margin) < 0  # dist4 is same as dist3
 
-    num_contacts = int(0)
-    if active1:
-      num_contacts += 1
-    if active2:
-      num_contacts += 1
-    if active3:
-      num_contacts += 1
-    if active4:
-      num_contacts += 1
+  num_contacts = int(0)
+  if active1:
+    num_contacts += 1
+  if active2:
+    num_contacts += 1
+  if active3:
+    num_contacts += 1
+  if active4:
+    num_contacts += 1
 
-    if num_contacts == 0:
-      return 0
+  if num_contacts == 0:
+    return 0, 0
 
-    # Reserve contact slots and write all active contacts
-    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
-    contact_count = 0
+  # Reserve contact slots and write all active contacts
+  contact_index = wp.atomic_add(ncon_out, 0, num_contacts)
+  contact_count = 0
 
-    if active1:
-      contact1 = pack_contact(pos1, n, b, dist1)
-      wp.static(contact_writer)(contact_index + contact_count, contact1, contact_writer_args)
-      contact_count += 1
+  if active1:
+    contact1 = pack_contact(pos1, n, b, dist1)
+    _write_contact(contact_index + contact_count, contact1, nconmax, dist_out, pos_out, normal_out, tangent_out)
+    contact_count += 1
 
-    if active2:
-      contact2 = pack_contact(pos2, n, b, dist2)
-      wp.static(contact_writer)(contact_index + contact_count, contact2, contact_writer_args)
-      contact_count += 1
+  if active2:
+    contact2 = pack_contact(pos2, n, b, dist2)
+    _write_contact(contact_index + contact_count, contact2, nconmax, dist_out, pos_out, normal_out, tangent_out)
+    contact_count += 1
 
-    if active3:
-      contact3 = pack_contact(pos3, n, b, dist3)
-      wp.static(contact_writer)(contact_index + contact_count, contact3, contact_writer_args)
-      contact_count += 1
+  if active3:
+    contact3 = pack_contact(pos3, n, b, dist3)
+    _write_contact(contact_index + contact_count, contact3, nconmax, dist_out, pos_out, normal_out, tangent_out)
+    contact_count += 1
 
-    if active4:
-      contact4 = pack_contact(pos4, n, b, dist3)
-      wp.static(contact_writer)(contact_index + contact_count, contact4, contact_writer_args)
-      contact_count += 1
+  if active4:
+    contact4 = pack_contact(pos4, n, b, dist3)
+    _write_contact(contact_index + contact_count, contact4, nconmax, dist_out, pos_out, normal_out, tangent_out)
+    contact_count += 1
 
-    return num_contacts
-
-  return plane_cylinder
+  return contact_index, contact_index + num_contacts

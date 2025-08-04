@@ -406,14 +406,43 @@ def sphere_sphere_wrapper(
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between two spheres."""
-  return wp.static(get_sphere_sphere(contact_writer))(
+  start, end = sphere_sphere(
     sphere1.pos,
     sphere1.size[0],
     sphere2.pos,
     sphere2.size[0],
     margin,
-    write_contact_args,
+    write_contact_args.nconmax_in,
+    write_contact_args.ncon_out,
+    write_contact_args.contact_dist_out,
+    write_contact_args.contact_pos_out,
+    write_contact_args.contact_normal_out,
+    write_contact_args.contact_tangent_out,
   )
+  for i in range(start, end):
+    _write_contact2(
+      i,
+      write_contact_args.nconmax_in,
+      write_contact_args.margin_in,
+      write_contact_args.gap_in,
+      write_contact_args.condim_in,
+      write_contact_args.friction_in,
+      write_contact_args.solref_in,
+      write_contact_args.solreffriction_in,
+      write_contact_args.solimp_in,
+      write_contact_args.geoms_in,
+      write_contact_args.worldid_in,
+      write_contact_args.contact_includemargin_out,
+      write_contact_args.contact_friction_out,
+      write_contact_args.contact_solref_out,
+      write_contact_args.contact_solreffriction_out,
+      write_contact_args.contact_solimp_out,
+      write_contact_args.contact_dim_out,
+      write_contact_args.contact_geom_out,
+      write_contact_args.contact_worldid_out,
+    )
+
+  return 0
 
 
 @wp.func
@@ -793,7 +822,7 @@ def plane_cylinder_wrapper(
   """Calculates contacts between a cylinder and a plane."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
-  return wp.static(get_plane_cylinder(contact_writer))(
+  start, end = plane_cylinder(
     plane_normal,
     plane.pos,
     cylinder.pos,
@@ -801,8 +830,37 @@ def plane_cylinder_wrapper(
     cylinder.size[0],
     cylinder.size[1],
     margin,
-    write_contact_args,
+    write_contact_args.nconmax_in,
+    write_contact_args.ncon_out,
+    write_contact_args.contact_dist_out,
+    write_contact_args.contact_pos_out,
+    write_contact_args.contact_normal_out,
+    write_contact_args.contact_tangent_out,
   )
+  for i in range(start, end):
+    _write_contact2(
+      i,
+      write_contact_args.nconmax_in,
+      write_contact_args.margin_in,
+      write_contact_args.gap_in,
+      write_contact_args.condim_in,
+      write_contact_args.friction_in,
+      write_contact_args.solref_in,
+      write_contact_args.solreffriction_in,
+      write_contact_args.solimp_in,
+      write_contact_args.geoms_in,
+      write_contact_args.worldid_in,
+      write_contact_args.contact_includemargin_out,
+      write_contact_args.contact_friction_out,
+      write_contact_args.contact_solref_out,
+      write_contact_args.contact_solreffriction_out,
+      write_contact_args.contact_solimp_out,
+      write_contact_args.contact_dim_out,
+      write_contact_args.contact_geom_out,
+      write_contact_args.contact_worldid_out,
+    )
+
+  return 0
 
 
 @wp.func
@@ -894,15 +952,44 @@ def sphere_box_wrapper(
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates one contact between a sphere and a box."""
-  return wp.static(get_sphere_box(contact_writer))(
+  start, end = sphere_box(
     sphere.pos,
     sphere.size[0],
     box.pos,
     box.rot,
     box.size,
     margin,
-    write_contact_args,
+    write_contact_args.nconmax_in,
+    write_contact_args.ncon_out,
+    write_contact_args.contact_dist_out,
+    write_contact_args.contact_pos_out,
+    write_contact_args.contact_normal_out,
+    write_contact_args.contact_tangent_out,
   )
+  for i in range(start, end):
+    _write_contact2(
+      i,
+      write_contact_args.nconmax_in,
+      write_contact_args.margin_in,
+      write_contact_args.gap_in,
+      write_contact_args.condim_in,
+      write_contact_args.friction_in,
+      write_contact_args.solref_in,
+      write_contact_args.solreffriction_in,
+      write_contact_args.solimp_in,
+      write_contact_args.geoms_in,
+      write_contact_args.worldid_in,
+      write_contact_args.contact_includemargin_out,
+      write_contact_args.contact_friction_out,
+      write_contact_args.contact_solref_out,
+      write_contact_args.contact_solreffriction_out,
+      write_contact_args.contact_solimp_out,
+      write_contact_args.contact_dim_out,
+      write_contact_args.contact_geom_out,
+      write_contact_args.contact_worldid_out,
+    )
+
+  return 0
 
 
 @wp.func
