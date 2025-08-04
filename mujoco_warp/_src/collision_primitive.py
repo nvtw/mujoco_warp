@@ -143,10 +143,10 @@ def _geom(
 
 @wp.func
 def _write_contact_ext(
-  contact_index: int,
   # Data in:
   nconmax_in: int,
   # In:
+  contact_index: int,
   margin_in: float,
   gap_in: float,
   condim_in: int,
@@ -969,8 +969,8 @@ def _primitive_narrowphase_builder(m: Model):
     if start >= 0:
       for i in range(start, end):
         _write_contact_ext(
-          i,
           nconmax_in,
+          i,
           margin,
           gap,
           condim,
