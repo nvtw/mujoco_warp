@@ -1041,374 +1041,383 @@ def get_sphere_box(contact_writer: Any):
   return sphere_box
 
 
-def get_capsule_box(contact_writer: Any):
-  @wp.func
-  def capsule_box(
-    # In:
-    cap_center: wp.vec3,
-    cap_axis: wp.vec3,
-    cap_radius: float,
-    cap_half_length: float,
-    box_center: wp.vec3,
-    box_rot: wp.mat33,
-    box_half_sizes: wp.vec3,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates contacts between a capsule and a box.
+@wp.func
+def capsule_box(
+  # In:
+  cap_center: wp.vec3,
+  cap_axis: wp.vec3,
+  cap_radius: float,
+  cap_half_length: float,
+  box_center: wp.vec3,
+  box_rot: wp.mat33,
+  box_half_sizes: wp.vec3,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  """Calculates contacts between a capsule and a box.
 
-    Args:
-      cap_center: Center of the capsule.
-      cap_axis: Axis of the capsule.
-      cap_radius: Radius of the capsule.
-      cap_half_length: Half-length of the capsule's cylindrical body.
-      cap_rot: Rotation matrix of the capsule.
-      box_center: Center of the box.
-      box_rot: Rotation matrix of the box.
-      box_half_sizes: Half-sizes of the box.
-      contact_writer_args: Arguments for the contact writer.
-      margin: Collision margin.
+  Args:
+    cap_center: Center of the capsule.
+    cap_axis: Axis of the capsule.
+    cap_radius: Radius of the capsule.
+    cap_half_length: Half-length of the capsule's cylindrical body.
+    box_center: Center of the box.
+    box_rot: Rotation matrix of the box.
+    box_half_sizes: Half-sizes of the box.
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    ncon_out: Output array for contact count.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
 
-    Returns:
-        int: Number of contacts generated.
-    """
-    # Based on the mjc implementation
-    boxmatT = wp.transpose(box_rot)
-    pos = boxmatT @ (cap_center - box_center)
-    axis = boxmatT @ cap_axis
-    halfaxis = axis * cap_half_length  # halfaxis is the capsule direction
-    axisdir = wp.int32(halfaxis[0] > 0.0) + 2 * wp.int32(halfaxis[1] > 0.0) + 4 * wp.int32(halfaxis[2] > 0.0)
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
+  # Based on the mjc implementation
+  boxmatT = wp.transpose(box_rot)
+  pos = boxmatT @ (cap_center - box_center)
+  axis = boxmatT @ cap_axis
+  halfaxis = axis * cap_half_length  # halfaxis is the capsule direction
+  axisdir = wp.int32(halfaxis[0] > 0.0) + 2 * wp.int32(halfaxis[1] > 0.0) + 4 * wp.int32(halfaxis[2] > 0.0)
 
-    bestdistmax = margin + 2.0 * (cap_radius + cap_half_length + box_half_sizes[0] + box_half_sizes[1] + box_half_sizes[2])
+  bestdistmax = margin + 2.0 * (cap_radius + cap_half_length + box_half_sizes[0] + box_half_sizes[1] + box_half_sizes[2])
 
-    # keep track of closest point
-    bestdist = wp.float32(bestdistmax)
-    bestsegmentpos = wp.float32(-12)
+  # keep track of closest point
+  bestdist = wp.float32(bestdistmax)
+  bestsegmentpos = wp.float32(-12)
 
-    # cltype: encoded collision configuration
-    # cltype / 3 == 0 : lower corner is closest to the capsule
-    #            == 2 : upper corner is closest to the capsule
-    #            == 1 : middle of the edge is closest to the capsule
-    # cltype % 3 == 0 : lower corner is closest to the box
-    #            == 2 : upper corner is closest to the box
-    #            == 1 : middle of the capsule is closest to the box
-    cltype = wp.int32(-4)
+  # cltype: encoded collision configuration
+  # cltype / 3 == 0 : lower corner is closest to the capsule
+  #            == 2 : upper corner is closest to the capsule
+  #            == 1 : middle of the edge is closest to the capsule
+  # cltype % 3 == 0 : lower corner is closest to the box
+  #            == 2 : upper corner is closest to the box
+  #            == 1 : middle of the capsule is closest to the box
+  cltype = wp.int32(-4)
 
-    # clface: index of the closest face of the box to the capsule
-    # -1: no face is closest (edge or corner is closest)
-    # 0, 1, 2: index of the axis perpendicular to the closest face
-    clface = wp.int32(-12)
+  # clface: index of the closest face of the box to the capsule
+  # -1: no face is closest (edge or corner is closest)
+  # 0, 1, 2: index of the axis perpendicular to the closest face
+  clface = wp.int32(-12)
 
-    # first: consider cases where a face of the box is closest
-    for i in range(-1, 2, 2):
-      axisTip = pos + wp.float32(i) * halfaxis
-      boxPoint = wp.vec3(axisTip)
+  # first: consider cases where a face of the box is closest
+  for i in range(-1, 2, 2):
+    axisTip = pos + wp.float32(i) * halfaxis
+    boxPoint = wp.vec3(axisTip)
 
-      n_out = wp.int32(0)
-      ax_out = wp.int32(-1)
+    n_out = wp.int32(0)
+    ax_out = wp.int32(-1)
 
-      for j in range(3):
-        if boxPoint[j] < -box_half_sizes[j]:
-          n_out += 1
-          ax_out = j
-          boxPoint[j] = -box_half_sizes[j]
-        elif boxPoint[j] > box_half_sizes[j]:
-          n_out += 1
-          ax_out = j
-          boxPoint[j] = box_half_sizes[j]
+    for j in range(3):
+      if boxPoint[j] < -box_half_sizes[j]:
+        n_out += 1
+        ax_out = j
+        boxPoint[j] = -box_half_sizes[j]
+      elif boxPoint[j] > box_half_sizes[j]:
+        n_out += 1
+        ax_out = j
+        boxPoint[j] = box_half_sizes[j]
 
-      if n_out > 1:
+    if n_out > 1:
+      continue
+
+    dist = wp.length_sq(boxPoint - axisTip)
+
+    if dist < bestdist:
+      bestdist = dist
+      bestsegmentpos = wp.float32(i)
+      cltype = -2 + i
+      clface = ax_out
+
+  # second: consider cases where an edge of the box is closest
+  clcorner = wp.int32(-123)  # which corner is the closest
+  cledge = wp.int32(-123)  # which axis
+  bestboxpos = wp.float32(0.0)
+
+  for i in range(8):
+    for j in range(3):
+      if i & (1 << j) != 0:
         continue
 
-      dist = wp.length_sq(boxPoint - axisTip)
+      c2 = wp.int32(-123)
 
-      if dist < bestdist:
-        bestdist = dist
-        bestsegmentpos = wp.float32(i)
-        cltype = -2 + i
-        clface = ax_out
+      # box_pt is the starting point (corner) on the box
+      box_pt = wp.cw_mul(
+        wp.vec3(
+          wp.where(i & 1, 1.0, -1.0),
+          wp.where(i & 2, 1.0, -1.0),
+          wp.where(i & 4, 1.0, -1.0),
+        ),
+        box_half_sizes,
+      )
+      box_pt[j] = 0.0
 
-    # second: consider cases where an edge of the box is closest
-    clcorner = wp.int32(-123)  # which corner is the closest
-    cledge = wp.int32(-123)  # which axis
-    bestboxpos = wp.float32(0.0)
+      # find closest point between capsule and the edge
+      dif = box_pt - pos
 
-    for i in range(8):
-      for j in range(3):
-        if i & (1 << j) != 0:
-          continue
+      u = -box_half_sizes[j] * dif[j]
+      v = wp.dot(halfaxis, dif)
+      ma = box_half_sizes[j] * box_half_sizes[j]
+      mb = -box_half_sizes[j] * halfaxis[j]
+      mc = cap_half_length * cap_half_length
+      det = ma * mc - mb * mb
+      if wp.abs(det) < MJ_MINVAL:
+        continue
 
-        c2 = wp.int32(-123)
+      idet = 1.0 / det
+      # sX : X=1 means middle of segment. X=0 or 2 one or the other end
 
-        # box_pt is the starting point (corner) on the box
-        box_pt = wp.cw_mul(
-          wp.vec3(
-            wp.where(i & 1, 1.0, -1.0),
-            wp.where(i & 2, 1.0, -1.0),
-            wp.where(i & 4, 1.0, -1.0),
-          ),
-          box_half_sizes,
-        )
-        box_pt[j] = 0.0
+      x1 = wp.float32((mc * u - mb * v) * idet)
+      x2 = wp.float32((ma * v - mb * u) * idet)
 
-        # find closest point between capsule and the edge
-        dif = box_pt - pos
+      s1 = wp.int32(1)
+      s2 = wp.int32(1)
 
-        u = -box_half_sizes[j] * dif[j]
-        v = wp.dot(halfaxis, dif)
-        ma = box_half_sizes[j] * box_half_sizes[j]
-        mb = -box_half_sizes[j] * halfaxis[j]
-        mc = cap_half_length * cap_half_length
-        det = ma * mc - mb * mb
-        if wp.abs(det) < MJ_MINVAL:
-          continue
+      if x1 > 1:
+        x1 = 1.0
+        s1 = 2
+        x2 = (v - mb) / mc
+      elif x1 < -1:
+        x1 = -1.0
+        s1 = 0
+        x2 = (v + mb) / mc
 
-        idet = 1.0 / det
-        # sX : X=1 means middle of segment. X=0 or 2 one or the other end
-
-        x1 = wp.float32((mc * u - mb * v) * idet)
-        x2 = wp.float32((ma * v - mb * u) * idet)
-
-        s1 = wp.int32(1)
-        s2 = wp.int32(1)
+      x2_over = x2 > 1.0
+      if x2_over or x2 < -1.0:
+        if x2_over:
+          x2 = 1.0
+          s2 = 2
+          x1 = (u - mb) / ma
+        else:
+          x2 = -1.0
+          s2 = 0
+          x1 = (u + mb) / ma
 
         if x1 > 1:
           x1 = 1.0
           s1 = 2
-          x2 = (v - mb) / mc
         elif x1 < -1:
           x1 = -1.0
           s1 = 0
-          x2 = (v + mb) / mc
 
-        x2_over = x2 > 1.0
-        if x2_over or x2 < -1.0:
-          if x2_over:
-            x2 = 1.0
-            s2 = 2
-            x1 = (u - mb) / ma
-          else:
-            x2 = -1.0
-            s2 = 0
-            x1 = (u + mb) / ma
+      dif -= halfaxis * x2
+      dif[j] += box_half_sizes[j] * x1
 
-          if x1 > 1:
-            x1 = 1.0
-            s1 = 2
-          elif x1 < -1:
-            x1 = -1.0
-            s1 = 0
+      # encode relative positions of the closest points
+      ct = s1 * 3 + s2
 
-        dif -= halfaxis * x2
-        dif[j] += box_half_sizes[j] * x1
+      dif_sq = wp.length_sq(dif)
+      if dif_sq < bestdist - MJ_MINVAL:
+        bestdist = dif_sq
+        bestsegmentpos = x2
+        bestboxpos = x1
+        # ct<6 means closest point on box is at lower end or middle of edge
+        c2 = ct / 6
 
-        # encode relative positions of the closest points
-        ct = s1 * 3 + s2
+        clcorner = i + (1 << j) * c2  # index of closest box corner
+        cledge = j  # axis index of closest box edge
+        cltype = ct  # encoded collision configuration
 
-        dif_sq = wp.length_sq(dif)
-        if dif_sq < bestdist - MJ_MINVAL:
-          bestdist = dif_sq
-          bestsegmentpos = x2
-          bestboxpos = x1
-          # ct<6 means closest point on box is at lower end or middle of edge
-          c2 = ct / 6
+  best = wp.float32(0.0)
 
-          clcorner = i + (1 << j) * c2  # index of closest box corner
-          cledge = j  # axis index of closest box edge
-          cltype = ct  # encoded collision configuration
+  p = wp.vec2(pos.x, pos.y)
+  dd = wp.vec2(halfaxis.x, halfaxis.y)
+  s = wp.vec2(box_half_sizes.x, box_half_sizes.y)
+  secondpos = wp.float32(-4.0)
 
-    best = wp.float32(0.0)
+  uu = dd.x * s.y
+  vv = dd.y * s.x
+  w_neg = dd.x * p.y - dd.y * p.x < 0
 
-    p = wp.vec2(pos.x, pos.y)
-    dd = wp.vec2(halfaxis.x, halfaxis.y)
-    s = wp.vec2(box_half_sizes.x, box_half_sizes.y)
-    secondpos = wp.float32(-4.0)
+  best = wp.float32(-1.0)
 
-    uu = dd.x * s.y
-    vv = dd.y * s.x
-    w_neg = dd.x * p.y - dd.y * p.x < 0
+  ee1 = uu - vv
+  ee2 = uu + vv
 
-    best = wp.float32(-1.0)
+  if wp.abs(ee1) > best:
+    best = wp.abs(ee1)
+    c1 = wp.where((ee1 < 0) == w_neg, 0, 3)
 
-    ee1 = uu - vv
-    ee2 = uu + vv
+  if wp.abs(ee2) > best:
+    best = wp.abs(ee2)
+    c1 = wp.where((ee2 > 0) == w_neg, 1, 2)
 
-    if wp.abs(ee1) > best:
-      best = wp.abs(ee1)
-      c1 = wp.where((ee1 < 0) == w_neg, 0, 3)
+  if cltype == -4:  # invalid type
+    return 0, 0
 
-    if wp.abs(ee2) > best:
-      best = wp.abs(ee2)
-      c1 = wp.where((ee2 > 0) == w_neg, 1, 2)
+  if cltype >= 0 and cltype / 3 != 1:  # closest to a corner of the box
+    c1 = axisdir ^ clcorner
+    # Calculate relative orientation between capsule and corner
+    # There are two possible configurations:
+    # 1. Capsule axis points toward/away from corner
+    # 2. Capsule axis aligns with a face or edge
+    if c1 != 0 and c1 != 7:  # create second contact point
+      if c1 == 1 or c1 == 2 or c1 == 4:
+        mul = 1
+      else:
+        mul = -1
+        c1 = 7 - c1
 
-    if cltype == -4:  # invalid type
-      return 0
+      # "de" and "dp" distance from first closest point on the capsule to both ends of it
+      # mul is a direction along the capsule's axis
 
-    if cltype >= 0 and cltype / 3 != 1:  # closest to a corner of the box
-      c1 = axisdir ^ clcorner
-      # Calculate relative orientation between capsule and corner
-      # There are two possible configurations:
-      # 1. Capsule axis points toward/away from corner
-      # 2. Capsule axis aligns with a face or edge
-      if c1 != 0 and c1 != 7:  # create second contact point
-        if c1 == 1 or c1 == 2 or c1 == 4:
-          mul = 1
-        else:
-          mul = -1
-          c1 = 7 - c1
+      if c1 == 1:
+        ax = 0
+        ax1 = 1
+        ax2 = 2
+      elif c1 == 2:
+        ax = 1
+        ax1 = 2
+        ax2 = 0
+      elif c1 == 4:
+        ax = 2
+        ax1 = 0
+        ax2 = 1
 
-        # "de" and "dp" distance from first closest point on the capsule to both ends of it
-        # mul is a direction along the capsule's axis
+      if axis[ax] * axis[ax] > 0.5:  # second point along the edge of the box
+        m = 2.0 * box_half_sizes[ax] / wp.abs(halfaxis[ax])
+        secondpos = min(1.0 - wp.float32(mul) * bestsegmentpos, m)
+      else:  # second point along a face of the box
+        # check for overshoot again
+        m = 2.0 * min(
+          box_half_sizes[ax1] / wp.abs(halfaxis[ax1]),
+          box_half_sizes[ax2] / wp.abs(halfaxis[ax2]),
+        )
+        secondpos = -min(1.0 + wp.float32(mul) * bestsegmentpos, m)
+      secondpos *= wp.float32(mul)
 
-        if c1 == 1:
-          ax = 0
-          ax1 = 1
-          ax2 = 2
-        elif c1 == 2:
-          ax = 1
-          ax1 = 2
-          ax2 = 0
-        elif c1 == 4:
-          ax = 2
-          ax1 = 0
-          ax2 = 1
+  elif cltype >= 0 and cltype / 3 == 1:  # we are on box's edge
+    # Calculate relative orientation between capsule and edge
+    # Two possible configurations:
+    # - T configuration: c1 = 2^n (no additional contacts)
+    # - X configuration: c1 != 2^n (potential additional contacts)
+    c1 = axisdir ^ clcorner
+    c1 &= 7 - (1 << cledge)  # mask out edge axis to determine configuration
 
-        if axis[ax] * axis[ax] > 0.5:  # second point along the edge of the box
-          m = 2.0 * box_half_sizes[ax] / wp.abs(halfaxis[ax])
-          secondpos = min(1.0 - wp.float32(mul) * bestsegmentpos, m)
-        else:  # second point along a face of the box
-          # check for overshoot again
-          m = 2.0 * min(
-            box_half_sizes[ax1] / wp.abs(halfaxis[ax1]),
-            box_half_sizes[ax2] / wp.abs(halfaxis[ax2]),
-          )
-          secondpos = -min(1.0 + wp.float32(mul) * bestsegmentpos, m)
-        secondpos *= wp.float32(mul)
+    if c1 == 1 or c1 == 2 or c1 == 4:  # create second contact point
+      if cledge == 0:
+        ax1 = 1
+        ax2 = 2
+      if cledge == 1:
+        ax1 = 2
+        ax2 = 0
+      if cledge == 2:
+        ax1 = 0
+        ax2 = 1
+      ax = cledge
 
-    elif cltype >= 0 and cltype / 3 == 1:  # we are on box's edge
-      # Calculate relative orientation between capsule and edge
-      # Two possible configurations:
-      # - T configuration: c1 = 2^n (no additional contacts)
-      # - X configuration: c1 != 2^n (potential additional contacts)
-      c1 = axisdir ^ clcorner
-      c1 &= 7 - (1 << cledge)  # mask out edge axis to determine configuration
+      # find which face the capsule has a lower angle, and switch the axis
+      if wp.abs(axis[ax1]) > wp.abs(axis[ax2]):
+        ax1 = ax2
+      ax2 = 3 - ax - ax1
 
-      if c1 == 1 or c1 == 2 or c1 == 4:  # create second contact point
-        if cledge == 0:
-          ax1 = 1
-          ax2 = 2
-        if cledge == 1:
-          ax1 = 2
-          ax2 = 0
-        if cledge == 2:
-          ax1 = 0
-          ax2 = 1
-        ax = cledge
+      # mul determines direction along capsule axis for second contact point
+      if c1 & (1 << ax2):
+        mul = 1
+        secondpos = 1.0 - bestsegmentpos
+      else:
+        mul = -1
+        secondpos = 1.0 + bestsegmentpos
 
-        # find which face the capsule has a lower angle, and switch the axis
-        if wp.abs(axis[ax1]) > wp.abs(axis[ax2]):
-          ax1 = ax2
-        ax2 = 3 - ax - ax1
+      # now find out whether we point towards the opposite side or towards one of the
+      # sides and also find the farthest point along the capsule that is above the box
 
-        # mul determines direction along capsule axis for second contact point
-        if c1 & (1 << ax2):
-          mul = 1
-          secondpos = 1.0 - bestsegmentpos
-        else:
-          mul = -1
-          secondpos = 1.0 + bestsegmentpos
+      e1 = 2.0 * box_half_sizes[ax2] / wp.abs(halfaxis[ax2])
+      secondpos = min(e1, secondpos)
 
-        # now find out whether we point towards the opposite side or towards one of the
-        # sides and also find the farthest point along the capsule that is above the box
+      if ((axisdir & (1 << ax)) != 0) == ((c1 & (1 << ax2)) != 0):
+        e2 = 1.0 - bestboxpos
+      else:
+        e2 = 1.0 + bestboxpos
 
-        e1 = 2.0 * box_half_sizes[ax2] / wp.abs(halfaxis[ax2])
-        secondpos = min(e1, secondpos)
+      e1 = box_half_sizes[ax] * e2 / wp.abs(halfaxis[ax])
 
-        if ((axisdir & (1 << ax)) != 0) == ((c1 & (1 << ax2)) != 0):
-          e2 = 1.0 - bestboxpos
-        else:
-          e2 = 1.0 + bestboxpos
+      secondpos = min(e1, secondpos)
+      secondpos *= wp.float32(mul)
 
-        e1 = box_half_sizes[ax] * e2 / wp.abs(halfaxis[ax])
+  elif cltype < 0:
+    # similarly we handle the case when one capsule's end is closest to a face of the box
+    # and find where is the other end pointing to and clamping to the farthest point
+    # of the capsule that's above the box
+    # if the closest point is inside the box there's no need for a second point
 
-        secondpos = min(e1, secondpos)
-        secondpos *= wp.float32(mul)
+    if clface != -1:  # create second contact point
+      mul = wp.where(cltype == -3, 1, -1)
+      secondpos = 2.0
 
-    elif cltype < 0:
-      # similarly we handle the case when one capsule's end is closest to a face of the box
-      # and find where is the other end pointing to and clamping to the farthest point
-      # of the capsule that's above the box
-      # if the closest point is inside the box there's no need for a second point
+      tmp1 = pos - halfaxis * wp.float32(mul)
 
-      if clface != -1:  # create second contact point
-        mul = wp.where(cltype == -3, 1, -1)
-        secondpos = 2.0
+      for i in range(3):
+        if i != clface:
+          ha_r = wp.float32(mul) / halfaxis[i]
+          e1 = (box_half_sizes[i] - tmp1[i]) * ha_r
+          if 0 < e1 and e1 < secondpos:
+            secondpos = e1
 
-        tmp1 = pos - halfaxis * wp.float32(mul)
+          e1 = (-box_half_sizes[i] - tmp1[i]) * ha_r
+          if 0 < e1 and e1 < secondpos:
+            secondpos = e1
 
-        for i in range(3):
-          if i != clface:
-            ha_r = wp.float32(mul) / halfaxis[i]
-            e1 = (box_half_sizes[i] - tmp1[i]) * ha_r
-            if 0 < e1 and e1 < secondpos:
-              secondpos = e1
+      secondpos *= wp.float32(mul)
 
-            e1 = (-box_half_sizes[i] - tmp1[i]) * ha_r
-            if 0 < e1 and e1 < secondpos:
-              secondpos = e1
+  num_contacts = int(0)
+  # create sphere in original orientation at first contact point
+  s1_pos_l = pos + halfaxis * bestsegmentpos
+  s1_pos_g = box_rot @ s1_pos_l + box_center
 
-        secondpos *= wp.float32(mul)
+  # Check first collision
+  contact1, found1 = _sphere_box(
+    s1_pos_g,
+    cap_radius,
+    box_center,
+    box_rot,
+    box_half_sizes,
+    margin,
+  )
+  if found1:
+    num_contacts += 1
 
-    num_contacts = int(0)
-    # create sphere in original orientation at first contact point
-    s1_pos_l = pos + halfaxis * bestsegmentpos
-    s1_pos_g = box_rot @ s1_pos_l + box_center
-
-    # Check first collision
-    contact1, found1 = _sphere_box(
-      s1_pos_g,
+  # Check second collision if applicable
+  contact2 = ContactPoint()
+  found2 = False
+  if secondpos > -3:  # secondpos was modified
+    s2_pos_l = pos + halfaxis * (secondpos + bestsegmentpos)
+    s2_pos_g = box_rot @ s2_pos_l + box_center
+    contact2, found2 = _sphere_box(
+      s2_pos_g,
       cap_radius,
       box_center,
       box_rot,
       box_half_sizes,
       margin,
     )
-    if found1:
+    if found2:
       num_contacts += 1
 
-    # Check second collision if applicable
-    contact2 = ContactPoint()
-    found2 = False
-    if secondpos > -3:  # secondpos was modified
-      s2_pos_l = pos + halfaxis * (secondpos + bestsegmentpos)
-      s2_pos_g = box_rot @ s2_pos_l + box_center
-      contact2, found2 = _sphere_box(
-        s2_pos_g,
-        cap_radius,
-        box_center,
-        box_rot,
-        box_half_sizes,
-        margin,
-      )
-      if found2:
-        num_contacts += 1
+  # Reserve contact slots based on how many we actually found
+  if num_contacts > 0:
+    contact_index = wp.atomic_add(ncon_out, 0, num_contacts)
+    contact_count = 0
 
-    # Reserve contact slots based on how many we actually found
-    if num_contacts > 0:
-      contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
-      contact_count = 0
+    if found1:
+      _write_contact(contact_index + contact_count, contact1, nconmax, dist_out, pos_out, normal_out, tangent_out)
+      contact_count += 1
 
-      if found1:
-        wp.static(contact_writer)(contact_index + contact_count, contact1, contact_writer_args)
-        contact_count += 1
+    if found2:
+      _write_contact(contact_index + contact_count, contact2, nconmax, dist_out, pos_out, normal_out, tangent_out)
+      contact_count += 1
 
-      if found2:
-        wp.static(contact_writer)(contact_index + contact_count, contact2, contact_writer_args)
-        contact_count += 1
+    return contact_index, contact_index + num_contacts
 
-    return num_contacts
+  return 0, 0
 
-  return capsule_box
 
 
 def get_plane_box(contact_writer: Any):
