@@ -13,15 +13,12 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import Any, Tuple
-
 import warp as wp
 
 from .math import closest_segment_point
 from .math import closest_segment_to_segment_points
 from .math import normalize_with_norm
 from .math import orthogonals
-from .math import get_tangent
 from .types import MJ_MINVAL
 
 wp.set_module_options({"enable_backward": False})
@@ -405,12 +402,13 @@ def plane_convex(
     for i in range(num_contacts):
       pos = wp.vec3(contact_data[i, 0], contact_data[i, 1], contact_data[i, 2])
       dist = contact_data_dist[i]
-      _write_contact(contact_index + i, pack_contact(pos, plane_normal, tangent, dist), nconmax, dist_out, pos_out, normal_out, tangent_out)
+      _write_contact(
+        contact_index + i, pack_contact(pos, plane_normal, tangent, dist), nconmax, dist_out, pos_out, normal_out, tangent_out
+      )
 
     return contact_index, contact_index + num_contacts
 
   return 0, 0
-
 
 
 @wp.func
@@ -427,7 +425,7 @@ def plane_sphere(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-) :
+):
   """Calculates one contact between a plane and a sphere.
 
   Args:
@@ -458,8 +456,6 @@ def plane_sphere(
   contact_index = wp.atomic_add(ncon_out, 0, 1)
   _write_contact(contact_index, contact, nconmax, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
-
-
 
 
 @wp.func
@@ -1432,8 +1428,6 @@ def capsule_box(
   return 0, 0
 
 
-
-
 @wp.func
 def plane_box(
   # In:
@@ -1524,8 +1518,6 @@ def plane_box(
     return contact_index, contact_index + num_contacts
 
   return 0, 0
-
-
 
 
 @wp.func
@@ -1988,7 +1980,6 @@ def box_box(
     return contact_index, contact_index + n
 
   return 0, 0
-
 
 
 @wp.func

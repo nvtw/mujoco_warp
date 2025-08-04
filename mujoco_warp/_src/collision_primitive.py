@@ -284,68 +284,7 @@ def write_contact2(
       contact_solimp_out[cid] = solimp_in
 
 
-@wp.struct
-class WriteContactArgs:
-  # Data in:
-  nconmax_in: int
-  # In:
-  margin_in: float
-  gap_in: float
-  condim_in: int
-  friction_in: vec5
-  solref_in: wp.vec2f
-  solreffriction_in: wp.vec2f
-  solimp_in: vec5
-  geoms_in: wp.vec2i
-  worldid_in: int
-  # Data out:
-  ncon_out: wp.array(dtype=int)
-  contact_dist_out: wp.array(dtype=float)
-  contact_pos_out: wp.array(dtype=wp.vec3)
-  contact_normal_out: wp.array(dtype=wp.vec3)
-  contact_tangent_out: wp.array(dtype=wp.vec3)
-  contact_includemargin_out: wp.array(dtype=float)
-  contact_friction_out: wp.array(dtype=vec5)
-  contact_solref_out: wp.array(dtype=wp.vec2)
-  contact_solreffriction_out: wp.array(dtype=wp.vec2)
-  contact_solimp_out: wp.array(dtype=vec5)
-  contact_dim_out: wp.array(dtype=int)
-  contact_geom_out: wp.array(dtype=wp.vec2i)
-  contact_worldid_out: wp.array(dtype=int)
 
-
-@wp.func
-def contact_writer(contact_index: int, contact: ContactPoint, args: WriteContactArgs):
-  write_contact2(
-    contact_index,
-    args.nconmax_in,
-    contact.dist,
-    contact.pos,
-    contact.normal,
-    contact.tangent,
-    args.margin_in,
-    args.gap_in,
-    args.condim_in,
-    args.friction_in,
-    args.solref_in,
-    args.solreffriction_in,
-    args.solimp_in,
-    args.geoms_in,
-    args.worldid_in,
-    args.ncon_out,
-    args.contact_dist_out,
-    args.contact_pos_out,
-    args.contact_normal_out,
-    args.contact_tangent_out,
-    args.contact_includemargin_out,
-    args.contact_friction_out,
-    args.contact_solref_out,
-    args.contact_solreffriction_out,
-    args.contact_solimp_out,
-    args.contact_dim_out,
-    args.contact_geom_out,
-    args.contact_worldid_out,
-  )
 
 
 @wp.func
@@ -354,8 +293,14 @@ def plane_sphere_wrapper(
   plane: Geom,
   sphere: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates one contact between a plane and a sphere."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   start, end = plane_sphere(
@@ -364,37 +309,14 @@ def plane_sphere_wrapper(
     sphere.pos,
     sphere.size[0],
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,    
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,    
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -403,8 +325,14 @@ def sphere_sphere_wrapper(
   sphere1: Geom,
   sphere2: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates one contact between two spheres."""
   start, end = sphere_sphere(
     sphere1.pos,
@@ -412,37 +340,14 @@ def sphere_sphere_wrapper(
     sphere2.pos,
     sphere2.size[0],
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -451,8 +356,14 @@ def sphere_capsule_wrapper(
   sphere: Geom,
   cap: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates one contact between a sphere and a capsule."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
   start, end = sphere_capsule(
@@ -465,37 +376,14 @@ def sphere_capsule_wrapper(
     cap.size[1],
     cap.rot,
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -504,8 +392,14 @@ def capsule_capsule_wrapper(
   cap1: Geom,
   cap2: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates one contact between two capsules."""
   cap1_axis = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
   cap2_axis = wp.vec3(cap2.rot[0, 2], cap2.rot[1, 2], cap2.rot[2, 2])
@@ -519,37 +413,14 @@ def capsule_capsule_wrapper(
     cap2.size[0],
     cap2.size[1],
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -558,8 +429,14 @@ def plane_capsule_wrapper(
   plane: Geom,
   cap: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates two contacts between a capsule and a plane."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
@@ -571,37 +448,14 @@ def plane_capsule_wrapper(
     cap.size[0],
     cap.size[1],
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -610,8 +464,14 @@ def plane_ellipsoid_wrapper(
   plane: Geom,
   ellipsoid: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates one contact between a plane and an ellipsoid."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   start, end = plane_ellipsoid(
@@ -621,37 +481,14 @@ def plane_ellipsoid_wrapper(
     ellipsoid.rot,
     ellipsoid.size,
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -660,8 +497,14 @@ def plane_box_wrapper(
   plane: Geom,
   box: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates contacts between a plane and a box."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   start, end = plane_box(
@@ -671,37 +514,14 @@ def plane_box_wrapper(
     box.rot,
     box.size,
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -710,8 +530,14 @@ def plane_convex_wrapper(
   plane: Geom,
   convex: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates contacts between a plane and a convex object."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   start, end = plane_convex(
@@ -725,37 +551,14 @@ def plane_convex_wrapper(
     convex.graph,
     convex.graphadr,
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -764,8 +567,14 @@ def sphere_cylinder_wrapper(
   sphere: Geom,
   cylinder: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates one contact between a sphere and a cylinder."""
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
   start, end = sphere_cylinder(
@@ -778,37 +587,14 @@ def sphere_cylinder_wrapper(
     cylinder.size[1],
     cylinder.rot,
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -817,8 +603,14 @@ def plane_cylinder_wrapper(
   plane: Geom,
   cylinder: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates contacts between a cylinder and a plane."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
@@ -830,37 +622,14 @@ def plane_cylinder_wrapper(
     cylinder.size[0],
     cylinder.size[1],
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -949,8 +718,14 @@ def sphere_box_wrapper(
   sphere: Geom,
   box: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates one contact between a sphere and a box."""
   start, end = sphere_box(
     sphere.pos,
@@ -959,37 +734,14 @@ def sphere_box_wrapper(
     box.rot,
     box.size,
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -998,8 +750,14 @@ def capsule_box_wrapper(
   cap: Geom,
   box: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates contacts between a capsule and a box."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
   start, end = capsule_box(
@@ -1011,37 +769,14 @@ def capsule_box_wrapper(
     box.rot,
     box.size,
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -1050,8 +785,14 @@ def box_box_wrapper(
   box1: Geom,
   box2: Geom,
   margin: float,
-  write_contact_args: WriteContactArgs,
-) -> int:
+  # Data out:
+  nconmax_in: int,
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+) -> wp.vec2i:
   """Calculates contacts between two boxes."""
   start, end = box_box(
     box1.pos,
@@ -1061,37 +802,14 @@ def box_box_wrapper(
     box2.rot,
     box2.size,
     margin,
-    write_contact_args.nconmax_in,
-    write_contact_args.ncon_out,
-    write_contact_args.contact_dist_out,
-    write_contact_args.contact_pos_out,
-    write_contact_args.contact_normal_out,
-    write_contact_args.contact_tangent_out,
+    nconmax_in,
+    ncon_out,
+    contact_dist_out,
+    contact_pos_out,
+    contact_normal_out,
+    contact_tangent_out,
   )
-  for i in range(start, end):
-    _write_contact2(
-      i,
-      write_contact_args.nconmax_in,
-      write_contact_args.margin_in,
-      write_contact_args.gap_in,
-      write_contact_args.condim_in,
-      write_contact_args.friction_in,
-      write_contact_args.solref_in,
-      write_contact_args.solreffriction_in,
-      write_contact_args.solimp_in,
-      write_contact_args.geoms_in,
-      write_contact_args.worldid_in,
-      write_contact_args.contact_includemargin_out,
-      write_contact_args.contact_friction_out,
-      write_contact_args.contact_solref_out,
-      write_contact_args.contact_solreffriction_out,
-      write_contact_args.contact_solimp_out,
-      write_contact_args.contact_dim_out,
-      write_contact_args.contact_geom_out,
-      write_contact_args.contact_worldid_out,
-    )
-
-  return 0
+  return wp.vec2i(start, end)
 
 
 _PRIMITIVE_COLLISIONS = {
@@ -1297,41 +1015,47 @@ def _primitive_narrowphase_builder(m: Model):
       hftri_index,
     )
 
-    write_contact_args = WriteContactArgs()
-    write_contact_args.nconmax_in = nconmax_in
-    write_contact_args.margin_in = margin
-    write_contact_args.gap_in = gap
-    write_contact_args.condim_in = condim
-    write_contact_args.friction_in = friction
-    write_contact_args.solref_in = solref
-    write_contact_args.solreffriction_in = solreffriction
-    write_contact_args.solimp_in = solimp
-    write_contact_args.geoms_in = geoms
-    write_contact_args.worldid_in = worldid
-    write_contact_args.ncon_out = ncon_out
-    write_contact_args.contact_dist_out = contact_dist_out
-    write_contact_args.contact_pos_out = contact_pos_out
-    write_contact_args.contact_normal_out = contact_normal_out
-    write_contact_args.contact_tangent_out = contact_tangent_out
-    write_contact_args.contact_includemargin_out = contact_includemargin_out
-    write_contact_args.contact_friction_out = contact_friction_out
-    write_contact_args.contact_solref_out = contact_solref_out
-    write_contact_args.contact_solreffriction_out = contact_solreffriction_out
-    write_contact_args.contact_solimp_out = contact_solimp_out
-    write_contact_args.contact_dim_out = contact_dim_out
-    write_contact_args.contact_geom_out = contact_geom_out
-    write_contact_args.contact_worldid_out = contact_worldid_out
-
+    start_end = wp.vec2i(-1, -1)
     for i in range(wp.static(len(_primitive_collisions_func))):
       collision_type1 = wp.static(_primitive_collisions_types[i][0])
       collision_type2 = wp.static(_primitive_collisions_types[i][1])
 
       if collision_type1 == type1 and collision_type2 == type2:
-        wp.static(_primitive_collisions_func[i])(
+        start_end = wp.static(_primitive_collisions_func[i])(
           geom1,
           geom2,
           margin,
-          write_contact_args,
+          nconmax_in,
+          ncon_out,
+          contact_dist_out,
+          contact_pos_out,
+          contact_normal_out,
+          contact_tangent_out,
+        )
+
+    # Write contact metadata for all contacts in the range
+    if start_end.x >= 0:
+      for i in range(start_end.x, start_end.y):
+        _write_contact2(
+          i,
+          nconmax_in,
+          margin,
+          gap,
+          condim,
+          friction,
+          solref,
+          solreffriction,
+          solimp,
+          geoms,
+          worldid,
+          contact_includemargin_out,
+          contact_friction_out,
+          contact_solref_out,
+          contact_solreffriction_out,
+          contact_solimp_out,
+          contact_dim_out,
+          contact_geom_out,
+          contact_worldid_out,
         )
 
   return _primitive_narrowphase
