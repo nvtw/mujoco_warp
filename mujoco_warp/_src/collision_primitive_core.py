@@ -624,191 +624,212 @@ def sphere_capsule(
   return contact_index, contact_index + 1
 
 
-def get_plane_capsule(contact_writer: Any):
-  @wp.func
-  def plane_capsule(
-    # In:
-    plane_normal: wp.vec3,
-    plane_pos: wp.vec3,
-    cap_center: wp.vec3,
-    cap_axis: wp.vec3,
-    cap_radius: float,
-    cap_half_length: float,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates two contacts between a capsule and a plane.
+@wp.func
+def plane_capsule(
+  # In:
+  plane_normal: wp.vec3,
+  plane_pos: wp.vec3,
+  cap_center: wp.vec3,
+  cap_axis: wp.vec3,
+  cap_radius: float,
+  cap_half_length: float,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  """Calculates two contacts between a capsule and a plane.
 
-    Finds contact points at both ends of the capsule where they intersect with the plane.
-    The contact normal is aligned with the plane normal.
+  Finds contact points at both ends of the capsule where they intersect with the plane.
+  The contact normal is aligned with the plane normal.
 
-    Args:
-      plane_normal: Normal vector of the plane.
-      plane_pos: A point on the plane.
-      cap_center: Center of the capsule.
-      cap_axis: Axis of the capsule.
-      cap_radius: Radius of the capsule.
-      cap_half_length: Half-length of the capsule's cylindrical body.
-      margin: Collision margin.
-      contact_writer_args: Arguments for the contact writer.
+  Args:
+    plane_normal: Normal vector of the plane.
+    plane_pos: A point on the plane.
+    cap_center: Center of the capsule.
+    cap_axis: Axis of the capsule.
+    cap_radius: Radius of the capsule.
+    cap_half_length: Half-length of the capsule's cylindrical body.
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    ncon_out: Output array for contact count.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
 
-    Returns:
-        int: Number of contacts generated (0-2)
-    """
-    n = plane_normal
-    # align contact frames with capsule axis
-    b, b_norm = normalize_with_norm(cap_axis - n * wp.dot(n, cap_axis))
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
+  n = plane_normal
+  # align contact frames with capsule axis
+  b, b_norm = normalize_with_norm(cap_axis - n * wp.dot(n, cap_axis))
 
-    if b_norm < 0.5:
-      if -0.5 < n[1] and n[1] < 0.5:
-        b = wp.vec3(0.0, 1.0, 0.0)
-      else:
-        b = wp.vec3(0.0, 0.0, 1.0)
+  if b_norm < 0.5:
+    if -0.5 < n[1] and n[1] < 0.5:
+      b = wp.vec3(0.0, 1.0, 0.0)
+    else:
+      b = wp.vec3(0.0, 0.0, 1.0)
 
-    # c = wp.cross(n, b)
-    # frame = wp.mat33(n[0], n[1], n[2], b[0], b[1], b[2], c[0], c[1], c[2])
-    segment = cap_axis * cap_half_length
+  # c = wp.cross(n, b)
+  # frame = wp.mat33(n[0], n[1], n[2], b[0], b[1], b[2], c[0], c[1], c[2])
+  segment = cap_axis * cap_half_length
 
-    dist1, pos1 = _plane_sphere(n, plane_pos, cap_center + segment, cap_radius)
-    dist2, pos2 = _plane_sphere(n, plane_pos, cap_center - segment, cap_radius)
+  dist1, pos1 = _plane_sphere(n, plane_pos, cap_center + segment, cap_radius)
+  dist2, pos2 = _plane_sphere(n, plane_pos, cap_center - segment, cap_radius)
 
-    # Check which contacts are active
-    active1 = (dist1 - margin) < 0
-    active2 = (dist2 - margin) < 0
+  # Check which contacts are active
+  active1 = (dist1 - margin) < 0
+  active2 = (dist2 - margin) < 0
 
-    num_contacts = int(0)
-    if active1:
-      num_contacts += 1
-    if active2:
-      num_contacts += 1
+  num_contacts = int(0)
+  if active1:
+    num_contacts += 1
+  if active2:
+    num_contacts += 1
 
-    if num_contacts == 0:
-      return 0
+  if num_contacts == 0:
+    return 0, 0
 
-    # Reserve contact slots based on active contacts
-    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
-    contact_count = 0
+  # Reserve contact slots based on active contacts
+  contact_index = wp.atomic_add(ncon_out, 0, num_contacts)
+  contact_count = 0
 
-    if active1:
-      contact1 = pack_contact(pos1, n, b, dist1)
-      wp.static(contact_writer)(contact_index + contact_count, contact1, contact_writer_args)
-      contact_count += 1
+  if active1:
+    contact1 = pack_contact(pos1, n, b, dist1)
+    _write_contact(contact_index + contact_count, contact1, nconmax, dist_out, pos_out, normal_out, tangent_out)
+    contact_count += 1
 
-    if active2:
-      contact2 = pack_contact(pos2, n, b, dist2)
-      wp.static(contact_writer)(contact_index + contact_count, contact2, contact_writer_args)
-      contact_count += 1
+  if active2:
+    contact2 = pack_contact(pos2, n, b, dist2)
+    _write_contact(contact_index + contact_count, contact2, nconmax, dist_out, pos_out, normal_out, tangent_out)
+    contact_count += 1
 
-    return num_contacts
-
-  return plane_capsule
-
-
-def get_plane_ellipsoid(contact_writer: Any):
-  @wp.func
-  def plane_ellipsoid(
-    # In:
-    plane_normal: wp.vec3,
-    plane_pos: wp.vec3,
-    ellipsoid_center: wp.vec3,
-    ellipsoid_rot: wp.mat33,
-    ellipsoid_radii: wp.vec3,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates one contact between a plane and an ellipsoid.
-
-    Args:
-      plane_normal: Normal vector of the plane.
-      plane_pos: A point on the plane.
-      ellipsoid_center: Center of the ellipsoid.
-      ellipsoid_rot: Rotation matrix of the ellipsoid.
-      ellipsoid_radii: Radii of the ellipsoid along its axes.
-      margin: Collision margin.
-      contact_writer_args: Arguments for the contact writer.
-
-    Returns:
-        int: Number of contacts generated (0 or 1).
-    """
-    sphere_support = -wp.normalize(wp.cw_mul(wp.transpose(ellipsoid_rot) @ plane_normal, ellipsoid_radii))
-    pos = ellipsoid_center + ellipsoid_rot @ wp.cw_mul(sphere_support, ellipsoid_radii)
-    dist = wp.dot(plane_normal, pos - plane_pos)
-
-    # Check if contact is active (within margin)
-    if (dist - margin) >= 0:
-      return 0
-
-    contact_pos = pos - plane_normal * dist * 0.5
-
-    contact = pack_contact_auto_tangent(contact_pos, plane_normal, dist)
-
-    # Reserve one contact slot
-    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
-    wp.static(contact_writer)(contact_index, contact, contact_writer_args)
-    return 1
-
-  return plane_ellipsoid
+  return contact_index, contact_index + num_contacts
 
 
-def get_capsule_capsule(contact_writer: Any):
-  @wp.func
-  def capsule_capsule(
-    # In:
-    cap1_center: wp.vec3,
-    cap1_axis: wp.vec3,
-    cap1_radius: float,
-    cap1_half_length: float,
-    cap2_center: wp.vec3,
-    cap2_axis: wp.vec3,
-    cap2_radius: float,
-    cap2_half_length: float,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates one contact between two capsules.
+@wp.func
+def plane_ellipsoid(
+  # In:
+  plane_normal: wp.vec3,
+  plane_pos: wp.vec3,
+  ellipsoid_center: wp.vec3,
+  ellipsoid_rot: wp.mat33,
+  ellipsoid_radii: wp.vec3,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  """Calculates one contact between a plane and an ellipsoid.
 
-    Args:
-      cap1_center: Center of the first capsule.
-      cap1_axis: Axis of the first capsule.
-      cap1_radius: Radius of the first capsule.
-      cap1_half_length: Half-length of the first capsule's cylindrical body.
-      cap2_center: Center of the second capsule.
-      cap2_axis: Axis of the second capsule.
-      cap2_radius: Radius of the second capsule.
-      cap2_half_length: Half-length of the second capsule's cylindrical body.
-      margin: Collision margin.
-      contact_writer_args: Arguments for the contact writer.
+  Args:
+    plane_normal: Normal vector of the plane.
+    plane_pos: A point on the plane.
+    ellipsoid_center: Center of the ellipsoid.
+    ellipsoid_rot: Rotation matrix of the ellipsoid.
+    ellipsoid_radii: Radii of the ellipsoid along its axes.
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    ncon_out: Output array for contact count.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
 
-    Returns:
-        int: Number of contacts generated (0 or 1).
-    """
-    seg1 = cap1_axis * cap1_half_length
-    seg2 = cap2_axis * cap2_half_length
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
+  sphere_support = -wp.normalize(wp.cw_mul(wp.transpose(ellipsoid_rot) @ plane_normal, ellipsoid_radii))
+  pos = ellipsoid_center + ellipsoid_rot @ wp.cw_mul(sphere_support, ellipsoid_radii)
+  dist = wp.dot(plane_normal, pos - plane_pos)
 
-    pt1, pt2 = closest_segment_to_segment_points(
-      cap1_center - seg1,
-      cap1_center + seg1,
-      cap2_center - seg2,
-      cap2_center + seg2,
-    )
+  # Check if contact is active (within margin)
+  if (dist - margin) >= 0:
+    return 0, 0
 
-    contact = _sphere_sphere(
-      pt1,
-      cap1_radius,
-      pt2,
-      cap2_radius,
-    )
+  contact_pos = pos - plane_normal * dist * 0.5
 
-    # Check if contact is active (within margin)
-    if (contact.dist - margin) >= 0:
-      return 0
+  contact = pack_contact_auto_tangent(contact_pos, plane_normal, dist)
 
-    # Reserve one contact slot
-    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
-    wp.static(contact_writer)(contact_index, contact, contact_writer_args)
-    return 1
+  # Reserve one contact slot
+  contact_index = wp.atomic_add(ncon_out, 0, 1)
+  _write_contact(contact_index, contact, nconmax, dist_out, pos_out, normal_out, tangent_out)
+  return contact_index, contact_index + 1
 
-  return capsule_capsule
+
+@wp.func
+def capsule_capsule(
+  # In:
+  cap1_center: wp.vec3,
+  cap1_axis: wp.vec3,
+  cap1_radius: float,
+  cap1_half_length: float,
+  cap2_center: wp.vec3,
+  cap2_axis: wp.vec3,
+  cap2_radius: float,
+  cap2_half_length: float,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  """Calculates one contact between two capsules.
+
+  Args:
+    cap1_center: Center of the first capsule.
+    cap1_axis: Axis of the first capsule.
+    cap1_radius: Radius of the first capsule.
+    cap1_half_length: Half-length of the first capsule's cylindrical body.
+    cap2_center: Center of the second capsule.
+    cap2_axis: Axis of the second capsule.
+    cap2_radius: Radius of the second capsule.
+    cap2_half_length: Half-length of the second capsule's cylindrical body.
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    ncon_out: Output array for contact count.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
+
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
+  seg1 = cap1_axis * cap1_half_length
+  seg2 = cap2_axis * cap2_half_length
+
+  pt1, pt2 = closest_segment_to_segment_points(
+    cap1_center - seg1,
+    cap1_center + seg1,
+    cap2_center - seg2,
+    cap2_center + seg2,
+  )
+
+  contact = _sphere_sphere(
+    pt1,
+    cap1_radius,
+    pt2,
+    cap2_radius,
+  )
+
+  # Check if contact is active (within margin)
+  if (contact.dist - margin) >= 0:
+    return 0, 0
+
+  # Reserve one contact slot
+  contact_index = wp.atomic_add(ncon_out, 0, 1)
+  _write_contact(contact_index, contact, nconmax, dist_out, pos_out, normal_out, tangent_out)
+  return contact_index, contact_index + 1
 
 
 def get_sphere_cylinder(contact_writer: Any):
