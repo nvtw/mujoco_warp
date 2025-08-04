@@ -121,6 +121,7 @@ def get_plane_convex(contact_writer: Any):
     convex_vertnum: int,
     convex_graph: wp.array(dtype=int),
     convex_graphadr: int,
+    margin: float,
     contact_writer_args: Any,
   ) -> int:
     """Calculates contacts between a plane and a convex object.
@@ -339,7 +340,12 @@ def get_plane_convex(contact_writer: Any):
 
     # Write contacts
     tangent = make_tangent(plane_normal)
-    num_contacts = 0
+    
+    # First pass: count unique contacts and store their data
+    contact_data = mat43f()  # Store up to 4 contacts (pos.xyz, dist)
+    contact_data_dist = wp.vec4f()
+    num_contacts = int(0)
+    
     for i in range(3, -1, -1):
       idx = indices[i]
       count = int(0)
@@ -353,9 +359,26 @@ def get_plane_convex(contact_writer: Any):
         pos = convex_pos + convex_rot @ pos
         support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
         dist = -support
+        
+        # Check if contact is active (within margin)
+        if (dist - margin) >= 0:
+          continue
+          
         pos = pos - 0.5 * dist * plane_normal
-        wp.static(contact_writer)(pack_contact(pos, plane_normal, tangent, dist), contact_writer_args)
+        
+        # Store contact data for later writing
+        contact_data[num_contacts] = wp.vec3(pos[0], pos[1], pos[2])
+        contact_data_dist[num_contacts] = dist
         num_contacts += 1
+
+    # Second pass: reserve contact slots and write contacts
+    if num_contacts > 0:
+      contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
+      
+      for i in range(num_contacts):
+        pos = wp.vec3(contact_data[i, 0], contact_data[i, 1], contact_data[i, 2])
+        dist = contact_data_dist[i]
+        wp.static(contact_writer)(contact_index + i, pack_contact(pos, plane_normal, tangent, dist), contact_writer_args)
 
     return num_contacts
 
@@ -370,6 +393,7 @@ def get_plane_sphere(contact_writer: Any):
     plane_pos: wp.vec3,
     sphere_center: wp.vec3,
     sphere_radius: float,
+    margin: float,
     contact_writer_args: Any,
   ) -> int:
     """Calculates one contact between a plane and a sphere.
@@ -379,14 +403,23 @@ def get_plane_sphere(contact_writer: Any):
       plane_pos: A point on the plane.
       sphere_center: Center of the sphere.
       sphere_radius: Radius of the sphere.
+      margin: Collision margin.
       contact_writer_args: Arguments for the contact writer.
 
     Returns:
-        int: Always returns 1.
+        int: Number of contacts generated (0 or 1).
     """
     dist, pos = _plane_sphere(plane_normal, plane_pos, sphere_center, sphere_radius)
+    
+    # Check if contact is active (within margin)
+    if (dist - margin) >= 0:
+      return 0
+    
     contact = pack_contact_auto_tangent(pos, plane_normal, dist)
-    wp.static(contact_writer)(contact, contact_writer_args)
+    
+    # Reserve one contact slot
+    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
+    wp.static(contact_writer)(contact_index, contact, contact_writer_args)
     return 1
 
   return plane_sphere
@@ -407,6 +440,7 @@ def get_sphere_sphere(contact_writer: Any):
     sphere1_radius: float,
     sphere2_center: wp.vec3,
     sphere2_radius: float,
+    margin: float,
     contact_writer_args: Any,
   ) -> int:
     """Calculates one contact between two spheres.
@@ -416,10 +450,11 @@ def get_sphere_sphere(contact_writer: Any):
       sphere1_radius: Radius of the first sphere.
       sphere2_center: Center of the second sphere.
       sphere2_radius: Radius of the second sphere.
+      margin: Collision margin.
       contact_writer_args: Arguments for the contact writer.
 
     Returns:
-        int: Always returns 1.
+        int: Number of contacts generated (0 or 1).
     """
     contact = _sphere_sphere(
       sphere1_center,
@@ -427,7 +462,14 @@ def get_sphere_sphere(contact_writer: Any):
       sphere2_center,
       sphere2_radius,
     )
-    wp.static(contact_writer)(contact, contact_writer_args)
+    
+    # Check if contact is active (within margin)
+    if (contact.dist - margin) >= 0:
+      return 0
+    
+    # Reserve one contact slot
+    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
+    wp.static(contact_writer)(contact_index, contact, contact_writer_args)
     return 1
 
   return sphere_sphere
@@ -491,6 +533,7 @@ def get_sphere_capsule(contact_writer: Any):
     cap_radius: float,
     cap_half_length: float,
     cap_rot: wp.mat33,
+    margin: float,
     contact_writer_args: Any,
   ) -> int:
     """Calculates one contact between a sphere and a capsule.
@@ -504,10 +547,11 @@ def get_sphere_capsule(contact_writer: Any):
       cap_radius: Radius of the capsule.
       cap_half_length: Half-length of the capsule's cylindrical body.
       cap_rot: Rotation matrix of the capsule (used for contact normal calculation).
+      margin: Collision margin.
       contact_writer_args: Arguments for the contact writer.
 
     Returns:
-        int: Always returns 1.
+        int: Number of contacts generated (0 or 1).
     """
     segment = cap_axis * cap_half_length
 
@@ -523,7 +567,14 @@ def get_sphere_capsule(contact_writer: Any):
       sphere_rot,
       cap_rot,
     )
-    wp.static(contact_writer)(contact, contact_writer_args)
+    
+    # Check if contact is active (within margin)
+    if (contact.dist - margin) >= 0:
+      return 0
+    
+    # Reserve one contact slot
+    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
+    wp.static(contact_writer)(contact_index, contact, contact_writer_args)
     return 1
 
   return sphere_capsule
@@ -539,6 +590,7 @@ def get_plane_capsule(contact_writer: Any):
     cap_axis: wp.vec3,
     cap_radius: float,
     cap_half_length: float,
+    margin: float,
     contact_writer_args: Any,
   ) -> int:
     """Calculates two contacts between a capsule and a plane.
@@ -553,10 +605,11 @@ def get_plane_capsule(contact_writer: Any):
       cap_axis: Axis of the capsule.
       cap_radius: Radius of the capsule.
       cap_half_length: Half-length of the capsule's cylindrical body.
+      margin: Collision margin.
       contact_writer_args: Arguments for the contact writer.
 
     Returns:
-        int: Always returns 2 since there are two contact points (one at each end)
+        int: Number of contacts generated (0-2)
     """
     n = plane_normal
     # align contact frames with capsule axis
@@ -573,14 +626,36 @@ def get_plane_capsule(contact_writer: Any):
     segment = cap_axis * cap_half_length
 
     dist1, pos1 = _plane_sphere(n, plane_pos, cap_center + segment, cap_radius)
-    contact1 = pack_contact(pos1, n, b, dist1)
-    wp.static(contact_writer)(contact1, contact_writer_args)
-
     dist2, pos2 = _plane_sphere(n, plane_pos, cap_center - segment, cap_radius)
-    contact2 = pack_contact(pos2, n, b, dist2)
-    wp.static(contact_writer)(contact2, contact_writer_args)
+    
+    # Check which contacts are active
+    active1 = (dist1 - margin) < 0
+    active2 = (dist2 - margin) < 0
+    
+    num_contacts = int(0)
+    if active1:
+      num_contacts += 1
+    if active2:
+      num_contacts += 1
+    
+    if num_contacts == 0:
+      return 0
 
-    return 2
+    # Reserve contact slots based on active contacts
+    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
+    contact_count = 0
+    
+    if active1:
+      contact1 = pack_contact(pos1, n, b, dist1)
+      wp.static(contact_writer)(contact_index + contact_count, contact1, contact_writer_args)
+      contact_count += 1
+    
+    if active2:
+      contact2 = pack_contact(pos2, n, b, dist2)
+      wp.static(contact_writer)(contact_index + contact_count, contact2, contact_writer_args)
+      contact_count += 1
+
+    return num_contacts
 
   return plane_capsule
 
@@ -594,6 +669,7 @@ def get_plane_ellipsoid(contact_writer: Any):
     ellipsoid_center: wp.vec3,
     ellipsoid_rot: wp.mat33,
     ellipsoid_radii: wp.vec3,
+    margin: float,
     contact_writer_args: Any,
   ) -> int:
     """Calculates one contact between a plane and an ellipsoid.
@@ -604,18 +680,27 @@ def get_plane_ellipsoid(contact_writer: Any):
       ellipsoid_center: Center of the ellipsoid.
       ellipsoid_rot: Rotation matrix of the ellipsoid.
       ellipsoid_radii: Radii of the ellipsoid along its axes.
+      margin: Collision margin.
       contact_writer_args: Arguments for the contact writer.
 
     Returns:
-        int: Always returns 1.
+        int: Number of contacts generated (0 or 1).
     """
     sphere_support = -wp.normalize(wp.cw_mul(wp.transpose(ellipsoid_rot) @ plane_normal, ellipsoid_radii))
     pos = ellipsoid_center + ellipsoid_rot @ wp.cw_mul(sphere_support, ellipsoid_radii)
     dist = wp.dot(plane_normal, pos - plane_pos)
+    
+    # Check if contact is active (within margin)
+    if (dist - margin) >= 0:
+      return 0
+      
     contact_pos = pos - plane_normal * dist * 0.5
 
     contact = pack_contact_auto_tangent(contact_pos, plane_normal, dist)
-    wp.static(contact_writer)(contact, contact_writer_args)
+    
+    # Reserve one contact slot
+    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
+    wp.static(contact_writer)(contact_index, contact, contact_writer_args)
     return 1
 
   return plane_ellipsoid
@@ -633,6 +718,7 @@ def get_capsule_capsule(contact_writer: Any):
     cap2_axis: wp.vec3,
     cap2_radius: float,
     cap2_half_length: float,
+    margin: float,
     contact_writer_args: Any,
   ) -> int:
     """Calculates one contact between two capsules.
@@ -646,10 +732,11 @@ def get_capsule_capsule(contact_writer: Any):
       cap2_axis: Axis of the second capsule.
       cap2_radius: Radius of the second capsule.
       cap2_half_length: Half-length of the second capsule's cylindrical body.
+      margin: Collision margin.
       contact_writer_args: Arguments for the contact writer.
 
     Returns:
-        int: Always returns 1.
+        int: Number of contacts generated (0 or 1).
     """
     seg1 = cap1_axis * cap1_half_length
     seg2 = cap2_axis * cap2_half_length
@@ -667,7 +754,14 @@ def get_capsule_capsule(contact_writer: Any):
       pt2,
       cap2_radius,
     )
-    wp.static(contact_writer)(contact, contact_writer_args)
+    
+    # Check if contact is active (within margin)
+    if (contact.dist - margin) >= 0:
+      return 0
+    
+    # Reserve one contact slot
+    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
+    wp.static(contact_writer)(contact_index, contact, contact_writer_args)
     return 1
 
   return capsule_capsule
@@ -685,6 +779,7 @@ def get_sphere_cylinder(contact_writer: Any):
     cylinder_radius: float,
     cylinder_half_height: float,
     cylinder_rot: wp.mat33,
+    margin: float,
     contact_writer_args: Any,
   ) -> int:
     """Calculates one contact between a sphere and a cylinder.
@@ -698,10 +793,11 @@ def get_sphere_cylinder(contact_writer: Any):
       cylinder_radius: Radius of the cylinder.
       cylinder_half_height: Half-height of the cylinder.
       cylinder_rot: Rotation matrix of the cylinder (used for contact normal calculation).
+      margin: Collision margin.
       contact_writer_args: Arguments for the contact writer.
 
     Returns:
-        int: Always returns 1.
+        int: Number of contacts generated (0 or 1).
     """
     vec = sphere_center - cylinder_center
     x = wp.dot(vec, cylinder_axis)
@@ -722,6 +818,8 @@ def get_sphere_cylinder(contact_writer: Any):
       else:
         collide_cap = False
 
+    contact = ContactPoint()
+
     # Side collision
     if collide_side:
       pos_target = cylinder_center + a_proj
@@ -733,11 +831,9 @@ def get_sphere_cylinder(contact_writer: Any):
         sphere_rot,
         cylinder_rot,
       )
-      wp.static(contact_writer)(contact, contact_writer_args)
-      return 1
 
     # Cap collision
-    if collide_cap:
+    elif collide_cap:
       if x > 0.0:
         # top cap
         pos_cap = cylinder_center + cylinder_axis * cylinder_half_height
@@ -750,25 +846,31 @@ def get_sphere_cylinder(contact_writer: Any):
       dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere_center, sphere_radius)
       plane_normal = -plane_normal  # Flip normal after position calculation
       contact = pack_contact_auto_tangent(pos_contact, plane_normal, dist)
-      wp.static(contact_writer)(contact, contact_writer_args)
-      return 1
 
     # Corner collision
-    inv_len = 1.0 / wp.sqrt(p_proj_sqr)
-    p_proj = p_proj * (cylinder_radius * inv_len)
+    else:
+      inv_len = 1.0 / wp.sqrt(p_proj_sqr)
+      p_proj = p_proj * (cylinder_radius * inv_len)
 
-    cap_offset = cylinder_axis * (wp.sign(x) * cylinder_half_height)
-    pos_corner = cylinder_center + cap_offset + p_proj
+      cap_offset = cylinder_axis * (wp.sign(x) * cylinder_half_height)
+      pos_corner = cylinder_center + cap_offset + p_proj
 
-    contact = _sphere_sphere_ext(
-      sphere_center,
-      sphere_radius,
-      pos_corner,
-      0.0,
-      sphere_rot,
-      cylinder_rot,
-    )
-    wp.static(contact_writer)(contact, contact_writer_args)
+      contact = _sphere_sphere_ext(
+        sphere_center,
+        sphere_radius,
+        pos_corner,
+        0.0,
+        sphere_rot,
+        cylinder_rot,
+      )
+
+    # Check if contact is active (within margin)
+    if (contact.dist - margin) >= 0:
+      return 0
+
+    # Reserve one contact slot
+    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
+    wp.static(contact_writer)(contact_index, contact, contact_writer_args)
     return 1
 
   return sphere_cylinder
@@ -855,9 +957,11 @@ def get_sphere_box(contact_writer: Any):
       margin,
     )
 
-    num_contacts = 0
+    num_contacts = int(0)
     if found:
-      wp.static(contact_writer)(contact, contact_writer_args)
+      # Reserve one contact slot
+      contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
+      wp.static(contact_writer)(contact_index, contact, contact_writer_args)
       num_contacts = 1
 
     return num_contacts
@@ -1183,13 +1287,13 @@ def get_capsule_box(contact_writer: Any):
 
         secondpos *= wp.float32(mul)
 
-    num_contacts = 0
+    num_contacts = int(0)
     # create sphere in original orientation at first contact point
     s1_pos_l = pos + halfaxis * bestsegmentpos
     s1_pos_g = box_rot @ s1_pos_l + box_center
 
-    # collide with sphere
-    contact, found = _sphere_box(
+    # Check first collision
+    contact1, found1 = _sphere_box(
       s1_pos_g,
       cap_radius,
       box_center,
@@ -1197,14 +1301,16 @@ def get_capsule_box(contact_writer: Any):
       box_half_sizes,
       margin,
     )
-    if found:
-      wp.static(contact_writer)(contact, contact_writer_args)
+    if found1:
       num_contacts += 1
 
+    # Check second collision if applicable
+    contact2 = ContactPoint()
+    found2 = False
     if secondpos > -3:  # secondpos was modified
       s2_pos_l = pos + halfaxis * (secondpos + bestsegmentpos)
       s2_pos_g = box_rot @ s2_pos_l + box_center
-      contact, found = _sphere_box(
+      contact2, found2 = _sphere_box(
         s2_pos_g,
         cap_radius,
         box_center,
@@ -1212,9 +1318,21 @@ def get_capsule_box(contact_writer: Any):
         box_half_sizes,
         margin,
       )
-      if found:
-        wp.static(contact_writer)(contact, contact_writer_args)
+      if found2:
         num_contacts += 1
+
+    # Reserve contact slots based on how many we actually found
+    if num_contacts > 0:
+      contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
+      contact_count = 0
+      
+      if found1:
+        wp.static(contact_writer)(contact_index + contact_count, contact1, contact_writer_args)
+        contact_count += 1
+      
+      if found2:
+        wp.static(contact_writer)(contact_index + contact_count, contact2, contact_writer_args)
+        contact_count += 1
 
     return num_contacts
 
@@ -1249,12 +1367,19 @@ def get_plane_box(contact_writer: Any):
     Returns:
         int: Number of contacts generated (0-4)
     """
-    num_contacts = int(0)
     corner = wp.vec3()
     dist = wp.dot(box_center - plane_pos, plane_normal)
 
+    # First pass: count valid contacts and store them
+    valid_contacts = mat43f()  # Store up to 4 contacts
+    valid_contacts_dist = vec4f()
+    num_contacts = int(0)
+    
     # test all corners, pick bottom 4
     for i in range(8):
+      if num_contacts >= 4:
+        break
+        
       # get corner in local coordinates
       corner.x = wp.where(i & 1, box_half_sizes.x, -box_half_sizes.x)
       corner.y = wp.where(i & 2, box_half_sizes.y, -box_half_sizes.y)
@@ -1269,14 +1394,28 @@ def get_plane_box(contact_writer: Any):
         continue
 
       cdist = dist + ldist
+      
+      # Check if contact is active (within margin)
+      if (cdist - margin) >= 0:
+        continue
+        
       contact_pos = corner + box_center - plane_normal * (cdist * 0.5)
 
-      contact = pack_contact_auto_tangent(contact_pos, plane_normal, cdist)
-      wp.static(contact_writer)(contact, contact_writer_args)
+      # Store contact information for later writing
+      valid_contacts[num_contacts] = contact_pos
+      valid_contacts_dist[num_contacts] = cdist  # Store distance in the 4th component
       num_contacts += 1
 
-      if num_contacts >= 4:
-        break
+    # Second pass: reserve contact slots and write contacts
+    if num_contacts > 0:
+      contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
+      tangent = make_tangent(plane_normal)
+      
+      for i in range(num_contacts):
+        contact_pos = wp.vec3(valid_contacts[i, 0], valid_contacts[i, 1], valid_contacts[i, 2])
+        cdist = valid_contacts_dist[i]
+        contact = pack_contact(contact_pos, plane_normal, tangent, cdist)
+        wp.static(contact_writer)(contact_index + i, contact, contact_writer_args)
 
     return num_contacts
 
@@ -1722,11 +1861,14 @@ def get_box_box(contact_writer: Any):
 
     tangent = make_tangent(normal)
     # Create contact points
-    for i in range(n):
-      points[i, 2] += hz
-      pos = rw @ points[i] + pw
-      contact = pack_contact(pos, normal, tangent, depth[i])
-      wp.static(contact_writer)(contact, contact_writer_args)
+    if n > 0:
+      contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, n)
+      
+      for i in range(n):
+        points[i, 2] += hz
+        pos = rw @ points[i] + pw
+        contact = pack_contact(pos, normal, tangent, depth[i])
+        wp.static(contact_writer)(contact_index + i, contact, contact_writer_args)
 
     return n
 
@@ -1743,6 +1885,7 @@ def get_plane_cylinder(contact_writer: Any):
     cylinder_axis: wp.vec3,
     cylinder_radius: float,
     cylinder_half_height: float,
+    margin: float,
     contact_writer_args: Any,
   ) -> int:
     """Calculates contacts between a cylinder and a plane.
@@ -1754,10 +1897,11 @@ def get_plane_cylinder(contact_writer: Any):
       cylinder_axis: Axis of the cylinder.
       cylinder_radius: Radius of the cylinder.
       cylinder_half_height: Half-height of the cylinder.
+      margin: Collision margin.
       contact_writer_args: Arguments for the contact writer.
 
     Returns:
-        int: Number of contacts generated.
+        int: Number of contacts generated (0-4).
     """
     # Extract plane normal and cylinder axis
     n = plane_normal
@@ -1794,21 +1938,14 @@ def get_plane_cylinder(contact_writer: Any):
     # Align contact frames with plane normal
     b, c = orthogonals(n)
 
-    num_contacts = 0
-
+    # Calculate all contact points and their distances
     # First contact point (end cap closer to plane)
     dist1 = dist0 + prjaxis + prjvec
     pos1 = cylinder_center + vec + axis - n * (dist1 * 0.5)
-    contact1 = pack_contact(pos1, n, b, dist1)
-    wp.static(contact_writer)(contact1, contact_writer_args)
-    num_contacts += 1
 
     # Second contact point (end cap farther from plane)
     dist2 = dist0 - prjaxis + prjvec
     pos2 = cylinder_center + vec - axis - n * (dist2 * 0.5)
-    contact2 = pack_contact(pos2, n, b, dist2)
-    wp.static(contact_writer)(contact2, contact_writer_args)
-    num_contacts += 1
 
     # Try triangle contact points on side closer to plane
     prjvec1 = -prjvec * 0.5
@@ -1820,15 +1957,52 @@ def get_plane_cylinder(contact_writer: Any):
 
     # Add contact point A - adjust to closest side
     pos3 = cylinder_center + vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
-    contact3 = pack_contact(pos3, n, b, dist3)
-    wp.static(contact_writer)(contact3, contact_writer_args)
-    num_contacts += 1
 
     # Add contact point B - adjust to closest side
     pos4 = cylinder_center - vec1 + axis - vec * 0.5 - n * (dist3 * 0.5)
-    contact4 = pack_contact(pos4, n, b, dist3)
-    wp.static(contact_writer)(contact4, contact_writer_args)
-    num_contacts += 1
+
+    # Check which contacts are active
+    active1 = (dist1 - margin) < 0
+    active2 = (dist2 - margin) < 0
+    active3 = (dist3 - margin) < 0
+    active4 = (dist3 - margin) < 0  # dist4 is same as dist3
+
+    num_contacts = int(0)
+    if active1:
+      num_contacts += 1
+    if active2:
+      num_contacts += 1
+    if active3:
+      num_contacts += 1
+    if active4:
+      num_contacts += 1
+
+    if num_contacts == 0:
+      return 0
+
+    # Reserve contact slots and write all active contacts
+    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
+    contact_count = 0
+
+    if active1:
+      contact1 = pack_contact(pos1, n, b, dist1)
+      wp.static(contact_writer)(contact_index + contact_count, contact1, contact_writer_args)
+      contact_count += 1
+
+    if active2:
+      contact2 = pack_contact(pos2, n, b, dist2)
+      wp.static(contact_writer)(contact_index + contact_count, contact2, contact_writer_args)
+      contact_count += 1
+
+    if active3:
+      contact3 = pack_contact(pos3, n, b, dist3)
+      wp.static(contact_writer)(contact_index + contact_count, contact3, contact_writer_args)
+      contact_count += 1
+
+    if active4:
+      contact4 = pack_contact(pos4, n, b, dist3)
+      wp.static(contact_writer)(contact_index + contact_count, contact4, contact_writer_args)
+      contact_count += 1
 
     return num_contacts
 

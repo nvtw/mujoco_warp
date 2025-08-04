@@ -193,6 +193,62 @@ def write_contact(
       contact_solimp_out[cid] = solimp_in
 
 
+
+
+@wp.func
+def write_contact2(
+  contact_index: int,
+  # Data in:
+  nconmax_in: int,
+  # In:
+  dist_in: float,
+  pos_in: wp.vec3,
+  normal_in: wp.vec3,
+  tangent_in: wp.vec3,
+  margin_in: float,
+  gap_in: float,
+  condim_in: int,
+  friction_in: vec5,
+  solref_in: wp.vec2f,
+  solreffriction_in: wp.vec2f,
+  solimp_in: vec5,
+  geoms_in: wp.vec2i,
+  worldid_in: int,
+  # Data out:
+  ncon_out: wp.array(dtype=int),
+  contact_dist_out: wp.array(dtype=float),
+  contact_pos_out: wp.array(dtype=wp.vec3),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
+  contact_includemargin_out: wp.array(dtype=float),
+  contact_friction_out: wp.array(dtype=vec5),
+  contact_solref_out: wp.array(dtype=wp.vec2),
+  contact_solreffriction_out: wp.array(dtype=wp.vec2),
+  contact_solimp_out: wp.array(dtype=vec5),
+  contact_dim_out: wp.array(dtype=int),
+  contact_geom_out: wp.array(dtype=wp.vec2i),
+  contact_worldid_out: wp.array(dtype=int),
+):
+  active = (dist_in - margin_in) < 0
+  if active:
+    cid = contact_index # wp.atomic_add(ncon_out, 0, 1)
+    if cid < nconmax_in:
+      contact_dist_out[cid] = dist_in
+      contact_pos_out[cid] = pos_in
+      contact_normal_out[cid] = normal_in
+      contact_tangent_out[cid] = tangent_in
+      contact_geom_out[cid] = geoms_in
+      contact_worldid_out[cid] = worldid_in
+      includemargin = margin_in - gap_in
+      contact_includemargin_out[cid] = includemargin
+      contact_dim_out[cid] = condim_in
+      contact_friction_out[cid] = friction_in
+      contact_solref_out[cid] = solref_in
+      contact_solreffriction_out[cid] = solreffriction_in
+      contact_solimp_out[cid] = solimp_in
+
+
+
 @wp.struct
 class WriteContactArgs:
   # Data in:
@@ -224,8 +280,9 @@ class WriteContactArgs:
 
 
 @wp.func
-def contact_writer(contact: ContactPoint, args: WriteContactArgs):
-  write_contact(
+def contact_writer(contact_index: int, contact: ContactPoint, args: WriteContactArgs):
+  write_contact2(
+    contact_index,
     args.nconmax_in,
     contact.dist,
     contact.pos,
@@ -271,6 +328,7 @@ def plane_sphere_wrapper(
     plane.pos,
     sphere.pos,
     sphere.size[0],
+    margin,
     write_contact_args,
   )
 
@@ -289,6 +347,7 @@ def sphere_sphere_wrapper(
     sphere1.size[0],
     sphere2.pos,
     sphere2.size[0],
+    margin,
     write_contact_args,
   )
 
@@ -312,6 +371,7 @@ def sphere_capsule_wrapper(
     cap.size[0],
     cap.size[1],
     cap.rot,
+    margin,
     write_contact_args,
   )
 
@@ -336,6 +396,7 @@ def capsule_capsule_wrapper(
     cap2_axis,
     cap2.size[0],
     cap2.size[1],
+    margin,
     write_contact_args,
   )
 
@@ -358,6 +419,7 @@ def plane_capsule_wrapper(
     cap_axis,
     cap.size[0],
     cap.size[1],
+    margin,
     write_contact_args,
   )
 
@@ -378,6 +440,7 @@ def plane_ellipsoid_wrapper(
     ellipsoid.pos,
     ellipsoid.rot,
     ellipsoid.size,
+    margin,
     write_contact_args,
   )
 
@@ -423,6 +486,7 @@ def plane_convex_wrapper(
     convex.vertnum,
     convex.graph,
     convex.graphadr,
+    margin,
     write_contact_args,
   )
 
@@ -446,6 +510,7 @@ def sphere_cylinder_wrapper(
     cylinder.size[0],
     cylinder.size[1],
     cylinder.rot,
+    margin,
     write_contact_args,
   )
 
@@ -468,6 +533,7 @@ def plane_cylinder_wrapper(
     cylinder_axis,
     cylinder.size[0],
     cylinder.size[1],
+    margin,
     write_contact_args,
   )
 
