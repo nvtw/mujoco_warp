@@ -558,63 +558,70 @@ def _sphere_sphere_ext(
   return pack_contact_auto_tangent(pos, n, dist)
 
 
-def get_sphere_capsule(contact_writer: Any):
-  @wp.func
-  def sphere_capsule(
-    # In:
-    sphere_center: wp.vec3,
-    sphere_radius: float,
-    sphere_rot: wp.mat33,
-    cap_center: wp.vec3,
-    cap_axis: wp.vec3,
-    cap_radius: float,
-    cap_half_length: float,
-    cap_rot: wp.mat33,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates one contact between a sphere and a capsule.
+@wp.func
+def sphere_capsule(
+  # In:
+  sphere_center: wp.vec3,
+  sphere_radius: float,
+  sphere_rot: wp.mat33,
+  cap_center: wp.vec3,
+  cap_axis: wp.vec3,
+  cap_radius: float,
+  cap_half_length: float,
+  cap_rot: wp.mat33,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  """Calculates one contact between a sphere and a capsule.
 
-    Args:
-      sphere_center: Center of the sphere.
-      sphere_radius: Radius of the sphere.
-      sphere_rot: Rotation matrix of the sphere (used for contact normal calculation).
-      cap_center: Center of the capsule.
-      cap_axis: Axis of the capsule.
-      cap_radius: Radius of the capsule.
-      cap_half_length: Half-length of the capsule's cylindrical body.
-      cap_rot: Rotation matrix of the capsule (used for contact normal calculation).
-      margin: Collision margin.
-      contact_writer_args: Arguments for the contact writer.
+  Args:
+    sphere_center: Center of the sphere.
+    sphere_radius: Radius of the sphere.
+    sphere_rot: Rotation matrix of the sphere (used for contact normal calculation).
+    cap_center: Center of the capsule.
+    cap_axis: Axis of the capsule.
+    cap_radius: Radius of the capsule.
+    cap_half_length: Half-length of the capsule's cylindrical body.
+    cap_rot: Rotation matrix of the capsule (used for contact normal calculation).
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    ncon_out: Output array for contact count.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
 
-    Returns:
-        int: Number of contacts generated (0 or 1).
-    """
-    segment = cap_axis * cap_half_length
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
+  segment = cap_axis * cap_half_length
 
-    # Find closest point on capsule centerline to sphere center
-    pt = closest_segment_point(cap_center - segment, cap_center + segment, sphere_center)
+  # Find closest point on capsule centerline to sphere center
+  pt = closest_segment_point(cap_center - segment, cap_center + segment, sphere_center)
 
-    # Treat as sphere-sphere collision between sphere and closest point
-    contact = _sphere_sphere_ext(
-      sphere_center,
-      sphere_radius,
-      pt,
-      cap_radius,
-      sphere_rot,
-      cap_rot,
-    )
+  # Treat as sphere-sphere collision between sphere and closest point
+  contact = _sphere_sphere_ext(
+    sphere_center,
+    sphere_radius,
+    pt,
+    cap_radius,
+    sphere_rot,
+    cap_rot,
+  )
 
-    # Check if contact is active (within margin)
-    if (contact.dist - margin) >= 0:
-      return 0
+  # Check if contact is active (within margin)
+  if (contact.dist - margin) >= 0:
+    return 0, 0
 
-    # Reserve one contact slot
-    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
-    wp.static(contact_writer)(contact_index, contact, contact_writer_args)
-    return 1
-
-  return sphere_capsule
+  # Reserve one contact slot
+  contact_index = wp.atomic_add(ncon_out, 0, 1)
+  _write_contact(contact_index, contact, nconmax, dist_out, pos_out, normal_out, tangent_out)
+  return contact_index, contact_index + 1
 
 
 def get_plane_capsule(contact_writer: Any):
