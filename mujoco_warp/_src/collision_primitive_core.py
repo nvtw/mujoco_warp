@@ -1420,87 +1420,98 @@ def capsule_box(
 
 
 
-def get_plane_box(contact_writer: Any):
-  @wp.func
-  def plane_box(
-    # In:
-    plane_normal: wp.vec3,
-    plane_pos: wp.vec3,
-    box_center: wp.vec3,
-    box_rot: wp.mat33,
-    box_half_sizes: wp.vec3,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates contacts between a plane and a box.
 
-    Can generate up to 4 contact points for the penetrating corners.
+@wp.func
+def plane_box(
+  # In:
+  plane_normal: wp.vec3,
+  plane_pos: wp.vec3,
+  box_center: wp.vec3,
+  box_rot: wp.mat33,
+  box_half_sizes: wp.vec3,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  """Calculates contacts between a plane and a box.
 
-    Args:
-      plane_normal: Normal vector of the plane.
-      plane_pos: A point on the plane.
-      box_center: Center of the box.
-      box_rot: Rotation matrix of the box.
-      box_half_sizes: Half-sizes of the box.
-      contact_writer_args: Arguments for the contact writer.
-      margin: Collision margin.
+  Can generate up to 4 contact points for the penetrating corners.
 
-    Returns:
-        int: Number of contacts generated (0-4)
-    """
-    corner = wp.vec3()
-    dist = wp.dot(box_center - plane_pos, plane_normal)
+  Args:
+    plane_normal: Normal vector of the plane.
+    plane_pos: A point on the plane.
+    box_center: Center of the box.
+    box_rot: Rotation matrix of the box.
+    box_half_sizes: Half-sizes of the box.
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    ncon_out: Output array for contact count.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
 
-    # First pass: count valid contacts and store them
-    valid_contacts = mat43f()  # Store up to 4 contacts
-    valid_contacts_dist = vec4f()
-    num_contacts = int(0)
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
+  corner = wp.vec3()
+  dist = wp.dot(box_center - plane_pos, plane_normal)
 
-    # test all corners, pick bottom 4
-    for i in range(8):
-      if num_contacts >= 4:
-        break
+  # First pass: count valid contacts and store them
+  valid_contacts = mat43f()  # Store up to 4 contacts
+  valid_contacts_dist = vec4f()
+  num_contacts = int(0)
 
-      # get corner in local coordinates
-      corner.x = wp.where(i & 1, box_half_sizes.x, -box_half_sizes.x)
-      corner.y = wp.where(i & 2, box_half_sizes.y, -box_half_sizes.y)
-      corner.z = wp.where(i & 4, box_half_sizes.z, -box_half_sizes.z)
+  # test all corners, pick bottom 4
+  for i in range(8):
+    if num_contacts >= 4:
+      break
 
-      # get corner in global coordinates relative to box center
-      corner = box_rot @ corner
+    # get corner in local coordinates
+    corner.x = wp.where(i & 1, box_half_sizes.x, -box_half_sizes.x)
+    corner.y = wp.where(i & 2, box_half_sizes.y, -box_half_sizes.y)
+    corner.z = wp.where(i & 4, box_half_sizes.z, -box_half_sizes.z)
 
-      # compute distance to plane, skip if too far or pointing up
-      ldist = wp.dot(plane_normal, corner)
-      if dist + ldist > margin or ldist > 0:
-        continue
+    # get corner in global coordinates relative to box center
+    corner = box_rot @ corner
 
-      cdist = dist + ldist
+    # compute distance to plane, skip if too far or pointing up
+    ldist = wp.dot(plane_normal, corner)
+    if dist + ldist > margin or ldist > 0:
+      continue
 
-      # Check if contact is active (within margin)
-      if (cdist - margin) >= 0:
-        continue
+    cdist = dist + ldist
 
-      contact_pos = corner + box_center - plane_normal * (cdist * 0.5)
+    # Check if contact is active (within margin)
+    if (cdist - margin) >= 0:
+      continue
 
-      # Store contact information for later writing
-      valid_contacts[num_contacts] = contact_pos
-      valid_contacts_dist[num_contacts] = cdist  # Store distance in the 4th component
-      num_contacts += 1
+    contact_pos = corner + box_center - plane_normal * (cdist * 0.5)
 
-    # Second pass: reserve contact slots and write contacts
-    if num_contacts > 0:
-      contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
-      tangent = make_tangent(plane_normal)
+    # Store contact information for later writing
+    valid_contacts[num_contacts] = contact_pos
+    valid_contacts_dist[num_contacts] = cdist  # Store distance in the 4th component
+    num_contacts += 1
 
-      for i in range(num_contacts):
-        contact_pos = wp.vec3(valid_contacts[i, 0], valid_contacts[i, 1], valid_contacts[i, 2])
-        cdist = valid_contacts_dist[i]
-        contact = pack_contact(contact_pos, plane_normal, tangent, cdist)
-        wp.static(contact_writer)(contact_index + i, contact, contact_writer_args)
+  # Second pass: reserve contact slots and write contacts
+  if num_contacts > 0:
+    contact_index = wp.atomic_add(ncon_out, 0, num_contacts)
+    tangent = make_tangent(plane_normal)
 
-    return num_contacts
+    for i in range(num_contacts):
+      contact_pos = wp.vec3(valid_contacts[i, 0], valid_contacts[i, 1], valid_contacts[i, 2])
+      cdist = valid_contacts_dist[i]
+      contact = pack_contact(contact_pos, plane_normal, tangent, cdist)
+      _write_contact(contact_index + i, contact, nconmax, dist_out, pos_out, normal_out, tangent_out)
 
-  return plane_box
+    return contact_index, contact_index + num_contacts
+
+  return 0, 0
+
 
 
 def get_box_box(contact_writer: Any):
