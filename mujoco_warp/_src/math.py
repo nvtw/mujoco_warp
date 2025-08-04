@@ -213,6 +213,22 @@ def make_frame(a: wp.vec3):
 
 
 @wp.func
+def extract_frame(normal: wp.vec3, tangent: wp.vec3) -> wp.mat33:
+  tangent2 = wp.cross(normal, tangent)
+  return wp.mat33(normal[0], normal[1], normal[2], tangent[0], tangent[1], tangent[2], tangent2[0], tangent2[1], tangent2[2])
+
+
+@wp.func
+def get_tangent(frame: wp.mat33) -> wp.vec3:
+  return wp.vec3(frame[1, 0], frame[1, 1], frame[1, 2])
+
+
+@wp.func
+def get_normal(frame: wp.mat33) -> wp.vec3:
+  return wp.vec3(frame[0, 0], frame[0, 1], frame[0, 2])
+
+
+@wp.func
 def normalize_with_norm(x: Any):
   norm = wp.length(x)
   if norm == 0.0:

@@ -148,7 +148,8 @@ def write_contact(
   # In:
   dist_in: float,
   pos_in: wp.vec3,
-  frame_in: wp.mat33,
+  normal_in: wp.vec3,
+  tangent_in: wp.vec3,
   margin_in: float,
   gap_in: float,
   condim_in: int,
@@ -162,7 +163,8 @@ def write_contact(
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
-  contact_frame_out: wp.array(dtype=wp.mat33),
+  contact_normal_out: wp.array(dtype=wp.vec3),
+  contact_tangent_out: wp.array(dtype=wp.vec3),
   contact_includemargin_out: wp.array(dtype=float),
   contact_friction_out: wp.array(dtype=vec5),
   contact_solref_out: wp.array(dtype=wp.vec2),
@@ -178,7 +180,8 @@ def write_contact(
     if cid < nconmax_in:
       contact_dist_out[cid] = dist_in
       contact_pos_out[cid] = pos_in
-      contact_frame_out[cid] = frame_in
+      contact_normal_out[cid] = normal_in
+      contact_tangent_out[cid] = tangent_in
       contact_geom_out[cid] = geoms_in
       contact_worldid_out[cid] = worldid_in
       includemargin = margin_in - gap_in
@@ -208,7 +211,8 @@ class WriteContactArgs:
   ncon_out: wp.array(dtype=int)
   contact_dist_out: wp.array(dtype=float)
   contact_pos_out: wp.array(dtype=wp.vec3)
-  contact_frame_out: wp.array(dtype=wp.mat33)
+  contact_normal_out: wp.array(dtype=wp.vec3)
+  contact_tangent_out: wp.array(dtype=wp.vec3)
   contact_includemargin_out: wp.array(dtype=float)
   contact_friction_out: wp.array(dtype=vec5)
   contact_solref_out: wp.array(dtype=wp.vec2)
@@ -225,7 +229,8 @@ def contact_writer(contact: ContactPoint, args: WriteContactArgs):
     args.nconmax_in,
     contact.dist,
     contact.pos,
-    extract_frame(contact),
+    contact.normal,
+    contact.tangent,
     args.margin_in,
     args.gap_in,
     args.condim_in,
@@ -238,7 +243,8 @@ def contact_writer(contact: ContactPoint, args: WriteContactArgs):
     args.ncon_out,
     args.contact_dist_out,
     args.contact_pos_out,
-    args.contact_frame_out,
+    args.contact_normal_out,
+    args.contact_tangent_out,
     args.contact_includemargin_out,
     args.contact_friction_out,
     args.contact_solref_out,
@@ -704,7 +710,8 @@ def _primitive_narrowphase_builder(m: Model):
     ncon_out: wp.array(dtype=int),
     contact_dist_out: wp.array(dtype=float),
     contact_pos_out: wp.array(dtype=wp.vec3),
-    contact_frame_out: wp.array(dtype=wp.mat33),
+    contact_normal_out: wp.array(dtype=wp.vec3),
+    contact_tangent_out: wp.array(dtype=wp.vec3),
     contact_includemargin_out: wp.array(dtype=float),
     contact_friction_out: wp.array(dtype=vec5),
     contact_solref_out: wp.array(dtype=wp.vec2),
@@ -826,7 +833,8 @@ def _primitive_narrowphase_builder(m: Model):
     write_contact_args.ncon_out = ncon_out
     write_contact_args.contact_dist_out = contact_dist_out
     write_contact_args.contact_pos_out = contact_pos_out
-    write_contact_args.contact_frame_out = contact_frame_out
+    write_contact_args.contact_normal_out = contact_normal_out
+    write_contact_args.contact_tangent_out = contact_tangent_out
     write_contact_args.contact_includemargin_out = contact_includemargin_out
     write_contact_args.contact_friction_out = contact_friction_out
     write_contact_args.contact_solref_out = contact_solref_out
@@ -923,7 +931,8 @@ def primitive_narrowphase(m: Model, d: Data):
       d.ncon,
       d.contact.dist,
       d.contact.pos,
-      d.contact.frame,
+      d.contact.normal,
+      d.contact.tangent,
       d.contact.includemargin,
       d.contact.friction,
       d.contact.solref,

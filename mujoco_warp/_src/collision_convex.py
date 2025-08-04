@@ -23,6 +23,8 @@ from .collision_hfield import hfield_prism_vertex
 from .collision_primitive import _geom
 from .collision_primitive import contact_params
 from .collision_primitive import write_contact
+from .math import get_normal
+from .math import get_tangent
 from .math import make_frame
 from .math import upper_tri_index
 from .math import upper_trid_index
@@ -180,7 +182,8 @@ def ccd_kernel_builder(
     ncon_hfield_out: wp.array2d(dtype=int),
     contact_dist_out: wp.array(dtype=float),
     contact_pos_out: wp.array(dtype=wp.vec3),
-    contact_frame_out: wp.array(dtype=wp.mat33),
+    contact_normal_out: wp.array(dtype=wp.vec3),
+    contact_tangent_out: wp.array(dtype=wp.vec3),
     contact_includemargin_out: wp.array(dtype=float),
     contact_friction_out: wp.array(dtype=vec5),
     contact_solref_out: wp.array(dtype=wp.vec2),
@@ -352,6 +355,8 @@ def ccd_kernel_builder(
       normal = x1 - x2
 
     frame = make_frame(normal)
+    normal = get_normal(frame)
+    tangent = get_tangent(frame)
     for i in range(count):
       # limit maximum number of contacts with height field
       if _max_contacts_height_field(ngeom, geom_type, geompair2hfgeompair, g1, g2, worldid, ncon_hfield_out):
@@ -361,7 +366,8 @@ def ccd_kernel_builder(
         nconmax_in,
         dist,
         points[i],
-        frame,
+        normal,
+        tangent,
         margin,
         gap,
         condim,
@@ -374,7 +380,8 @@ def ccd_kernel_builder(
         ncon_out,
         contact_dist_out,
         contact_pos_out,
-        contact_frame_out,
+        contact_normal_out,
+        contact_tangent_out,
         contact_includemargin_out,
         contact_friction_out,
         contact_solref_out,
@@ -482,7 +489,8 @@ def convex_narrowphase(m: Model, d: Data):
           d.ncon_hfield,
           d.contact.dist,
           d.contact.pos,
-          d.contact.frame,
+          d.contact.normal,
+          d.contact.tangent,
           d.contact.includemargin,
           d.contact.friction,
           d.contact.solref,

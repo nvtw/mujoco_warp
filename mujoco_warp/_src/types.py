@@ -1348,7 +1348,8 @@ class Contact:
 
   dist: wp.array(dtype=float)
   pos: wp.array(dtype=wp.vec3)
-  frame: wp.array(dtype=wp.mat33)
+  normal: wp.array(dtype=wp.vec3)
+  tangent: wp.array(dtype=wp.vec3)
   includemargin: wp.array(dtype=float)
   friction: wp.array(dtype=vec5)
   solref: wp.array(dtype=wp.vec2)

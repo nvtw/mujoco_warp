@@ -21,6 +21,7 @@ from .math import closest_segment_point
 from .math import closest_segment_to_segment_points
 from .math import normalize_with_norm
 from .math import orthogonals
+from .math import get_tangent
 from .types import MJ_MINVAL
 
 wp.set_module_options({"enable_backward": False})
@@ -102,11 +103,6 @@ def extract_frame(c: ContactPoint) -> wp.mat33:
   tangent = c.tangent
   tangent2 = wp.cross(normal, tangent)
   return wp.mat33(normal[0], normal[1], normal[2], tangent[0], tangent[1], tangent[2], tangent2[0], tangent2[1], tangent2[2])
-
-
-@wp.func
-def get_tangent(frame: wp.mat33) -> wp.vec3:
-  return wp.vec3(frame[0, 1], frame[1, 1], frame[2, 1])
 
 
 _HUGE_VAL = 1e6
