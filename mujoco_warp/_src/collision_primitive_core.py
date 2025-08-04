@@ -832,113 +832,120 @@ def capsule_capsule(
   return contact_index, contact_index + 1
 
 
-def get_sphere_cylinder(contact_writer: Any):
-  @wp.func
-  def sphere_cylinder(
-    # In:
-    sphere_center: wp.vec3,
-    sphere_radius: float,
-    sphere_rot: wp.mat33,
-    cylinder_center: wp.vec3,
-    cylinder_axis: wp.vec3,
-    cylinder_radius: float,
-    cylinder_half_height: float,
-    cylinder_rot: wp.mat33,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates one contact between a sphere and a cylinder.
+@wp.func
+def sphere_cylinder(
+  # In:
+  sphere_center: wp.vec3,
+  sphere_radius: float,
+  sphere_rot: wp.mat33,
+  cylinder_center: wp.vec3,
+  cylinder_axis: wp.vec3,
+  cylinder_radius: float,
+  cylinder_half_height: float,
+  cylinder_rot: wp.mat33,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  """Calculates one contact between a sphere and a cylinder.
 
-    Args:
-      sphere_center: Center of the sphere.
-      sphere_radius: Radius of the sphere.
-      sphere_rot: Rotation matrix of the sphere (used for contact normal calculation).
-      cylinder_center: Center of the cylinder.
-      cylinder_axis: Axis of the cylinder.
-      cylinder_radius: Radius of the cylinder.
-      cylinder_half_height: Half-height of the cylinder.
-      cylinder_rot: Rotation matrix of the cylinder (used for contact normal calculation).
-      margin: Collision margin.
-      contact_writer_args: Arguments for the contact writer.
+  Args:
+    sphere_center: Center of the sphere.
+    sphere_radius: Radius of the sphere.
+    sphere_rot: Rotation matrix of the sphere (used for contact normal calculation).
+    cylinder_center: Center of the cylinder.
+    cylinder_axis: Axis of the cylinder.
+    cylinder_radius: Radius of the cylinder.
+    cylinder_half_height: Half-height of the cylinder.
+    cylinder_rot: Rotation matrix of the cylinder (used for contact normal calculation).
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    ncon_out: Output array for contact count.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
 
-    Returns:
-        int: Number of contacts generated (0 or 1).
-    """
-    vec = sphere_center - cylinder_center
-    x = wp.dot(vec, cylinder_axis)
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
+  vec = sphere_center - cylinder_center
+  x = wp.dot(vec, cylinder_axis)
 
-    a_proj = cylinder_axis * x
-    p_proj = vec - a_proj
-    p_proj_sqr = wp.dot(p_proj, p_proj)
+  a_proj = cylinder_axis * x
+  p_proj = vec - a_proj
+  p_proj_sqr = wp.dot(p_proj, p_proj)
 
-    collide_side = wp.abs(x) < cylinder_half_height
-    collide_cap = p_proj_sqr < (cylinder_radius * cylinder_radius)
+  collide_side = wp.abs(x) < cylinder_half_height
+  collide_cap = p_proj_sqr < (cylinder_radius * cylinder_radius)
 
-    if collide_side and collide_cap:
-      dist_cap = cylinder_half_height - wp.abs(x)
-      dist_radius = cylinder_radius - wp.sqrt(p_proj_sqr)
+  if collide_side and collide_cap:
+    dist_cap = cylinder_half_height - wp.abs(x)
+    dist_radius = cylinder_radius - wp.sqrt(p_proj_sqr)
 
-      if dist_cap < dist_radius:
-        collide_side = False
-      else:
-        collide_cap = False
-
-    contact = ContactPoint()
-
-    # Side collision
-    if collide_side:
-      pos_target = cylinder_center + a_proj
-      contact = _sphere_sphere_ext(
-        sphere_center,
-        sphere_radius,
-        pos_target,
-        cylinder_radius,
-        sphere_rot,
-        cylinder_rot,
-      )
-
-    # Cap collision
-    elif collide_cap:
-      if x > 0.0:
-        # top cap
-        pos_cap = cylinder_center + cylinder_axis * cylinder_half_height
-        plane_normal = cylinder_axis
-      else:
-        # bottom cap
-        pos_cap = cylinder_center - cylinder_axis * cylinder_half_height
-        plane_normal = -cylinder_axis
-
-      dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere_center, sphere_radius)
-      plane_normal = -plane_normal  # Flip normal after position calculation
-      contact = pack_contact_auto_tangent(pos_contact, plane_normal, dist)
-
-    # Corner collision
+    if dist_cap < dist_radius:
+      collide_side = False
     else:
-      inv_len = 1.0 / wp.sqrt(p_proj_sqr)
-      p_proj = p_proj * (cylinder_radius * inv_len)
+      collide_cap = False
 
-      cap_offset = cylinder_axis * (wp.sign(x) * cylinder_half_height)
-      pos_corner = cylinder_center + cap_offset + p_proj
+  contact = ContactPoint()
 
-      contact = _sphere_sphere_ext(
-        sphere_center,
-        sphere_radius,
-        pos_corner,
-        0.0,
-        sphere_rot,
-        cylinder_rot,
-      )
+  # Side collision
+  if collide_side:
+    pos_target = cylinder_center + a_proj
+    contact = _sphere_sphere_ext(
+      sphere_center,
+      sphere_radius,
+      pos_target,
+      cylinder_radius,
+      sphere_rot,
+      cylinder_rot,
+    )
 
-    # Check if contact is active (within margin)
-    if (contact.dist - margin) >= 0:
-      return 0
+  # Cap collision
+  elif collide_cap:
+    if x > 0.0:
+      # top cap
+      pos_cap = cylinder_center + cylinder_axis * cylinder_half_height
+      plane_normal = cylinder_axis
+    else:
+      # bottom cap
+      pos_cap = cylinder_center - cylinder_axis * cylinder_half_height
+      plane_normal = -cylinder_axis
 
-    # Reserve one contact slot
-    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
-    wp.static(contact_writer)(contact_index, contact, contact_writer_args)
-    return 1
+    dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere_center, sphere_radius)
+    plane_normal = -plane_normal  # Flip normal after position calculation
+    contact = pack_contact_auto_tangent(pos_contact, plane_normal, dist)
 
-  return sphere_cylinder
+  # Corner collision
+  else:
+    inv_len = 1.0 / wp.sqrt(p_proj_sqr)
+    p_proj = p_proj * (cylinder_radius * inv_len)
+
+    cap_offset = cylinder_axis * (wp.sign(x) * cylinder_half_height)
+    pos_corner = cylinder_center + cap_offset + p_proj
+
+    contact = _sphere_sphere_ext(
+      sphere_center,
+      sphere_radius,
+      pos_corner,
+      0.0,
+      sphere_rot,
+      cylinder_rot,
+    )
+
+  # Check if contact is active (within margin)
+  if (contact.dist - margin) >= 0:
+    return 0, 0
+
+  # Reserve one contact slot
+  contact_index = wp.atomic_add(ncon_out, 0, 1)
+  _write_contact(contact_index, contact, nconmax, dist_out, pos_out, normal_out, tangent_out)
+  return contact_index, contact_index + 1
 
 
 @wp.func

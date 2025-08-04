@@ -710,7 +710,7 @@ def sphere_cylinder_wrapper(
 ) -> int:
   """Calculates one contact between a sphere and a cylinder."""
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
-  return wp.static(get_sphere_cylinder(contact_writer))(
+  start, end = sphere_cylinder(
     sphere.pos,
     sphere.size[0],
     sphere.rot,
@@ -720,8 +720,37 @@ def sphere_cylinder_wrapper(
     cylinder.size[1],
     cylinder.rot,
     margin,
-    write_contact_args,
+    write_contact_args.nconmax_in,
+    write_contact_args.ncon_out,
+    write_contact_args.contact_dist_out,
+    write_contact_args.contact_pos_out,
+    write_contact_args.contact_normal_out,
+    write_contact_args.contact_tangent_out,
   )
+  for i in range(start, end):
+    _write_contact2(
+      i,
+      write_contact_args.nconmax_in,
+      write_contact_args.margin_in,
+      write_contact_args.gap_in,
+      write_contact_args.condim_in,
+      write_contact_args.friction_in,
+      write_contact_args.solref_in,
+      write_contact_args.solreffriction_in,
+      write_contact_args.solimp_in,
+      write_contact_args.geoms_in,
+      write_contact_args.worldid_in,
+      write_contact_args.contact_includemargin_out,
+      write_contact_args.contact_friction_out,
+      write_contact_args.contact_solref_out,
+      write_contact_args.contact_solreffriction_out,
+      write_contact_args.contact_solimp_out,
+      write_contact_args.contact_dim_out,
+      write_contact_args.contact_geom_out,
+      write_contact_args.contact_worldid_out,
+    )
+
+  return 0
 
 
 @wp.func
