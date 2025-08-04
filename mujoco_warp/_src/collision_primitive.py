@@ -142,7 +142,7 @@ def _geom(
 
 
 @wp.func
-def _write_contact2(
+def _write_contact_ext(
   contact_index: int,
   # Data in:
   nconmax_in: int,
@@ -215,59 +215,6 @@ def write_contact(
   active = (dist_in - margin_in) < 0
   if active:
     cid = wp.atomic_add(ncon_out, 0, 1)
-    if cid < nconmax_in:
-      contact_dist_out[cid] = dist_in
-      contact_pos_out[cid] = pos_in
-      contact_normal_out[cid] = normal_in
-      contact_tangent_out[cid] = tangent_in
-      contact_geom_out[cid] = geoms_in
-      contact_worldid_out[cid] = worldid_in
-      includemargin = margin_in - gap_in
-      contact_includemargin_out[cid] = includemargin
-      contact_dim_out[cid] = condim_in
-      contact_friction_out[cid] = friction_in
-      contact_solref_out[cid] = solref_in
-      contact_solreffriction_out[cid] = solreffriction_in
-      contact_solimp_out[cid] = solimp_in
-
-
-@wp.func
-def write_contact2(
-  contact_index: int,
-  # Data in:
-  nconmax_in: int,
-  # In:
-  dist_in: float,
-  pos_in: wp.vec3,
-  normal_in: wp.vec3,
-  tangent_in: wp.vec3,
-  margin_in: float,
-  gap_in: float,
-  condim_in: int,
-  friction_in: vec5,
-  solref_in: wp.vec2f,
-  solreffriction_in: wp.vec2f,
-  solimp_in: vec5,
-  geoms_in: wp.vec2i,
-  worldid_in: int,
-  # Data out:
-  ncon_out: wp.array(dtype=int),
-  contact_dist_out: wp.array(dtype=float),
-  contact_pos_out: wp.array(dtype=wp.vec3),
-  contact_normal_out: wp.array(dtype=wp.vec3),
-  contact_tangent_out: wp.array(dtype=wp.vec3),
-  contact_includemargin_out: wp.array(dtype=float),
-  contact_friction_out: wp.array(dtype=vec5),
-  contact_solref_out: wp.array(dtype=wp.vec2),
-  contact_solreffriction_out: wp.array(dtype=wp.vec2),
-  contact_solimp_out: wp.array(dtype=vec5),
-  contact_dim_out: wp.array(dtype=int),
-  contact_geom_out: wp.array(dtype=wp.vec2i),
-  contact_worldid_out: wp.array(dtype=int),
-):
-  active = (dist_in - margin_in) < 0
-  if active:
-    cid = contact_index  # wp.atomic_add(ncon_out, 0, 1)
     if cid < nconmax_in:
       contact_dist_out[cid] = dist_in
       contact_pos_out[cid] = pos_in
@@ -1021,7 +968,7 @@ def _primitive_narrowphase_builder(m: Model):
     # Write contact metadata for all contacts in the range
     if start >= 0:
       for i in range(start, end):
-        _write_contact2(
+        _write_contact_ext(
           i,
           nconmax_in,
           margin,
