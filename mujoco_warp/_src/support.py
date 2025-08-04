@@ -17,6 +17,7 @@ from typing import Tuple
 
 import warp as wp
 
+from . import math
 from .math import motion_cross
 from .types import ConeType
 from .types import Data
@@ -27,7 +28,6 @@ from .types import vec5
 from .warp_util import cache_kernel
 from .warp_util import event_scope
 from .warp_util import kernel as nested_kernel
-from . import math
 
 wp.set_module_options({"enable_backward": False})
 

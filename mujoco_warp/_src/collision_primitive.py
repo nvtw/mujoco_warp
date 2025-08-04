@@ -284,9 +284,6 @@ def write_contact2(
       contact_solimp_out[cid] = solimp_in
 
 
-
-
-
 @wp.func
 def plane_sphere_wrapper(
   # In:
@@ -314,7 +311,7 @@ def plane_sphere_wrapper(
     contact_dist_out,
     contact_pos_out,
     contact_normal_out,
-    contact_tangent_out,    
+    contact_tangent_out,
   )
 
 
@@ -780,7 +777,7 @@ def box_box_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) :
+):
   """Calculates contacts between two boxes."""
   return box_box(
     box1.pos,
