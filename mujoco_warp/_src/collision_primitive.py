@@ -300,10 +300,10 @@ def plane_sphere_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+):
   """Calculates one contact between a plane and a sphere."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
-  start, end = plane_sphere(
+  return plane_sphere(
     plane_normal,
     plane.pos,
     sphere.pos,
@@ -316,7 +316,6 @@ def plane_sphere_wrapper(
     contact_normal_out,
     contact_tangent_out,    
   )
-  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -332,9 +331,9 @@ def sphere_sphere_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+):
   """Calculates one contact between two spheres."""
-  start, end = sphere_sphere(
+  return sphere_sphere(
     sphere1.pos,
     sphere1.size[0],
     sphere2.pos,
@@ -347,7 +346,6 @@ def sphere_sphere_wrapper(
     contact_normal_out,
     contact_tangent_out,
   )
-  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -363,10 +361,10 @@ def sphere_capsule_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+):
   """Calculates one contact between a sphere and a capsule."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  start, end = sphere_capsule(
+  return sphere_capsule(
     sphere.pos,
     sphere.size[0],
     sphere.rot,
@@ -383,7 +381,6 @@ def sphere_capsule_wrapper(
     contact_normal_out,
     contact_tangent_out,
   )
-  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -399,11 +396,11 @@ def capsule_capsule_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+):
   """Calculates one contact between two capsules."""
   cap1_axis = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
   cap2_axis = wp.vec3(cap2.rot[0, 2], cap2.rot[1, 2], cap2.rot[2, 2])
-  start, end = capsule_capsule(
+  return capsule_capsule(
     cap1.pos,
     cap1_axis,
     cap1.size[0],
@@ -420,7 +417,6 @@ def capsule_capsule_wrapper(
     contact_normal_out,
     contact_tangent_out,
   )
-  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -436,11 +432,11 @@ def plane_capsule_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+):
   """Calculates two contacts between a capsule and a plane."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  start, end = plane_capsule(
+  return plane_capsule(
     plane_normal,
     plane.pos,
     cap.pos,
@@ -455,7 +451,6 @@ def plane_capsule_wrapper(
     contact_normal_out,
     contact_tangent_out,
   )
-  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -471,10 +466,10 @@ def plane_ellipsoid_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+):
   """Calculates one contact between a plane and an ellipsoid."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
-  start, end = plane_ellipsoid(
+  return plane_ellipsoid(
     plane_normal,
     plane.pos,
     ellipsoid.pos,
@@ -488,7 +483,6 @@ def plane_ellipsoid_wrapper(
     contact_normal_out,
     contact_tangent_out,
   )
-  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -504,10 +498,10 @@ def plane_box_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+):
   """Calculates contacts between a plane and a box."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
-  start, end = plane_box(
+  return plane_box(
     plane_normal,
     plane.pos,
     box.pos,
@@ -521,7 +515,6 @@ def plane_box_wrapper(
     contact_normal_out,
     contact_tangent_out,
   )
-  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -537,10 +530,10 @@ def plane_convex_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+):
   """Calculates contacts between a plane and a convex object."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
-  start, end = plane_convex(
+  return plane_convex(
     plane_normal,
     plane.pos,
     convex.pos,
@@ -558,7 +551,6 @@ def plane_convex_wrapper(
     contact_normal_out,
     contact_tangent_out,
   )
-  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -574,10 +566,10 @@ def sphere_cylinder_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+):
   """Calculates one contact between a sphere and a cylinder."""
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
-  start, end = sphere_cylinder(
+  return sphere_cylinder(
     sphere.pos,
     sphere.size[0],
     sphere.rot,
@@ -594,7 +586,6 @@ def sphere_cylinder_wrapper(
     contact_normal_out,
     contact_tangent_out,
   )
-  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -610,11 +601,11 @@ def plane_cylinder_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+):
   """Calculates contacts between a cylinder and a plane."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
-  start, end = plane_cylinder(
+  return plane_cylinder(
     plane_normal,
     plane.pos,
     cylinder.pos,
@@ -629,7 +620,6 @@ def plane_cylinder_wrapper(
     contact_normal_out,
     contact_tangent_out,
   )
-  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -725,9 +715,9 @@ def sphere_box_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+):
   """Calculates one contact between a sphere and a box."""
-  start, end = sphere_box(
+  return sphere_box(
     sphere.pos,
     sphere.size[0],
     box.pos,
@@ -741,7 +731,6 @@ def sphere_box_wrapper(
     contact_normal_out,
     contact_tangent_out,
   )
-  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -757,10 +746,10 @@ def capsule_box_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+):
   """Calculates contacts between a capsule and a box."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  start, end = capsule_box(
+  return capsule_box(
     cap.pos,
     cap_axis,
     cap.size[0],
@@ -776,7 +765,6 @@ def capsule_box_wrapper(
     contact_normal_out,
     contact_tangent_out,
   )
-  return wp.vec2i(start, end)
 
 
 @wp.func
@@ -792,9 +780,9 @@ def box_box_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> wp.vec2i:
+) :
   """Calculates contacts between two boxes."""
-  start, end = box_box(
+  return box_box(
     box1.pos,
     box1.rot,
     box1.size,
@@ -809,7 +797,6 @@ def box_box_wrapper(
     contact_normal_out,
     contact_tangent_out,
   )
-  return wp.vec2i(start, end)
 
 
 _PRIMITIVE_COLLISIONS = {
@@ -1015,13 +1002,14 @@ def _primitive_narrowphase_builder(m: Model):
       hftri_index,
     )
 
-    start_end = wp.vec2i(-1, -1)
+    start = -1
+    end = -1
     for i in range(wp.static(len(_primitive_collisions_func))):
       collision_type1 = wp.static(_primitive_collisions_types[i][0])
       collision_type2 = wp.static(_primitive_collisions_types[i][1])
 
       if collision_type1 == type1 and collision_type2 == type2:
-        start_end = wp.static(_primitive_collisions_func[i])(
+        start, end = wp.static(_primitive_collisions_func[i])(
           geom1,
           geom2,
           margin,
@@ -1034,8 +1022,8 @@ def _primitive_narrowphase_builder(m: Model):
         )
 
     # Write contact metadata for all contacts in the range
-    if start_end.x >= 0:
-      for i in range(start_end.x, start_end.y):
+    if start >= 0:
+      for i in range(start, end):
         _write_contact2(
           i,
           nconmax_in,
