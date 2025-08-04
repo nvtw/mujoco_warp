@@ -966,7 +966,7 @@ def box_box_wrapper(
   write_contact_args: WriteContactArgs,
 ) -> int:
   """Calculates contacts between two boxes."""
-  return wp.static(get_box_box(contact_writer))(
+  start, end = box_box(
     box1.pos,
     box1.rot,
     box1.size,
@@ -974,8 +974,37 @@ def box_box_wrapper(
     box2.rot,
     box2.size,
     margin,
-    write_contact_args,
+    write_contact_args.nconmax_in,
+    write_contact_args.ncon_out,
+    write_contact_args.contact_dist_out,
+    write_contact_args.contact_pos_out,
+    write_contact_args.contact_normal_out,
+    write_contact_args.contact_tangent_out,
   )
+  for i in range(start, end):
+    _write_contact2(
+      i,
+      write_contact_args.nconmax_in,
+      write_contact_args.margin_in,
+      write_contact_args.gap_in,
+      write_contact_args.condim_in,
+      write_contact_args.friction_in,
+      write_contact_args.solref_in,
+      write_contact_args.solreffriction_in,
+      write_contact_args.solimp_in,
+      write_contact_args.geoms_in,
+      write_contact_args.worldid_in,
+      write_contact_args.contact_includemargin_out,
+      write_contact_args.contact_friction_out,
+      write_contact_args.contact_solref_out,
+      write_contact_args.contact_solreffriction_out,
+      write_contact_args.contact_solimp_out,
+      write_contact_args.contact_dim_out,
+      write_contact_args.contact_geom_out,
+      write_contact_args.contact_worldid_out,
+    )
+
+  return 0
 
 
 _PRIMITIVE_COLLISIONS = {

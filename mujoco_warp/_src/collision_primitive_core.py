@@ -1514,457 +1514,468 @@ def plane_box(
 
 
 
-def get_box_box(contact_writer: Any):
-  @wp.func
-  def box_box(
-    # In:
-    box1_center: wp.vec3,
-    box1_rot: wp.mat33,
-    box1_half_sizes: wp.vec3,
-    box2_center: wp.vec3,
-    box2_rot: wp.mat33,
-    box2_half_sizes: wp.vec3,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates contacts between two boxes.
 
-    Args:
-      box1_center: Center of the first box.
-      box1_rot: Rotation matrix of the first box.
-      box1_half_sizes: Half-sizes of the first box.
-      box2_center: Center of the second box.
-      box2_rot: Rotation matrix of the second box.
-      box2_half_sizes: Half-sizes of the second box.
-      contact_writer_args: Arguments for the contact writer.
-      margin: Collision margin.
+@wp.func
+def box_box(
+  # In:
+  box1_center: wp.vec3,
+  box1_rot: wp.mat33,
+  box1_half_sizes: wp.vec3,
+  box2_center: wp.vec3,
+  box2_rot: wp.mat33,
+  box2_half_sizes: wp.vec3,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  """Calculates contacts between two boxes.
 
-    Returns:
-        int: Number of contacts generated.
-    """
-    # Compute transforms between box's frames
+  Args:
+    box1_center: Center of the first box.
+    box1_rot: Rotation matrix of the first box.
+    box1_half_sizes: Half-sizes of the first box.
+    box2_center: Center of the second box.
+    box2_rot: Rotation matrix of the second box.
+    box2_half_sizes: Half-sizes of the second box.
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    ncon_out: Output array for contact count.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
 
-    pos21 = wp.transpose(box1_rot) @ (box2_center - box1_center)
-    pos12 = wp.transpose(box2_rot) @ (box1_center - box2_center)
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
+  # Compute transforms between box's frames
 
-    rot21 = wp.transpose(box1_rot) @ box2_rot
-    rot12 = wp.transpose(rot21)
+  pos21 = wp.transpose(box1_rot) @ (box2_center - box1_center)
+  pos12 = wp.transpose(box2_rot) @ (box1_center - box2_center)
 
-    rot21abs = wp.matrix_from_rows(wp.abs(rot21[0]), wp.abs(rot21[1]), wp.abs(rot21[2]))
-    rot12abs = wp.transpose(rot21abs)
+  rot21 = wp.transpose(box1_rot) @ box2_rot
+  rot12 = wp.transpose(rot21)
 
-    plen2 = rot21abs @ box2_half_sizes
-    plen1 = rot12abs @ box1_half_sizes
+  rot21abs = wp.matrix_from_rows(wp.abs(rot21[0]), wp.abs(rot21[1]), wp.abs(rot21[2]))
+  rot12abs = wp.transpose(rot21abs)
 
-    # Compute axis of maximum separation
-    s_sum_3 = 3.0 * (box1_half_sizes + box2_half_sizes)
-    separation = wp.float32(margin + s_sum_3[0] + s_sum_3[1] + s_sum_3[2])
-    axis_code = wp.int32(-1)
+  plen2 = rot21abs @ box2_half_sizes
+  plen1 = rot12abs @ box1_half_sizes
 
-    # First test: consider boxes' face normals
-    for i in range(3):
-      c1 = -wp.abs(pos21[i]) + box1_half_sizes[i] + plen2[i]
+  # Compute axis of maximum separation
+  s_sum_3 = 3.0 * (box1_half_sizes + box2_half_sizes)
+  separation = wp.float32(margin + s_sum_3[0] + s_sum_3[1] + s_sum_3[2])
+  axis_code = wp.int32(-1)
 
-      c2 = -wp.abs(pos12[i]) + box2_half_sizes[i] + plen1[i]
+  # First test: consider boxes' face normals
+  for i in range(3):
+    c1 = -wp.abs(pos21[i]) + box1_half_sizes[i] + plen2[i]
 
-      if c1 < -margin or c2 < -margin:
-        return 0
+    c2 = -wp.abs(pos12[i]) + box2_half_sizes[i] + plen1[i]
 
-      if c1 < separation:
-        separation = c1
-        axis_code = i + 3 * wp.int32(pos21[i] < 0) + 0  # Face of box1
-      if c2 < separation:
-        separation = c2
-        axis_code = i + 3 * wp.int32(pos12[i] < 0) + 6  # Face of box2
+    if c1 < -margin or c2 < -margin:
+      return 0, 0
 
-    clnorm = wp.vec3(0.0)
-    inv = wp.bool(False)
-    cle1 = wp.int32(0)
-    cle2 = wp.int32(0)
+    if c1 < separation:
+      separation = c1
+      axis_code = i + 3 * wp.int32(pos21[i] < 0) + 0  # Face of box1
+    if c2 < separation:
+      separation = c2
+      axis_code = i + 3 * wp.int32(pos12[i] < 0) + 6  # Face of box2
 
-    # Second test: consider cross products of boxes' edges
-    for i in range(3):
-      for j in range(3):
-        # Compute cross product of box edges (potential separating axis)
-        if i == 0:
-          cross_axis = wp.vec3(0.0, -rot12[j, 2], rot12[j, 1])
-        elif i == 1:
-          cross_axis = wp.vec3(rot12[j, 2], 0.0, -rot12[j, 0])
-        else:
-          cross_axis = wp.vec3(-rot12[j, 1], rot12[j, 0], 0.0)
+  clnorm = wp.vec3(0.0)
+  inv = wp.bool(False)
+  cle1 = wp.int32(0)
+  cle2 = wp.int32(0)
 
-        cross_length = wp.length(cross_axis)
-        if cross_length < MJ_MINVAL:
-          continue
+  # Second test: consider cross products of boxes' edges
+  for i in range(3):
+    for j in range(3):
+      # Compute cross product of box edges (potential separating axis)
+      if i == 0:
+        cross_axis = wp.vec3(0.0, -rot12[j, 2], rot12[j, 1])
+      elif i == 1:
+        cross_axis = wp.vec3(rot12[j, 2], 0.0, -rot12[j, 0])
+      else:
+        cross_axis = wp.vec3(-rot12[j, 1], rot12[j, 0], 0.0)
 
-        cross_axis /= cross_length
+      cross_length = wp.length(cross_axis)
+      if cross_length < MJ_MINVAL:
+        continue
 
-        box_dist = wp.dot(pos21, cross_axis)
-        c3 = wp.float32(0.0)
+      cross_axis /= cross_length
 
-        # Project box half-sizes onto the potential separating axis
+      box_dist = wp.dot(pos21, cross_axis)
+      c3 = wp.float32(0.0)
+
+      # Project box half-sizes onto the potential separating axis
+      for k in range(3):
+        if k != i:
+          c3 += box1_half_sizes[k] * wp.abs(cross_axis[k])
+        if k != j:
+          c3 += box2_half_sizes[k] * rot21abs[i, 3 - k - j] / cross_length
+
+      c3 -= wp.abs(box_dist)
+
+      # Early exit: no collision if separated along this axis
+      if c3 < -margin:
+        return 0, 0
+
+      # Track minimum separation and which edge-edge pair it occurs on
+      if c3 < separation * (1.0 - 1e-12):
+        separation = c3
+        # Determine which corners/edges are closest
+        cle1 = 0
+        cle2 = 0
+
         for k in range(3):
-          if k != i:
-            c3 += box1_half_sizes[k] * wp.abs(cross_axis[k])
+          if k != i and (int(cross_axis[k] > 0) ^ int(box_dist < 0)):
+            cle1 += 1 << k
           if k != j:
-            c3 += box2_half_sizes[k] * rot21abs[i, 3 - k - j] / cross_length
+            if int(rot21[i, 3 - k - j] > 0) ^ int(box_dist < 0) ^ int((k - j + 3) % 3 == 1):
+              cle2 += 1 << k
 
-        c3 -= wp.abs(box_dist)
+        axis_code = 12 + i * 3 + j
+        clnorm = cross_axis
+        inv = box_dist < 0
 
-        # Early exit: no collision if separated along this axis
-        if c3 < -margin:
-          return 0
+  # No axis with separation < margin found
+  if axis_code == -1:
+    return 0, 0
 
-        # Track minimum separation and which edge-edge pair it occurs on
-        if c3 < separation * (1.0 - 1e-12):
-          separation = c3
-          # Determine which corners/edges are closest
-          cle1 = 0
-          cle2 = 0
+  # Contact point storage
+  points = mat83f()
+  depth = vec8f()
+  max_con_pair = 8
+  # 8 contacts should suffice for most configurations
+  n = wp.int32(0)
+  if axis_code < 12:
+    # Handle face-vertex collision
+    face_idx = axis_code % 6
+    box_idx = axis_code / 6
+    rotmore = _compute_rotmore(face_idx)
 
-          for k in range(3):
-            if k != i and (int(cross_axis[k] > 0) ^ int(box_dist < 0)):
-              cle1 += 1 << k
-            if k != j:
-              if int(rot21[i, 3 - k - j] > 0) ^ int(box_dist < 0) ^ int((k - j + 3) % 3 == 1):
-                cle2 += 1 << k
+    r = rotmore @ wp.where(box_idx, rot12, rot21)
+    p = rotmore @ wp.where(box_idx, pos12, pos21)
+    ss = wp.abs(rotmore @ wp.where(box_idx, box2_half_sizes, box1_half_sizes))
+    s = wp.where(box_idx, box1_half_sizes, box2_half_sizes)
+    rt = wp.transpose(r)
 
-          axis_code = 12 + i * 3 + j
-          clnorm = cross_axis
-          inv = box_dist < 0
+    lx, ly, hz = ss[0], ss[1], ss[2]
+    p[2] -= hz
 
-    # No axis with separation < margin found
-    if axis_code == -1:
-      return 0
+    clcorner = wp.int32(0)  # corner of non-face box with least axis separation
 
-    # Contact point storage
-    points = mat83f()
-    depth = vec8f()
-    max_con_pair = 8
-    # 8 contacts should suffice for most configurations
+    for i in range(3):
+      if r[2, i] < 0:
+        clcorner += 1 << i
+
+    lp = p
+    for i in range(wp.static(3)):
+      lp += rt[i] * s[i] * wp.where(clcorner & 1 << i, 1.0, -1.0)
+
+    m = wp.int32(1)
+    dirs = wp.int32(0)
+
+    cn1 = wp.vec3(0.0)
+    cn2 = wp.vec3(0.0)
+
+    for i in range(3):
+      if wp.abs(r[2, i]) < 0.5:
+        if not dirs:
+          cn1 = rt[i] * s[i] * wp.where(clcorner & (1 << i), -2.0, 2.0)
+        else:
+          cn2 = rt[i] * s[i] * wp.where(clcorner & (1 << i), -2.0, 2.0)
+
+        dirs += 1
+
+    k = dirs * dirs
+
+    # Find potential contact points
+
     n = wp.int32(0)
-    if axis_code < 12:
-      # Handle face-vertex collision
-      face_idx = axis_code % 6
-      box_idx = axis_code / 6
-      rotmore = _compute_rotmore(face_idx)
 
-      r = rotmore @ wp.where(box_idx, rot12, rot21)
-      p = rotmore @ wp.where(box_idx, pos12, pos21)
-      ss = wp.abs(rotmore @ wp.where(box_idx, box2_half_sizes, box1_half_sizes))
-      s = wp.where(box_idx, box1_half_sizes, box2_half_sizes)
-      rt = wp.transpose(r)
+    for i in range(k):
+      for q in range(2):
+        # lines_a and lines_b (lines between corners) computed on the fly
+        lav = lp + wp.where(i < 2, wp.vec3(0.0), wp.where(i == 2, cn1, cn2))
+        lbv = wp.where(i == 0 or i == 3, cn1, cn2)
 
-      lx, ly, hz = ss[0], ss[1], ss[2]
-      p[2] -= hz
+        if wp.abs(lbv[q]) > MJ_MINVAL:
+          br = 1.0 / lbv[q]
+          for j in range(-1, 2, 2):
+            l = ss[q] * wp.float32(j)
+            c1 = (l - lav[q]) * br
+            if c1 < 0 or c1 > 1:
+              continue
+            c2 = lav[1 - q] + lbv[1 - q] * c1
+            if wp.abs(c2) > ss[1 - q]:
+              continue
 
-      clcorner = wp.int32(0)  # corner of non-face box with least axis separation
-
-      for i in range(3):
-        if r[2, i] < 0:
-          clcorner += 1 << i
-
-      lp = p
-      for i in range(wp.static(3)):
-        lp += rt[i] * s[i] * wp.where(clcorner & 1 << i, 1.0, -1.0)
-
-      m = wp.int32(1)
-      dirs = wp.int32(0)
-
-      cn1 = wp.vec3(0.0)
-      cn2 = wp.vec3(0.0)
-
-      for i in range(3):
-        if wp.abs(r[2, i]) < 0.5:
-          if not dirs:
-            cn1 = rt[i] * s[i] * wp.where(clcorner & (1 << i), -2.0, 2.0)
-          else:
-            cn2 = rt[i] * s[i] * wp.where(clcorner & (1 << i), -2.0, 2.0)
-
-          dirs += 1
-
-      k = dirs * dirs
-
-      # Find potential contact points
-
-      n = wp.int32(0)
-
-      for i in range(k):
-        for q in range(2):
-          # lines_a and lines_b (lines between corners) computed on the fly
-          lav = lp + wp.where(i < 2, wp.vec3(0.0), wp.where(i == 2, cn1, cn2))
-          lbv = wp.where(i == 0 or i == 3, cn1, cn2)
-
-          if wp.abs(lbv[q]) > MJ_MINVAL:
-            br = 1.0 / lbv[q]
-            for j in range(-1, 2, 2):
-              l = ss[q] * wp.float32(j)
-              c1 = (l - lav[q]) * br
-              if c1 < 0 or c1 > 1:
-                continue
-              c2 = lav[1 - q] + lbv[1 - q] * c1
-              if wp.abs(c2) > ss[1 - q]:
-                continue
-
-              points[n] = lav + c1 * lbv
-              n += 1
-
-      if dirs == 2:
-        ax = cn1[0]
-        bx = cn2[0]
-        ay = cn1[1]
-        by = cn2[1]
-        C = 1.0 / (ax * by - bx * ay)
-
-        for i in range(4):
-          llx = wp.where(i / 2, lx, -lx)
-          lly = wp.where(i % 2, ly, -ly)
-
-          x = llx - lp[0]
-          y = lly - lp[1]
-
-          u = (x * by - y * bx) * C
-          v = (y * ax - x * ay) * C
-
-          if u > 0 and v > 0 and u < 1 and v < 1:
-            points[n] = wp.vec3(llx, lly, lp[2] + u * cn1[2] + v * cn2[2])
+            points[n] = lav + c1 * lbv
             n += 1
 
-      for i in range(1 << dirs):
-        tmpv = lp + wp.float32(i & 1) * cn1 + wp.float32((i & 2) != 0) * cn2
-        if tmpv[0] > -lx and tmpv[0] < lx and tmpv[1] > -ly and tmpv[1] < ly:
-          points[n] = tmpv
-          n += 1
-
-      m = n
-      n = wp.int32(0)
-
-      for i in range(m):
-        if points[i][2] > margin:
-          continue
-        if i != n:
-          points[n] = points[i]
-
-        points[n, 2] *= 0.5
-        depth[n] = points[n, 2]
-        n += 1
-
-      # Set up contact frame
-      rw = wp.where(box_idx, box2_rot, box1_rot) @ wp.transpose(rotmore)
-      pw = wp.where(box_idx, box2_center, box1_center)
-      normal = wp.where(box_idx, -1.0, 1.0) * wp.transpose(rw)[2]
-
-    else:
-      # Handle edge-edge collision
-      edge1 = (axis_code - 12) / 3
-      edge2 = (axis_code - 12) % 3
-
-      # Set up non-contacting edges ax1, ax2 for box2 and pax1, pax2 for box 1
-      ax1 = wp.int(1 - (edge2 & 1))
-      ax2 = wp.int(2 - (edge2 & 2))
-
-      pax1 = wp.int(1 - (edge1 & 1))
-      pax2 = wp.int(2 - (edge1 & 2))
-
-      if rot21abs[edge1, ax1] < rot21abs[edge1, ax2]:
-        ax1, ax2 = ax2, ax1
-
-      if rot12abs[edge2, pax1] < rot12abs[edge2, pax2]:
-        pax1, pax2 = pax2, pax1
-
-      rotmore = _compute_rotmore(wp.where(cle1 & (1 << pax2), pax2, pax2 + 3))
-
-      # Transform coordinates for edge-edge contact calculation
-      p = rotmore @ pos21
-      rnorm = rotmore @ clnorm
-      r = rotmore @ rot21
-      rt = wp.transpose(r)
-      s = wp.abs(wp.transpose(rotmore) @ box1_half_sizes)
-
-      lx, ly, hz = s[0], s[1], s[2]
-      p[2] -= hz
-
-      # Calculate closest box2 face
-
-      points[0] = (
-        p
-        + rt[ax1] * box2_half_sizes[ax1] * wp.where(cle2 & (1 << ax1), 1.0, -1.0)
-        + rt[ax2] * box2_half_sizes[ax2] * wp.where(cle2 & (1 << ax2), 1.0, -1.0)
-      )
-      points[1] = points[0] - rt[edge2] * box2_half_sizes[edge2]
-      points[0] += rt[edge2] * box2_half_sizes[edge2]
-
-      points[2] = (
-        p
-        + rt[ax1] * box2_half_sizes[ax1] * wp.where(cle2 & (1 << ax1), -1.0, 1.0)
-        + rt[ax2] * box2_half_sizes[ax2] * wp.where(cle2 & (1 << ax2), 1.0, -1.0)
-      )
-
-      points[3] = points[2] - rt[edge2] * box2_half_sizes[edge2]
-      points[2] += rt[edge2] * box2_half_sizes[edge2]
-
-      n = 4
-
-      # Set up coordinate axes for contact face of box2
-      axi_lp = points[0]
-      axi_cn1 = points[1] - points[0]
-      axi_cn2 = points[2] - points[0]
-
-      # Check if contact normal is valid
-      if wp.abs(rnorm[2]) < MJ_MINVAL:
-        return 0  # Shouldn't happen
-
-      # Calculate inverse normal for projection
-      innorm = wp.where(inv, -1.0, 1.0) / rnorm[2]
-
-      pu = mat43f()
-
-      # Project points onto contact plane
-      for i in range(4):
-        pu[i] = points[i]
-        c_scl = points[i, 2] * wp.where(inv, -1.0, 1.0) * innorm
-        points[i] -= rnorm * c_scl
-
-      pts_lp = points[0]
-      pts_cn1 = points[1] - points[0]
-      pts_cn2 = points[2] - points[0]
-
-      n = wp.int32(0)
-
-      for i in range(4):
-        for q in range(2):
-          la = pts_lp[q] + wp.where(i < 2, 0.0, wp.where(i == 2, pts_cn1[q], pts_cn2[q]))
-          lb = wp.where(i == 0 or i == 3, pts_cn1[q], pts_cn2[q])
-          lc = pts_lp[1 - q] + wp.where(i < 2, 0.0, wp.where(i == 2, pts_cn1[1 - q], pts_cn2[1 - q]))
-          ld = wp.where(i == 0 or i == 3, pts_cn1[1 - q], pts_cn2[1 - q])
-
-          # linesu_a and linesu_b (lines between corners) computed on the fly
-          lua = axi_lp + wp.where(i < 2, wp.vec3(0.0), wp.where(i == 2, axi_cn1, axi_cn2))
-          lub = wp.where(i == 0 or i == 3, axi_cn1, axi_cn2)
-
-          if wp.abs(lb) > MJ_MINVAL:
-            br = 1.0 / lb
-            for j in range(-1, 2, 2):
-              if n == max_con_pair:
-                break
-              l = s[q] * wp.float32(j)
-              c1 = (l - la) * br
-              if c1 < 0 or c1 > 1:
-                continue
-              c2 = lc + ld * c1
-              if wp.abs(c2) > s[1 - q]:
-                continue
-              if (lua[2] + lub[2] * c1) * innorm > margin:
-                continue
-
-              points[n] = lua * 0.5 + c1 * lub * 0.5
-              points[n, q] += 0.5 * l
-              points[n, 1 - q] += 0.5 * c2
-              depth[n] = points[n, 2] * innorm * 2.0
-              n += 1
-
-      nl = n
-
-      ax = pts_cn1[0]
-      bx = pts_cn2[0]
-      ay = pts_cn1[1]
-      by = pts_cn2[1]
+    if dirs == 2:
+      ax = cn1[0]
+      bx = cn2[0]
+      ay = cn1[1]
+      by = cn2[1]
       C = 1.0 / (ax * by - bx * ay)
 
       for i in range(4):
-        if n == max_con_pair:
-          break
         llx = wp.where(i / 2, lx, -lx)
         lly = wp.where(i % 2, ly, -ly)
 
-        x = llx - pts_lp[0]
-        y = lly - pts_lp[1]
+        x = llx - lp[0]
+        y = lly - lp[1]
 
         u = (x * by - y * bx) * C
         v = (y * ax - x * ay) * C
 
-        if nl == 0:
-          if (u < 0 or u > 0) and (v < 0 or v > 1):
-            continue
-        elif u < 0 or v < 0 or u > 1 or v > 1:
-          continue
+        if u > 0 and v > 0 and u < 1 and v < 1:
+          points[n] = wp.vec3(llx, lly, lp[2] + u * cn1[2] + v * cn2[2])
+          n += 1
 
-        u = wp.clamp(u, 0.0, 1.0)
-        v = wp.clamp(v, 0.0, 1.0)
-        w = 1.0 - u - v
-        vtmp = pu[0] * w + pu[1] * u + pu[2] * v
-
-        points[n] = wp.vec3(llx, lly, 0.0)
-
-        vtmp2 = points[n] - vtmp
-        tc1 = wp.length_sq(vtmp2)
-        if vtmp[2] > 0 and tc1 > margin * margin:
-          continue
-
-        points[n] = 0.5 * (points[n] + vtmp)
-
-        depth[n] = wp.sqrt(tc1) * wp.where(vtmp[2] < 0, -1.0, 1.0)
+    for i in range(1 << dirs):
+      tmpv = lp + wp.float32(i & 1) * cn1 + wp.float32((i & 2) != 0) * cn2
+      if tmpv[0] > -lx and tmpv[0] < lx and tmpv[1] > -ly and tmpv[1] < ly:
+        points[n] = tmpv
         n += 1
 
-      nf = n
+    m = n
+    n = wp.int32(0)
 
-      for i in range(4):
-        if n >= max_con_pair:
-          break
-        x = pu[i, 0]
-        y = pu[i, 1]
-        if nl == 0 and nf != 0:
-          if (x < -lx or x > lx) and (y < -ly or y > ly):
-            continue
-        elif x < -lx or x > lx or y < -ly or y > ly:
+    for i in range(m):
+      if points[i][2] > margin:
+        continue
+      if i != n:
+        points[n] = points[i]
+
+      points[n, 2] *= 0.5
+      depth[n] = points[n, 2]
+      n += 1
+
+    # Set up contact frame
+    rw = wp.where(box_idx, box2_rot, box1_rot) @ wp.transpose(rotmore)
+    pw = wp.where(box_idx, box2_center, box1_center)
+    normal = wp.where(box_idx, -1.0, 1.0) * wp.transpose(rw)[2]
+
+  else:
+    # Handle edge-edge collision
+    edge1 = (axis_code - 12) / 3
+    edge2 = (axis_code - 12) % 3
+
+    # Set up non-contacting edges ax1, ax2 for box2 and pax1, pax2 for box 1
+    ax1 = wp.int(1 - (edge2 & 1))
+    ax2 = wp.int(2 - (edge2 & 2))
+
+    pax1 = wp.int(1 - (edge1 & 1))
+    pax2 = wp.int(2 - (edge1 & 2))
+
+    if rot21abs[edge1, ax1] < rot21abs[edge1, ax2]:
+      ax1, ax2 = ax2, ax1
+
+    if rot12abs[edge2, pax1] < rot12abs[edge2, pax2]:
+      pax1, pax2 = pax2, pax1
+
+    rotmore = _compute_rotmore(wp.where(cle1 & (1 << pax2), pax2, pax2 + 3))
+
+    # Transform coordinates for edge-edge contact calculation
+    p = rotmore @ pos21
+    rnorm = rotmore @ clnorm
+    r = rotmore @ rot21
+    rt = wp.transpose(r)
+    s = wp.abs(wp.transpose(rotmore) @ box1_half_sizes)
+
+    lx, ly, hz = s[0], s[1], s[2]
+    p[2] -= hz
+
+    # Calculate closest box2 face
+
+    points[0] = (
+      p
+      + rt[ax1] * box2_half_sizes[ax1] * wp.where(cle2 & (1 << ax1), 1.0, -1.0)
+      + rt[ax2] * box2_half_sizes[ax2] * wp.where(cle2 & (1 << ax2), 1.0, -1.0)
+    )
+    points[1] = points[0] - rt[edge2] * box2_half_sizes[edge2]
+    points[0] += rt[edge2] * box2_half_sizes[edge2]
+
+    points[2] = (
+      p
+      + rt[ax1] * box2_half_sizes[ax1] * wp.where(cle2 & (1 << ax1), -1.0, 1.0)
+      + rt[ax2] * box2_half_sizes[ax2] * wp.where(cle2 & (1 << ax2), 1.0, -1.0)
+    )
+
+    points[3] = points[2] - rt[edge2] * box2_half_sizes[edge2]
+    points[2] += rt[edge2] * box2_half_sizes[edge2]
+
+    n = 4
+
+    # Set up coordinate axes for contact face of box2
+    axi_lp = points[0]
+    axi_cn1 = points[1] - points[0]
+    axi_cn2 = points[2] - points[0]
+
+    # Check if contact normal is valid
+    if wp.abs(rnorm[2]) < MJ_MINVAL:
+      return 0, 0  # Shouldn't happen
+
+    # Calculate inverse normal for projection
+    innorm = wp.where(inv, -1.0, 1.0) / rnorm[2]
+
+    pu = mat43f()
+
+    # Project points onto contact plane
+    for i in range(4):
+      pu[i] = points[i]
+      c_scl = points[i, 2] * wp.where(inv, -1.0, 1.0) * innorm
+      points[i] -= rnorm * c_scl
+
+    pts_lp = points[0]
+    pts_cn1 = points[1] - points[0]
+    pts_cn2 = points[2] - points[0]
+
+    n = wp.int32(0)
+
+    for i in range(4):
+      for q in range(2):
+        la = pts_lp[q] + wp.where(i < 2, 0.0, wp.where(i == 2, pts_cn1[q], pts_cn2[q]))
+        lb = wp.where(i == 0 or i == 3, pts_cn1[q], pts_cn2[q])
+        lc = pts_lp[1 - q] + wp.where(i < 2, 0.0, wp.where(i == 2, pts_cn1[1 - q], pts_cn2[1 - q]))
+        ld = wp.where(i == 0 or i == 3, pts_cn1[1 - q], pts_cn2[1 - q])
+
+        # linesu_a and linesu_b (lines between corners) computed on the fly
+        lua = axi_lp + wp.where(i < 2, wp.vec3(0.0), wp.where(i == 2, axi_cn1, axi_cn2))
+        lub = wp.where(i == 0 or i == 3, axi_cn1, axi_cn2)
+
+        if wp.abs(lb) > MJ_MINVAL:
+          br = 1.0 / lb
+          for j in range(-1, 2, 2):
+            if n == max_con_pair:
+              break
+            l = s[q] * wp.float32(j)
+            c1 = (l - la) * br
+            if c1 < 0 or c1 > 1:
+              continue
+            c2 = lc + ld * c1
+            if wp.abs(c2) > s[1 - q]:
+              continue
+            if (lua[2] + lub[2] * c1) * innorm > margin:
+              continue
+
+            points[n] = lua * 0.5 + c1 * lub * 0.5
+            points[n, q] += 0.5 * l
+            points[n, 1 - q] += 0.5 * c2
+            depth[n] = points[n, 2] * innorm * 2.0
+            n += 1
+
+    nl = n
+
+    ax = pts_cn1[0]
+    bx = pts_cn2[0]
+    ay = pts_cn1[1]
+    by = pts_cn2[1]
+    C = 1.0 / (ax * by - bx * ay)
+
+    for i in range(4):
+      if n == max_con_pair:
+        break
+      llx = wp.where(i / 2, lx, -lx)
+      lly = wp.where(i % 2, ly, -ly)
+
+      x = llx - pts_lp[0]
+      y = lly - pts_lp[1]
+
+      u = (x * by - y * bx) * C
+      v = (y * ax - x * ay) * C
+
+      if nl == 0:
+        if (u < 0 or u > 0) and (v < 0 or v > 1):
           continue
+      elif u < 0 or v < 0 or u > 1 or v > 1:
+        continue
 
-        c1 = wp.float32(0)
+      u = wp.clamp(u, 0.0, 1.0)
+      v = wp.clamp(v, 0.0, 1.0)
+      w = 1.0 - u - v
+      vtmp = pu[0] * w + pu[1] * u + pu[2] * v
 
-        for j in range(2):
-          if pu[i, j] < -s[j]:
-            c1 += (pu[i, j] + s[j]) * (pu[i, j] + s[j])
-          elif pu[i, j] > s[j]:
-            c1 += (pu[i, j] - s[j]) * (pu[i, j] - s[j])
+      points[n] = wp.vec3(llx, lly, 0.0)
 
-        c1 += pu[i, 2] * innorm * pu[i, 2] * innorm
+      vtmp2 = points[n] - vtmp
+      tc1 = wp.length_sq(vtmp2)
+      if vtmp[2] > 0 and tc1 > margin * margin:
+        continue
 
-        if pu[i, 2] > 0 and c1 > margin * margin:
+      points[n] = 0.5 * (points[n] + vtmp)
+
+      depth[n] = wp.sqrt(tc1) * wp.where(vtmp[2] < 0, -1.0, 1.0)
+      n += 1
+
+    nf = n
+
+    for i in range(4):
+      if n >= max_con_pair:
+        break
+      x = pu[i, 0]
+      y = pu[i, 1]
+      if nl == 0 and nf != 0:
+        if (x < -lx or x > lx) and (y < -ly or y > ly):
           continue
+      elif x < -lx or x > lx or y < -ly or y > ly:
+        continue
 
-        tmp_p = wp.vec3(pu[i, 0], pu[i, 1], 0.0)
+      c1 = wp.float32(0)
 
-        for j in range(2):
-          if pu[i, j] < -s[j]:
-            tmp_p[j] = -s[j] * 0.5
-          elif pu[i, j] > s[j]:
-            tmp_p[j] = +s[j] * 0.5
+      for j in range(2):
+        if pu[i, j] < -s[j]:
+          c1 += (pu[i, j] + s[j]) * (pu[i, j] + s[j])
+        elif pu[i, j] > s[j]:
+          c1 += (pu[i, j] - s[j]) * (pu[i, j] - s[j])
 
-        tmp_p += pu[i]
-        points[n] = tmp_p * 0.5
+      c1 += pu[i, 2] * innorm * pu[i, 2] * innorm
 
-        depth[n] = wp.sqrt(c1) * wp.where(pu[i, 2] < 0, -1.0, 1.0)
-        n += 1
+      if pu[i, 2] > 0 and c1 > margin * margin:
+        continue
 
-      # Set up contact data for all points
-      rw = box1_rot @ wp.transpose(rotmore)
-      pw = box1_center
-      normal = wp.where(inv, -1.0, 1.0) * rw @ rnorm
+      tmp_p = wp.vec3(pu[i, 0], pu[i, 1], 0.0)
 
-    tangent = make_tangent(normal)
-    # Create contact points
-    if n > 0:
-      contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, n)
+      for j in range(2):
+        if pu[i, j] < -s[j]:
+          tmp_p[j] = -s[j] * 0.5
+        elif pu[i, j] > s[j]:
+          tmp_p[j] = +s[j] * 0.5
 
-      for i in range(n):
-        points[i, 2] += hz
-        pos = rw @ points[i] + pw
-        contact = pack_contact(pos, normal, tangent, depth[i])
-        wp.static(contact_writer)(contact_index + i, contact, contact_writer_args)
+      tmp_p += pu[i]
+      points[n] = tmp_p * 0.5
 
-    return n
+      depth[n] = wp.sqrt(c1) * wp.where(pu[i, 2] < 0, -1.0, 1.0)
+      n += 1
 
-  return box_box
+    # Set up contact data for all points
+    rw = box1_rot @ wp.transpose(rotmore)
+    pw = box1_center
+    normal = wp.where(inv, -1.0, 1.0) * rw @ rnorm
+
+  tangent = make_tangent(normal)
+  # Create contact points
+  if n > 0:
+    contact_index = wp.atomic_add(ncon_out, 0, n)
+
+    for i in range(n):
+      points[i, 2] += hz
+      pos = rw @ points[i] + pw
+      contact = pack_contact(pos, normal, tangent, depth[i])
+      _write_contact(contact_index + i, contact, nconmax, dist_out, pos_out, normal_out, tangent_out)
+
+    return contact_index, contact_index + n
+
+  return 0, 0
+
 
 
 def get_plane_cylinder(contact_writer: Any):
