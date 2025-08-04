@@ -105,6 +105,23 @@ def extract_frame(c: ContactPoint) -> wp.mat33:
   return wp.mat33(normal[0], normal[1], normal[2], tangent[0], tangent[1], tangent[2], tangent2[0], tangent2[1], tangent2[2])
 
 
+@wp.func
+def _write_contact(
+  index: int,
+  contact: ContactPoint,
+  nconmax: int,
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  if index < nconmax:
+    dist_out[index] = contact.dist
+    pos_out[index] = contact.pos
+    normal_out[index] = contact.normal
+    tangent_out[index] = contact.tangent
+
+
 _HUGE_VAL = 1e6
 
 
@@ -340,12 +357,12 @@ def get_plane_convex(contact_writer: Any):
 
     # Write contacts
     tangent = make_tangent(plane_normal)
-    
+
     # First pass: count unique contacts and store their data
     contact_data = mat43f()  # Store up to 4 contacts (pos.xyz, dist)
     contact_data_dist = wp.vec4f()
     num_contacts = int(0)
-    
+
     for i in range(3, -1, -1):
       idx = indices[i]
       count = int(0)
@@ -359,13 +376,13 @@ def get_plane_convex(contact_writer: Any):
         pos = convex_pos + convex_rot @ pos
         support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
         dist = -support
-        
+
         # Check if contact is active (within margin)
         if (dist - margin) >= 0:
           continue
-          
+
         pos = pos - 0.5 * dist * plane_normal
-        
+
         # Store contact data for later writing
         contact_data[num_contacts] = wp.vec3(pos[0], pos[1], pos[2])
         contact_data_dist[num_contacts] = dist
@@ -374,7 +391,7 @@ def get_plane_convex(contact_writer: Any):
     # Second pass: reserve contact slots and write contacts
     if num_contacts > 0:
       contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
-      
+
       for i in range(num_contacts):
         pos = wp.vec3(contact_data[i, 0], contact_data[i, 1], contact_data[i, 2])
         dist = contact_data_dist[i]
@@ -385,44 +402,54 @@ def get_plane_convex(contact_writer: Any):
   return plane_convex
 
 
-def get_plane_sphere(contact_writer: Any):
-  @wp.func
-  def plane_sphere(
-    # In:
-    plane_normal: wp.vec3,
-    plane_pos: wp.vec3,
-    sphere_center: wp.vec3,
-    sphere_radius: float,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates one contact between a plane and a sphere.
 
-    Args:
-      plane_normal: Normal vector of the plane.
-      plane_pos: A point on the plane.
-      sphere_center: Center of the sphere.
-      sphere_radius: Radius of the sphere.
-      margin: Collision margin.
-      contact_writer_args: Arguments for the contact writer.
+@wp.func
+def plane_sphere(
+  # In:
+  plane_normal: wp.vec3,
+  plane_pos: wp.vec3,
+  sphere_center: wp.vec3,
+  sphere_radius: float,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+) :
+  """Calculates one contact between a plane and a sphere.
 
-    Returns:
-        int: Number of contacts generated (0 or 1).
-    """
-    dist, pos = _plane_sphere(plane_normal, plane_pos, sphere_center, sphere_radius)
-    
-    # Check if contact is active (within margin)
-    if (dist - margin) >= 0:
-      return 0
-    
-    contact = pack_contact_auto_tangent(pos, plane_normal, dist)
-    
-    # Reserve one contact slot
-    contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
-    wp.static(contact_writer)(contact_index, contact, contact_writer_args)
-    return 1
+  Args:
+    plane_normal: Normal vector of the plane.
+    plane_pos: A point on the plane.
+    sphere_center: Center of the sphere.
+    sphere_radius: Radius of the sphere.
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
+    ncon_out: Output array for contact count.
 
-  return plane_sphere
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
+  dist, pos = _plane_sphere(plane_normal, plane_pos, sphere_center, sphere_radius)
+
+  # Check if contact is active (within margin)
+  if (dist - margin) >= 0:
+    return 0, 0
+
+  contact = pack_contact_auto_tangent(pos, plane_normal, dist)
+
+  # Reserve one contact slot
+  contact_index = wp.atomic_add(ncon_out, 0, 1)
+  _write_contact(contact_index, contact, nconmax, dist_out, pos_out, normal_out, tangent_out)
+  return contact_index, contact_index + 1
+
+
 
 
 @wp.func
@@ -462,11 +489,11 @@ def get_sphere_sphere(contact_writer: Any):
       sphere2_center,
       sphere2_radius,
     )
-    
+
     # Check if contact is active (within margin)
     if (contact.dist - margin) >= 0:
       return 0
-    
+
     # Reserve one contact slot
     contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
     wp.static(contact_writer)(contact_index, contact, contact_writer_args)
@@ -567,11 +594,11 @@ def get_sphere_capsule(contact_writer: Any):
       sphere_rot,
       cap_rot,
     )
-    
+
     # Check if contact is active (within margin)
     if (contact.dist - margin) >= 0:
       return 0
-    
+
     # Reserve one contact slot
     contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
     wp.static(contact_writer)(contact_index, contact, contact_writer_args)
@@ -627,29 +654,29 @@ def get_plane_capsule(contact_writer: Any):
 
     dist1, pos1 = _plane_sphere(n, plane_pos, cap_center + segment, cap_radius)
     dist2, pos2 = _plane_sphere(n, plane_pos, cap_center - segment, cap_radius)
-    
+
     # Check which contacts are active
     active1 = (dist1 - margin) < 0
     active2 = (dist2 - margin) < 0
-    
+
     num_contacts = int(0)
     if active1:
       num_contacts += 1
     if active2:
       num_contacts += 1
-    
+
     if num_contacts == 0:
       return 0
 
     # Reserve contact slots based on active contacts
     contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
     contact_count = 0
-    
+
     if active1:
       contact1 = pack_contact(pos1, n, b, dist1)
       wp.static(contact_writer)(contact_index + contact_count, contact1, contact_writer_args)
       contact_count += 1
-    
+
     if active2:
       contact2 = pack_contact(pos2, n, b, dist2)
       wp.static(contact_writer)(contact_index + contact_count, contact2, contact_writer_args)
@@ -689,15 +716,15 @@ def get_plane_ellipsoid(contact_writer: Any):
     sphere_support = -wp.normalize(wp.cw_mul(wp.transpose(ellipsoid_rot) @ plane_normal, ellipsoid_radii))
     pos = ellipsoid_center + ellipsoid_rot @ wp.cw_mul(sphere_support, ellipsoid_radii)
     dist = wp.dot(plane_normal, pos - plane_pos)
-    
+
     # Check if contact is active (within margin)
     if (dist - margin) >= 0:
       return 0
-      
+
     contact_pos = pos - plane_normal * dist * 0.5
 
     contact = pack_contact_auto_tangent(contact_pos, plane_normal, dist)
-    
+
     # Reserve one contact slot
     contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
     wp.static(contact_writer)(contact_index, contact, contact_writer_args)
@@ -754,11 +781,11 @@ def get_capsule_capsule(contact_writer: Any):
       pt2,
       cap2_radius,
     )
-    
+
     # Check if contact is active (within margin)
     if (contact.dist - margin) >= 0:
       return 0
-    
+
     # Reserve one contact slot
     contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, 1)
     wp.static(contact_writer)(contact_index, contact, contact_writer_args)
@@ -1325,11 +1352,11 @@ def get_capsule_box(contact_writer: Any):
     if num_contacts > 0:
       contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
       contact_count = 0
-      
+
       if found1:
         wp.static(contact_writer)(contact_index + contact_count, contact1, contact_writer_args)
         contact_count += 1
-      
+
       if found2:
         wp.static(contact_writer)(contact_index + contact_count, contact2, contact_writer_args)
         contact_count += 1
@@ -1374,12 +1401,12 @@ def get_plane_box(contact_writer: Any):
     valid_contacts = mat43f()  # Store up to 4 contacts
     valid_contacts_dist = vec4f()
     num_contacts = int(0)
-    
+
     # test all corners, pick bottom 4
     for i in range(8):
       if num_contacts >= 4:
         break
-        
+
       # get corner in local coordinates
       corner.x = wp.where(i & 1, box_half_sizes.x, -box_half_sizes.x)
       corner.y = wp.where(i & 2, box_half_sizes.y, -box_half_sizes.y)
@@ -1394,11 +1421,11 @@ def get_plane_box(contact_writer: Any):
         continue
 
       cdist = dist + ldist
-      
+
       # Check if contact is active (within margin)
       if (cdist - margin) >= 0:
         continue
-        
+
       contact_pos = corner + box_center - plane_normal * (cdist * 0.5)
 
       # Store contact information for later writing
@@ -1410,7 +1437,7 @@ def get_plane_box(contact_writer: Any):
     if num_contacts > 0:
       contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
       tangent = make_tangent(plane_normal)
-      
+
       for i in range(num_contacts):
         contact_pos = wp.vec3(valid_contacts[i, 0], valid_contacts[i, 1], valid_contacts[i, 2])
         cdist = valid_contacts_dist[i]
@@ -1863,7 +1890,7 @@ def get_box_box(contact_writer: Any):
     # Create contact points
     if n > 0:
       contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, n)
-      
+
       for i in range(n):
         points[i, 2] += hz
         pos = rw @ points[i] + pw

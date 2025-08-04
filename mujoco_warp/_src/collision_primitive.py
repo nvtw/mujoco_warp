@@ -142,6 +142,44 @@ def _geom(
 
 
 @wp.func
+def _write_contact2(
+  contact_index: int,
+  # Data in:
+  nconmax_in: int,
+  # In:
+  margin_in: float,
+  gap_in: float,
+  condim_in: int,
+  friction_in: vec5,
+  solref_in: wp.vec2f,
+  solreffriction_in: wp.vec2f,
+  solimp_in: vec5,
+  geoms_in: wp.vec2i,
+  worldid_in: int,
+  # Data out:
+  contact_includemargin_out: wp.array(dtype=float),
+  contact_friction_out: wp.array(dtype=vec5),
+  contact_solref_out: wp.array(dtype=wp.vec2),
+  contact_solreffriction_out: wp.array(dtype=wp.vec2),
+  contact_solimp_out: wp.array(dtype=vec5),
+  contact_dim_out: wp.array(dtype=int),
+  contact_geom_out: wp.array(dtype=wp.vec2i),
+  contact_worldid_out: wp.array(dtype=int),
+):
+  cid = contact_index
+  if cid < nconmax_in:
+    contact_geom_out[cid] = geoms_in
+    contact_worldid_out[cid] = worldid_in
+    includemargin = margin_in - gap_in
+    contact_includemargin_out[cid] = includemargin
+    contact_dim_out[cid] = condim_in
+    contact_friction_out[cid] = friction_in
+    contact_solref_out[cid] = solref_in
+    contact_solreffriction_out[cid] = solreffriction_in
+    contact_solimp_out[cid] = solimp_in
+
+
+@wp.func
 def write_contact(
   # Data in:
   nconmax_in: int,
@@ -193,8 +231,6 @@ def write_contact(
       contact_solimp_out[cid] = solimp_in
 
 
-
-
 @wp.func
 def write_contact2(
   contact_index: int,
@@ -231,7 +267,7 @@ def write_contact2(
 ):
   active = (dist_in - margin_in) < 0
   if active:
-    cid = contact_index # wp.atomic_add(ncon_out, 0, 1)
+    cid = contact_index  # wp.atomic_add(ncon_out, 0, 1)
     if cid < nconmax_in:
       contact_dist_out[cid] = dist_in
       contact_pos_out[cid] = pos_in
@@ -246,7 +282,6 @@ def write_contact2(
       contact_solref_out[cid] = solref_in
       contact_solreffriction_out[cid] = solreffriction_in
       contact_solimp_out[cid] = solimp_in
-
 
 
 @wp.struct
@@ -323,14 +358,43 @@ def plane_sphere_wrapper(
 ) -> int:
   """Calculates one contact between a plane and a sphere."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
-  return wp.static(get_plane_sphere(contact_writer))(
+  start, end = plane_sphere(
     plane_normal,
     plane.pos,
     sphere.pos,
     sphere.size[0],
     margin,
-    write_contact_args,
+    write_contact_args.nconmax_in,
+    write_contact_args.ncon_out,
+    write_contact_args.contact_dist_out,
+    write_contact_args.contact_pos_out,
+    write_contact_args.contact_normal_out,
+    write_contact_args.contact_tangent_out,    
   )
+  for i in range(start, end):
+    _write_contact2(
+      i,
+      write_contact_args.nconmax_in,
+      write_contact_args.margin_in,
+      write_contact_args.gap_in,
+      write_contact_args.condim_in,
+      write_contact_args.friction_in,
+      write_contact_args.solref_in,
+      write_contact_args.solreffriction_in,
+      write_contact_args.solimp_in,
+      write_contact_args.geoms_in,
+      write_contact_args.worldid_in,
+      write_contact_args.contact_includemargin_out,
+      write_contact_args.contact_friction_out,
+      write_contact_args.contact_solref_out,
+      write_contact_args.contact_solreffriction_out,
+      write_contact_args.contact_solimp_out,
+      write_contact_args.contact_dim_out,
+      write_contact_args.contact_geom_out,
+      write_contact_args.contact_worldid_out,
+    )
+
+  return 0
 
 
 @wp.func
