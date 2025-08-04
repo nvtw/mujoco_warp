@@ -125,281 +125,291 @@ def _write_contact(
 _HUGE_VAL = 1e6
 
 
-def get_plane_convex(contact_writer: Any):
-  @wp.func
-  def plane_convex(
-    # In:
-    plane_normal: wp.vec3,
-    plane_pos: wp.vec3,
-    convex_pos: wp.vec3,
-    convex_rot: wp.mat33,
-    convex_vert: wp.array(dtype=wp.vec3),
-    convex_vertadr: int,
-    convex_vertnum: int,
-    convex_graph: wp.array(dtype=int),
-    convex_graphadr: int,
-    margin: float,
-    contact_writer_args: Any,
-  ) -> int:
-    """Calculates contacts between a plane and a convex object.
+@wp.func
+def plane_convex(
+  # In:
+  plane_normal: wp.vec3,
+  plane_pos: wp.vec3,
+  convex_pos: wp.vec3,
+  convex_rot: wp.mat33,
+  convex_vert: wp.array(dtype=wp.vec3),
+  convex_vertadr: int,
+  convex_vertnum: int,
+  convex_graph: wp.array(dtype=int),
+  convex_graphadr: int,
+  margin: float,
+  nconmax: int,
+  ncon_out: wp.array(dtype=int),
+  dist_out: wp.array(dtype=float),
+  pos_out: wp.array(dtype=wp.vec3),
+  normal_out: wp.array(dtype=wp.vec3),
+  tangent_out: wp.array(dtype=wp.vec3),
+):
+  """Calculates contacts between a plane and a convex object.
 
-    Args:
-      plane_normal: Normal vector of the plane.
-      plane_pos: A point on the plane.
-      convex_pos: Position of the convex object.
-      convex_rot: Rotation matrix of the convex object.
-      contacts_out: An array to store the resulting contact points.
-      convex_vert: An array of vertices for the convex object.
-      convex_vertadr: Starting address of the convex object's vertices in `convex_vert`.
-      convex_vertnum: Number of vertices for the convex object.
-      convex_graph: Graph representation of the convex object for adjacency information.
-      convex_graphadr: Starting address of the convex object's graph in `convex_graph`.
+  Args:
+    plane_normal: Normal vector of the plane.
+    plane_pos: A point on the plane.
+    convex_pos: Position of the convex object.
+    convex_rot: Rotation matrix of the convex object.
+    convex_vert: An array of vertices for the convex object.
+    convex_vertadr: Starting address of the convex object's vertices in `convex_vert`.
+    convex_vertnum: Number of vertices for the convex object.
+    convex_graph: Graph representation of the convex object for adjacency information.
+    convex_graphadr: Starting address of the convex object's graph in `convex_graph`.
+    margin: Collision margin.
+    nconmax: Maximum number of contacts.
+    ncon_out: Output array for contact count.
+    dist_out: Output array for contact distances.
+    pos_out: Output array for contact positions.
+    normal_out: Output array for contact normals.
+    tangent_out: Output array for contact tangents.
 
-    Returns:
-        int: Number of contacts generated.
-    """
+  Returns:
+      tuple(int, int): (first contact id inclusive, last contact id exclusive)
+  """
 
-    # get points in the convex frame
-    plane_pos_local = wp.transpose(convex_rot) @ (plane_pos - convex_pos)
-    n = wp.transpose(convex_rot) @ plane_normal
+  # get points in the convex frame
+  plane_pos_local = wp.transpose(convex_rot) @ (plane_pos - convex_pos)
+  n = wp.transpose(convex_rot) @ plane_normal
 
-    # Store indices in vec4
-    indices = wp.vec4i(-1, -1, -1, -1)
+  # Store indices in vec4
+  indices = wp.vec4i(-1, -1, -1, -1)
 
-    # exhaustive search over all vertices
-    if convex_graphadr == -1 or convex_vertnum < 10:
-      # Find support points
-      max_support = wp.float32(-_HUGE_VAL)
-      for i in range(convex_vertnum):
-        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
-        max_support = wp.max(support, max_support)
+  # exhaustive search over all vertices
+  if convex_graphadr == -1 or convex_vertnum < 10:
+    # Find support points
+    max_support = wp.float32(-_HUGE_VAL)
+    for i in range(convex_vertnum):
+      support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
+      max_support = wp.max(support, max_support)
 
-      threshold = wp.max(0.0, max_support - 1e-3)
-      # Find point a (first support point)
-      a_dist = wp.float32(-_HUGE_VAL)
-      for i in range(convex_vertnum):
-        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
+    threshold = wp.max(0.0, max_support - 1e-3)
+    # Find point a (first support point)
+    a_dist = wp.float32(-_HUGE_VAL)
+    for i in range(convex_vertnum):
+      support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
+      dist = wp.where(support > threshold, 0.0, -_HUGE_VAL)
+      if dist > a_dist:
+        indices[0] = i
+        a_dist = dist
+    a = convex_vert[convex_vertadr + indices[0]]
+
+    # Find point b (furthest from a)
+    b_dist = wp.float32(-_HUGE_VAL)
+    for i in range(convex_vertnum):
+      support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
+      dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
+      dist = wp.length_sq(a - convex_vert[convex_vertadr + i]) + dist_mask
+      if dist > b_dist:
+        indices[1] = i
+        b_dist = dist
+    b = convex_vert[convex_vertadr + indices[1]]
+
+    # Find point c (furthest along axis orthogonal to a-b)
+    ab = wp.cross(n, a - b)
+    c_dist = wp.float32(-_HUGE_VAL)
+    for i in range(convex_vertnum):
+      support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
+      dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
+      dist = wp.length_sq(ab - convex_vert[convex_vertadr + i]) + dist_mask
+      if dist > c_dist:
+        indices[2] = i
+        c_dist = dist
+    c = convex_vert[convex_vertadr + indices[2]]
+
+    # Find point d (furthest from other triangle edges)
+    ac = wp.cross(n, a - c)
+    bc = wp.cross(n, b - c)
+    d_dist = wp.float32(-_HUGE_VAL)
+    for i in range(convex_vertnum):
+      support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
+      dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
+      ap = ac - convex_vert[convex_vertadr + i]
+      bp = bc - convex_vert[convex_vertadr + i]
+      dist_ap = wp.abs(wp.dot(ap, ac)) + dist_mask
+      dist_bp = wp.abs(wp.dot(bp, bc)) + dist_mask
+      if dist_ap + dist_bp > d_dist:
+        indices[3] = i
+        d_dist = dist_ap + dist_bp
+
+  else:
+    numvert = convex_graph[convex_graphadr]
+    vert_edgeadr = convex_graphadr + 2
+    vert_globalid = convex_graphadr + 2 + numvert
+    edge_localid = convex_graphadr + 2 + 2 * numvert
+
+    # Find support points
+    max_support = wp.float32(-_HUGE_VAL)
+
+    # hillclimb until no change
+    prev = int(-1)
+    imax = int(0)
+
+    while True:
+      prev = int(imax)
+      i = int(convex_graph[vert_edgeadr + imax])
+      while convex_graph[edge_localid + i] >= 0:
+        subidx = convex_graph[edge_localid + i]
+        idx = convex_graph[vert_globalid + subidx]
+        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
+        if support > max_support:
+          max_support = support
+          imax = int(subidx)
+        i += int(1)
+      if imax == prev:
+        break
+
+    threshold = wp.max(0.0, max_support - 1e-3)
+
+    a_dist = wp.float32(-_HUGE_VAL)
+    # hillclimb until no change
+    prev = int(-1)
+    imax = int(0)
+
+    while True:
+      prev = int(imax)
+      i = int(convex_graph[vert_edgeadr + imax])
+      while convex_graph[edge_localid + i] >= 0:
+        subidx = convex_graph[edge_localid + i]
+        idx = convex_graph[vert_globalid + subidx]
+        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
         dist = wp.where(support > threshold, 0.0, -_HUGE_VAL)
         if dist > a_dist:
-          indices[0] = i
           a_dist = dist
-      a = convex_vert[convex_vertadr + indices[0]]
+          imax = int(subidx)
+        i += int(1)
+      if imax == prev:
+        break
+    imax = convex_graph[vert_globalid + imax]
+    a = convex_vert[convex_vertadr + imax]
+    indices[0] = imax
 
-      # Find point b (furthest from a)
-      b_dist = wp.float32(-_HUGE_VAL)
-      for i in range(convex_vertnum):
-        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
+    # Find point b (furthest from a)
+    b_dist = wp.float32(-_HUGE_VAL)
+    # hillclimb until no change
+    prev = int(-1)
+    imax = int(0)
+
+    while True:
+      prev = int(imax)
+      i = int(convex_graph[vert_edgeadr + imax])
+      while convex_graph[edge_localid + i] >= 0:
+        subidx = convex_graph[edge_localid + i]
+        idx = convex_graph[vert_globalid + subidx]
+        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
         dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
-        dist = wp.length_sq(a - convex_vert[convex_vertadr + i]) + dist_mask
+        dist = wp.length_sq(a - convex_vert[convex_vertadr + idx]) + dist_mask
         if dist > b_dist:
-          indices[1] = i
           b_dist = dist
-      b = convex_vert[convex_vertadr + indices[1]]
+          imax = int(subidx)
+        i += int(1)
+      if imax == prev:
+        break
+    imax = convex_graph[vert_globalid + imax]
+    b = convex_vert[convex_vertadr + imax]
+    indices[1] = imax
 
-      # Find point c (furthest along axis orthogonal to a-b)
-      ab = wp.cross(n, a - b)
-      c_dist = wp.float32(-_HUGE_VAL)
-      for i in range(convex_vertnum):
-        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
+    # Find point c (furthest along axis orthogonal to a-b)
+    ab = wp.cross(n, a - b)
+    c_dist = wp.float32(-_HUGE_VAL)
+    # hillclimb until no change
+    prev = int(-1)
+    imax = int(0)
+
+    while True:
+      prev = int(imax)
+      i = int(convex_graph[vert_edgeadr + imax])
+      while convex_graph[edge_localid + i] >= 0:
+        subidx = convex_graph[edge_localid + i]
+        idx = convex_graph[vert_globalid + subidx]
+        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
         dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
-        dist = wp.length_sq(ab - convex_vert[convex_vertadr + i]) + dist_mask
+        dist = wp.length_sq(ab - convex_vert[convex_vertadr + idx]) + dist_mask
         if dist > c_dist:
-          indices[2] = i
           c_dist = dist
-      c = convex_vert[convex_vertadr + indices[2]]
+          imax = int(subidx)
+        i += int(1)
+      if imax == prev:
+        break
+    imax = convex_graph[vert_globalid + imax]
+    c = convex_vert[convex_vertadr + imax]
+    indices[2] = imax
 
-      # Find point d (furthest from other triangle edges)
-      ac = wp.cross(n, a - c)
-      bc = wp.cross(n, b - c)
-      d_dist = wp.float32(-_HUGE_VAL)
-      for i in range(convex_vertnum):
-        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + i], n)
+    # Find point d (furthest from other triangle edges)
+    ac = wp.cross(n, a - c)
+    bc = wp.cross(n, b - c)
+    d_dist = wp.float32(-_HUGE_VAL)
+    # hillclimb until no change
+    prev = int(-1)
+    imax = int(0)
+
+    while True:
+      prev = int(imax)
+      i = int(convex_graph[vert_edgeadr + imax])
+      while convex_graph[edge_localid + i] >= 0:
+        subidx = convex_graph[edge_localid + i]
+        idx = convex_graph[vert_globalid + subidx]
+        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
         dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
-        ap = ac - convex_vert[convex_vertadr + i]
-        bp = bc - convex_vert[convex_vertadr + i]
+        ap = ac - convex_vert[convex_vertadr + idx]
+        bp = bc - convex_vert[convex_vertadr + idx]
         dist_ap = wp.abs(wp.dot(ap, ac)) + dist_mask
         dist_bp = wp.abs(wp.dot(bp, bc)) + dist_mask
         if dist_ap + dist_bp > d_dist:
-          indices[3] = i
           d_dist = dist_ap + dist_bp
+          imax = int(subidx)
+        i += int(1)
+      if imax == prev:
+        break
+    imax = convex_graph[vert_globalid + imax]
+    indices[3] = imax
 
-    else:
-      numvert = convex_graph[convex_graphadr]
-      vert_edgeadr = convex_graphadr + 2
-      vert_globalid = convex_graphadr + 2 + numvert
-      edge_localid = convex_graphadr + 2 + 2 * numvert
+  # Write contacts
+  tangent = make_tangent(plane_normal)
 
-      # Find support points
-      max_support = wp.float32(-_HUGE_VAL)
+  # First pass: count unique contacts and store their data
+  contact_data = mat43f()  # Store up to 4 contacts (pos.xyz, dist)
+  contact_data_dist = wp.vec4f()
+  num_contacts = int(0)
 
-      # hillclimb until no change
-      prev = int(-1)
-      imax = int(0)
+  for i in range(3, -1, -1):
+    idx = indices[i]
+    count = int(0)
+    for j in range(i + 1):
+      if indices[j] == idx:
+        count = count + 1
 
-      while True:
-        prev = int(imax)
-        i = int(convex_graph[vert_edgeadr + imax])
-        while convex_graph[edge_localid + i] >= 0:
-          subidx = convex_graph[edge_localid + i]
-          idx = convex_graph[vert_globalid + subidx]
-          support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
-          if support > max_support:
-            max_support = support
-            imax = int(subidx)
-          i += int(1)
-        if imax == prev:
-          break
+    # Check if the index is unique (appears exactly once)
+    if count == 1:
+      pos = convex_vert[convex_vertadr + idx]
+      pos = convex_pos + convex_rot @ pos
+      support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
+      dist = -support
 
-      threshold = wp.max(0.0, max_support - 1e-3)
+      # Check if contact is active (within margin)
+      if (dist - margin) >= 0:
+        continue
 
-      a_dist = wp.float32(-_HUGE_VAL)
-      # hillclimb until no change
-      prev = int(-1)
-      imax = int(0)
+      pos = pos - 0.5 * dist * plane_normal
 
-      while True:
-        prev = int(imax)
-        i = int(convex_graph[vert_edgeadr + imax])
-        while convex_graph[edge_localid + i] >= 0:
-          subidx = convex_graph[edge_localid + i]
-          idx = convex_graph[vert_globalid + subidx]
-          support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
-          dist = wp.where(support > threshold, 0.0, -_HUGE_VAL)
-          if dist > a_dist:
-            a_dist = dist
-            imax = int(subidx)
-          i += int(1)
-        if imax == prev:
-          break
-      imax = convex_graph[vert_globalid + imax]
-      a = convex_vert[convex_vertadr + imax]
-      indices[0] = imax
+      # Store contact data for later writing
+      contact_data[num_contacts] = wp.vec3(pos[0], pos[1], pos[2])
+      contact_data_dist[num_contacts] = dist
+      num_contacts += 1
 
-      # Find point b (furthest from a)
-      b_dist = wp.float32(-_HUGE_VAL)
-      # hillclimb until no change
-      prev = int(-1)
-      imax = int(0)
+  # Second pass: reserve contact slots and write contacts
+  if num_contacts > 0:
+    contact_index = wp.atomic_add(ncon_out, 0, num_contacts)
 
-      while True:
-        prev = int(imax)
-        i = int(convex_graph[vert_edgeadr + imax])
-        while convex_graph[edge_localid + i] >= 0:
-          subidx = convex_graph[edge_localid + i]
-          idx = convex_graph[vert_globalid + subidx]
-          support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
-          dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
-          dist = wp.length_sq(a - convex_vert[convex_vertadr + idx]) + dist_mask
-          if dist > b_dist:
-            b_dist = dist
-            imax = int(subidx)
-          i += int(1)
-        if imax == prev:
-          break
-      imax = convex_graph[vert_globalid + imax]
-      b = convex_vert[convex_vertadr + imax]
-      indices[1] = imax
+    for i in range(num_contacts):
+      pos = wp.vec3(contact_data[i, 0], contact_data[i, 1], contact_data[i, 2])
+      dist = contact_data_dist[i]
+      _write_contact(contact_index + i, pack_contact(pos, plane_normal, tangent, dist), nconmax, dist_out, pos_out, normal_out, tangent_out)
 
-      # Find point c (furthest along axis orthogonal to a-b)
-      ab = wp.cross(n, a - b)
-      c_dist = wp.float32(-_HUGE_VAL)
-      # hillclimb until no change
-      prev = int(-1)
-      imax = int(0)
+    return contact_index, contact_index + num_contacts
 
-      while True:
-        prev = int(imax)
-        i = int(convex_graph[vert_edgeadr + imax])
-        while convex_graph[edge_localid + i] >= 0:
-          subidx = convex_graph[edge_localid + i]
-          idx = convex_graph[vert_globalid + subidx]
-          support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
-          dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
-          dist = wp.length_sq(ab - convex_vert[convex_vertadr + idx]) + dist_mask
-          if dist > c_dist:
-            c_dist = dist
-            imax = int(subidx)
-          i += int(1)
-        if imax == prev:
-          break
-      imax = convex_graph[vert_globalid + imax]
-      c = convex_vert[convex_vertadr + imax]
-      indices[2] = imax
-
-      # Find point d (furthest from other triangle edges)
-      ac = wp.cross(n, a - c)
-      bc = wp.cross(n, b - c)
-      d_dist = wp.float32(-_HUGE_VAL)
-      # hillclimb until no change
-      prev = int(-1)
-      imax = int(0)
-
-      while True:
-        prev = int(imax)
-        i = int(convex_graph[vert_edgeadr + imax])
-        while convex_graph[edge_localid + i] >= 0:
-          subidx = convex_graph[edge_localid + i]
-          idx = convex_graph[vert_globalid + subidx]
-          support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
-          dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
-          ap = ac - convex_vert[convex_vertadr + idx]
-          bp = bc - convex_vert[convex_vertadr + idx]
-          dist_ap = wp.abs(wp.dot(ap, ac)) + dist_mask
-          dist_bp = wp.abs(wp.dot(bp, bc)) + dist_mask
-          if dist_ap + dist_bp > d_dist:
-            d_dist = dist_ap + dist_bp
-            imax = int(subidx)
-          i += int(1)
-        if imax == prev:
-          break
-      imax = convex_graph[vert_globalid + imax]
-      indices[3] = imax
-
-    # Write contacts
-    tangent = make_tangent(plane_normal)
-
-    # First pass: count unique contacts and store their data
-    contact_data = mat43f()  # Store up to 4 contacts (pos.xyz, dist)
-    contact_data_dist = wp.vec4f()
-    num_contacts = int(0)
-
-    for i in range(3, -1, -1):
-      idx = indices[i]
-      count = int(0)
-      for j in range(i + 1):
-        if indices[j] == idx:
-          count = count + 1
-
-      # Check if the index is unique (appears exactly once)
-      if count == 1:
-        pos = convex_vert[convex_vertadr + idx]
-        pos = convex_pos + convex_rot @ pos
-        support = wp.dot(plane_pos_local - convex_vert[convex_vertadr + idx], n)
-        dist = -support
-
-        # Check if contact is active (within margin)
-        if (dist - margin) >= 0:
-          continue
-
-        pos = pos - 0.5 * dist * plane_normal
-
-        # Store contact data for later writing
-        contact_data[num_contacts] = wp.vec3(pos[0], pos[1], pos[2])
-        contact_data_dist[num_contacts] = dist
-        num_contacts += 1
-
-    # Second pass: reserve contact slots and write contacts
-    if num_contacts > 0:
-      contact_index = wp.atomic_add(contact_writer_args.ncon_out, 0, num_contacts)
-
-      for i in range(num_contacts):
-        pos = wp.vec3(contact_data[i, 0], contact_data[i, 1], contact_data[i, 2])
-        dist = contact_data_dist[i]
-        wp.static(contact_writer)(contact_index + i, pack_contact(pos, plane_normal, tangent, dist), contact_writer_args)
-
-    return num_contacts
-
-  return plane_convex
+  return 0, 0
 
 
 
