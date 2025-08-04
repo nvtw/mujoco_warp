@@ -794,6 +794,7 @@ def capsule_capsule(
   cap2_half_length: float,
   margin: float,
   max_contacts: int,
+  # Out:
   contact_indexer_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),

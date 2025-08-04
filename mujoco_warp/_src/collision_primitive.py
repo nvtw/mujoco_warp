@@ -233,12 +233,13 @@ def write_contact(
 
 @wp.func
 def plane_sphere_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   plane: Geom,
   sphere: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -264,12 +265,13 @@ def plane_sphere_wrapper(
 
 @wp.func
 def sphere_sphere_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   sphere1: Geom,
   sphere2: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -294,12 +296,13 @@ def sphere_sphere_wrapper(
 
 @wp.func
 def sphere_capsule_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   sphere: Geom,
   cap: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -329,12 +332,13 @@ def sphere_capsule_wrapper(
 
 @wp.func
 def capsule_capsule_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   cap1: Geom,
   cap2: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -365,12 +369,13 @@ def capsule_capsule_wrapper(
 
 @wp.func
 def plane_capsule_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   plane: Geom,
   cap: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -399,12 +404,13 @@ def plane_capsule_wrapper(
 
 @wp.func
 def plane_ellipsoid_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   plane: Geom,
   ellipsoid: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -431,12 +437,13 @@ def plane_ellipsoid_wrapper(
 
 @wp.func
 def plane_box_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   plane: Geom,
   box: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -463,12 +470,13 @@ def plane_box_wrapper(
 
 @wp.func
 def plane_convex_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   plane: Geom,
   convex: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -499,12 +507,13 @@ def plane_convex_wrapper(
 
 @wp.func
 def sphere_cylinder_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   sphere: Geom,
   cylinder: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -534,12 +543,13 @@ def sphere_cylinder_wrapper(
 
 @wp.func
 def plane_cylinder_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   plane: Geom,
   cylinder: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -648,12 +658,13 @@ def contact_params(
 
 @wp.func
 def sphere_box_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   sphere: Geom,
   box: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -679,12 +690,13 @@ def sphere_box_wrapper(
 
 @wp.func
 def capsule_box_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   cap: Geom,
   box: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -713,12 +725,13 @@ def capsule_box_wrapper(
 
 @wp.func
 def box_box_wrapper(
+  # Data in:
+  nconmax_in: int,
   # In:
   box1: Geom,
   box2: Geom,
   margin: float,
   # Data out:
-  nconmax_in: int,
   ncon_out: wp.array(dtype=int),
   contact_dist_out: wp.array(dtype=float),
   contact_pos_out: wp.array(dtype=wp.vec3),
@@ -954,10 +967,10 @@ def _primitive_narrowphase_builder(m: Model):
 
       if collision_type1 == type1 and collision_type2 == type2:
         start, end = wp.static(_primitive_collisions_func[i])(
+          nconmax_in,
           geom1,
           geom2,
           margin,
-          nconmax_in,
           ncon_out,
           contact_dist_out,
           contact_pos_out,
