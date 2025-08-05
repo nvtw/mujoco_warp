@@ -971,7 +971,6 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
     contact=types.Contact(
       dist=wp.zeros((nconmax,), dtype=float),
       pos=wp.zeros((nconmax,), dtype=wp.vec3f),
-      # frame=wp.zeros((nconmax,), dtype=wp.mat33f),
       normal=wp.zeros((nconmax,), dtype=wp.vec3f),
       tangent=wp.zeros((nconmax,), dtype=wp.vec3f),
       includemargin=wp.zeros((nconmax,), dtype=float),
@@ -1594,14 +1593,10 @@ def get_data_into(
 
   result.contact.dist[:] = d.contact.dist.numpy()[:ncon]
   result.contact.pos[:] = d.contact.pos.numpy()[:ncon]
-  frame = np.zeros((ncon, 9))
   normal = d.contact.normal.numpy()[:ncon]
   tangent = d.contact.tangent.numpy()[:ncon]
   tangent2 = np.cross(normal, tangent)
-  frame[:, 0:3] = normal
-  frame[:, 3:6] = tangent
-  frame[:, 6:9] = tangent2
-  result.contact.frame[:] = frame
+  result.contact.frame[:] = np.hstack([normal, tangent, tangent2])
   result.contact.includemargin[:] = d.contact.includemargin.numpy()[:ncon]
   result.contact.friction[:] = d.contact.friction.numpy()[:ncon]
   result.contact.solref[:] = d.contact.solref.numpy()[:ncon]

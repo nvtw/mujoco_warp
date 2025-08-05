@@ -69,7 +69,8 @@ def _compute_rotmore(face_idx: int) -> wp.mat33:
 
 
 @wp.func
-def make_tangent(a: wp.vec3):
+def make_tangent(a: wp.vec3) -> wp.vec3:
+  """Generates a tangent vector orthogonal to the input vector."""
   a = wp.normalize(a)
   b, c = orthogonals(a)
   return b
@@ -77,6 +78,8 @@ def make_tangent(a: wp.vec3):
 
 @wp.struct
 class ContactPoint:
+  """Represents a contact point with position, normal, tangent, and distance."""
+
   pos: wp.vec3
   normal: wp.vec3
   tangent: wp.vec3
@@ -85,17 +88,20 @@ class ContactPoint:
 
 @wp.func
 def pack_contact(pos: wp.vec3, normal: wp.vec3, tangent: wp.vec3, dist: float) -> ContactPoint:
+  """Creates a ContactPoint from position, normal, tangent, and distance."""
   return ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=dist)
 
 
 @wp.func
 def pack_contact_auto_tangent(pos: wp.vec3, normal: wp.vec3, dist: float) -> ContactPoint:
+  """Creates a ContactPoint with automatically generated tangent from normal."""
   tangent = make_tangent(normal)
   return ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=dist)
 
 
 @wp.func
 def extract_frame(c: ContactPoint) -> wp.mat33:
+  """Extracts a coordinate frame matrix from a contact point."""
   normal = c.normal
   tangent = c.tangent
   tangent2 = wp.cross(normal, tangent)
@@ -114,6 +120,7 @@ def _write_contact(
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
 ):
+  """Writes contact data to output arrays if index is within bounds."""
   if index < max_contacts:
     dist_out[index] = contact.dist
     pos_out[index] = contact.pos
