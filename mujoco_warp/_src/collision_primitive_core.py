@@ -139,7 +139,7 @@ def plane_convex(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -159,7 +159,7 @@ def plane_convex(
     convex_graphadr: Starting address of the convex object's graph in `convex_graph`.
     margin: Collision margin.
     max_contacts: Maximum number of contacts.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
     dist_out: Output array for contact distances.
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
@@ -400,7 +400,7 @@ def plane_convex(
 
   # Second pass: reserve contact slots and write contacts
   if num_contacts > 0:
-    contact_index = wp.atomic_add(contact_indexer_out, 0, num_contacts)
+    contact_index = wp.atomic_add(contact_counter_out, 0, num_contacts)
 
     for i in range(num_contacts):
       pos = wp.vec3(contact_data[i, 0], contact_data[i, 1], contact_data[i, 2])
@@ -430,7 +430,7 @@ def plane_sphere(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -449,7 +449,7 @@ def plane_sphere(
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
     tangent_out: Output array for contact tangents.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -463,7 +463,7 @@ def plane_sphere(
   contact = pack_contact_auto_tangent(pos, plane_normal, dist)
 
   # Reserve one contact slot
-  contact_index = wp.atomic_add(contact_indexer_out, 0, 1)
+  contact_index = wp.atomic_add(contact_counter_out, 0, 1)
   _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
 
@@ -485,7 +485,7 @@ def sphere_sphere(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -500,7 +500,7 @@ def sphere_sphere(
     sphere2_radius: Radius of the second sphere.
     margin: Collision margin.
     max_contacts: Maximum number of contacts.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
     dist_out: Output array for contact distances.
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
@@ -521,7 +521,7 @@ def sphere_sphere(
     return 0, 0
 
   # Reserve one contact slot
-  contact_index = wp.atomic_add(contact_indexer_out, 0, 1)
+  contact_index = wp.atomic_add(contact_counter_out, 0, 1)
   _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
 
@@ -586,7 +586,7 @@ def sphere_capsule(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -605,7 +605,7 @@ def sphere_capsule(
     cap_rot: Rotation matrix of the capsule (used for contact normal calculation).
     margin: Collision margin.
     max_contacts: Maximum number of contacts.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
     dist_out: Output array for contact distances.
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
@@ -634,7 +634,7 @@ def sphere_capsule(
     return 0, 0
 
   # Reserve one contact slot
-  contact_index = wp.atomic_add(contact_indexer_out, 0, 1)
+  contact_index = wp.atomic_add(contact_counter_out, 0, 1)
   _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
 
@@ -651,7 +651,7 @@ def plane_capsule(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -671,7 +671,7 @@ def plane_capsule(
     cap_half_length: Half-length of the capsule's cylindrical body.
     margin: Collision margin.
     max_contacts: Maximum number of contacts.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
     dist_out: Output array for contact distances.
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
@@ -711,7 +711,7 @@ def plane_capsule(
     return 0, 0
 
   # Reserve contact slots based on active contacts
-  contact_index = wp.atomic_add(contact_indexer_out, 0, num_contacts)
+  contact_index = wp.atomic_add(contact_counter_out, 0, num_contacts)
   contact_count = 0
 
   if active1:
@@ -738,7 +738,7 @@ def plane_ellipsoid(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -754,7 +754,7 @@ def plane_ellipsoid(
     ellipsoid_radii: Radii of the ellipsoid along its axes.
     margin: Collision margin.
     max_contacts: Maximum number of contacts.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
     dist_out: Output array for contact distances.
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
@@ -776,7 +776,7 @@ def plane_ellipsoid(
   contact = pack_contact_auto_tangent(contact_pos, plane_normal, dist)
 
   # Reserve one contact slot
-  contact_index = wp.atomic_add(contact_indexer_out, 0, 1)
+  contact_index = wp.atomic_add(contact_counter_out, 0, 1)
   _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
 
@@ -795,7 +795,7 @@ def capsule_capsule(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -814,7 +814,7 @@ def capsule_capsule(
     cap2_half_length: Half-length of the second capsule's cylindrical body.
     margin: Collision margin.
     max_contacts: Maximum number of contacts.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
     dist_out: Output array for contact distances.
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
@@ -845,7 +845,7 @@ def capsule_capsule(
     return 0, 0
 
   # Reserve one contact slot
-  contact_index = wp.atomic_add(contact_indexer_out, 0, 1)
+  contact_index = wp.atomic_add(contact_counter_out, 0, 1)
   _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
 
@@ -864,7 +864,7 @@ def sphere_cylinder(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -883,7 +883,7 @@ def sphere_cylinder(
     cylinder_rot: Rotation matrix of the cylinder (used for contact normal calculation).
     margin: Collision margin.
     max_contacts: Maximum number of contacts.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
     dist_out: Output array for contact distances.
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
@@ -962,7 +962,7 @@ def sphere_cylinder(
     return 0, 0
 
   # Reserve one contact slot
-  contact_index = wp.atomic_add(contact_indexer_out, 0, 1)
+  contact_index = wp.atomic_add(contact_counter_out, 0, 1)
   _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
 
@@ -1024,7 +1024,7 @@ def sphere_box(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -1040,7 +1040,7 @@ def sphere_box(
     box_half_sizes: Half-sizes of the box.
     margin: Collision margin.
     max_contacts: Maximum number of contacts.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
     dist_out: Output array for contact distances.
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
@@ -1060,7 +1060,7 @@ def sphere_box(
 
   if found:
     # Reserve one contact slot
-    contact_index = wp.atomic_add(contact_indexer_out, 0, 1)
+    contact_index = wp.atomic_add(contact_counter_out, 0, 1)
     _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
     return contact_index, contact_index + 1
 
@@ -1080,7 +1080,7 @@ def capsule_box(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -1098,7 +1098,7 @@ def capsule_box(
     box_half_sizes: Half-sizes of the box.
     margin: Collision margin.
     max_contacts: Maximum number of contacts.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
     dist_out: Output array for contact distances.
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
@@ -1430,7 +1430,7 @@ def capsule_box(
 
   # Reserve contact slots based on how many we actually found
   if num_contacts > 0:
-    contact_index = wp.atomic_add(contact_indexer_out, 0, num_contacts)
+    contact_index = wp.atomic_add(contact_counter_out, 0, num_contacts)
     contact_count = 0
 
     if found1:
@@ -1457,7 +1457,7 @@ def plane_box(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -1475,7 +1475,7 @@ def plane_box(
     box_half_sizes: Half-sizes of the box.
     margin: Collision margin.
     max_contacts: Maximum number of contacts.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
     dist_out: Output array for contact distances.
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
@@ -1525,7 +1525,7 @@ def plane_box(
 
   # Second pass: reserve contact slots and write contacts
   if num_contacts > 0:
-    contact_index = wp.atomic_add(contact_indexer_out, 0, num_contacts)
+    contact_index = wp.atomic_add(contact_counter_out, 0, num_contacts)
     tangent = make_tangent(plane_normal)
 
     for i in range(num_contacts):
@@ -1551,7 +1551,7 @@ def box_box(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -1568,7 +1568,7 @@ def box_box(
     box2_half_sizes: Half-sizes of the second box.
     margin: Collision margin.
     max_contacts: Maximum number of contacts.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
     dist_out: Output array for contact distances.
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
@@ -1989,7 +1989,7 @@ def box_box(
   tangent = make_tangent(normal)
   # Create contact points
   if n > 0:
-    contact_index = wp.atomic_add(contact_indexer_out, 0, n)
+    contact_index = wp.atomic_add(contact_counter_out, 0, n)
 
     for i in range(n):
       points[i, 2] += hz
@@ -2014,7 +2014,7 @@ def plane_cylinder(
   margin: float,
   max_contacts: int,
   # Out:
-  contact_indexer_out: wp.array(dtype=int),
+  contact_counter_out: wp.array(dtype=int),
   dist_out: wp.array(dtype=float),
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
@@ -2031,7 +2031,7 @@ def plane_cylinder(
     cylinder_half_height: Half-height of the cylinder.
     margin: Collision margin.
     max_contacts: Maximum number of contacts.
-    contact_indexer_out: Output array for contact count.
+    contact_counter_out: Output array for contact count.
     dist_out: Output array for contact distances.
     pos_out: Output array for contact positions.
     normal_out: Output array for contact normals.
@@ -2118,7 +2118,7 @@ def plane_cylinder(
     return 0, 0
 
   # Reserve contact slots and write all active contacts
-  contact_index = wp.atomic_add(contact_indexer_out, 0, num_contacts)
+  contact_index = wp.atomic_add(contact_counter_out, 0, num_contacts)
   contact_count = 0
 
   if active1:
