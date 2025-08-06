@@ -120,7 +120,12 @@ def _write_contact(
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
 ):
-  """Writes contact data to output arrays if index is within bounds."""
+  """Writes contact geometry information to output arrays.
+
+  Stores the contact's distance, position, normal vector, and tangent vector at the given index
+  in the respective output arrays, but only if the index is within the maximum contacts limit.
+  This function is used internally to record the geometric properties of detected contacts.
+  """
   if index < max_contacts:
     dist_out[index] = contact.dist
     pos_out[index] = contact.pos
