@@ -151,7 +151,7 @@ def plane_convex(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates contacts between a plane and a convex object.
 
   Args:
@@ -442,7 +442,7 @@ def plane_sphere(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates one contact between a plane and a sphere.
 
   Args:
@@ -497,7 +497,7 @@ def sphere_sphere(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates one contact between two spheres.
 
   Args:
@@ -598,7 +598,7 @@ def sphere_capsule(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates one contact between a sphere and a capsule.
 
   Args:
@@ -663,7 +663,7 @@ def plane_capsule(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates two contacts between a capsule and a plane.
 
   Finds contact points at both ends of the capsule where they intersect with the plane.
@@ -750,7 +750,7 @@ def plane_ellipsoid(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates one contact between a plane and an ellipsoid.
 
   Args:
@@ -807,7 +807,7 @@ def capsule_capsule(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates one contact between two capsules.
 
   Args:
@@ -876,7 +876,7 @@ def sphere_cylinder(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates one contact between a sphere and a cylinder.
 
   Args:
@@ -1036,7 +1036,7 @@ def sphere_box(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates one contact between a sphere and a box.
 
   Args:
@@ -1092,7 +1092,7 @@ def capsule_box(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates contacts between a capsule and a box.
 
   Args:
@@ -1469,7 +1469,7 @@ def plane_box(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates contacts between a plane and a box.
 
   Can generate up to 4 contact points for the penetrating corners.
@@ -1563,7 +1563,7 @@ def box_box(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates contacts between two boxes.
 
   Args:
@@ -2026,7 +2026,7 @@ def plane_cylinder(
   pos_out: wp.array(dtype=wp.vec3),
   normal_out: wp.array(dtype=wp.vec3),
   tangent_out: wp.array(dtype=wp.vec3),
-):
+) -> tuple[int, int]:
   """Calculates contacts between a cylinder and a plane.
 
   Args:
