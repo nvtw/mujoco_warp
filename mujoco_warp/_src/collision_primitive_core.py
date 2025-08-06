@@ -95,13 +95,6 @@ def contact(pos: wp.vec3, normal: wp.vec3, tangent: wp.vec3, dist: float) -> Con
 
 
 @wp.func
-def contact_auto_tangent(pos: wp.vec3, normal: wp.vec3, dist: float) -> ContactPoint:
-  """Creates a ContactPoint with automatically generated tangent from normal."""
-  tangent = make_tangent(normal)
-  return ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=dist)
-
-
-@wp.func
 def frame(c: ContactPoint) -> wp.mat33:
   """Extracts a coordinate frame matrix from a contact point."""
   normal = c.normal
@@ -474,7 +467,7 @@ def plane_sphere(
   if (dist - margin) >= 0:
     return 0, 0
 
-  c = contact_auto_tangent(pos, plane_normal, dist)
+  c = ContactPoint(pos=pos, normal=plane_normal, tangent=make_tangent(plane_normal), dist=dist)
 
   # Reserve one contact slot
   contact_index = wp.atomic_add(contact_counter_out, 0, 1)
@@ -557,7 +550,7 @@ def _sphere_sphere(
   dist = dist - (radius1 + radius2)
   pos = pos1 + n * (radius1 + 0.5 * dist)
 
-  return contact_auto_tangent(pos, n, dist)
+  return ContactPoint(pos=pos, normal=n, tangent=make_tangent(n), dist=dist)
 
 
 @wp.func
@@ -583,7 +576,7 @@ def _sphere_sphere_ext(
   dist = dist - (radius1 + radius2)
   pos = pos1 + n * (radius1 + 0.5 * dist)
 
-  return contact_auto_tangent(pos, n, dist)
+  return ContactPoint(pos=pos, normal=n, tangent=make_tangent(n), dist=dist)
 
 
 @wp.func
@@ -787,7 +780,7 @@ def plane_ellipsoid(
 
   contact_pos = pos - plane_normal * dist * 0.5
 
-  c = contact_auto_tangent(contact_pos, plane_normal, dist)
+  c = ContactPoint(pos=contact_pos, normal=plane_normal, tangent=make_tangent(plane_normal), dist=dist)
 
   # Reserve one contact slot
   contact_index = wp.atomic_add(contact_counter_out, 0, 1)
@@ -952,7 +945,7 @@ def sphere_cylinder(
 
     dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere_center, sphere_radius)
     plane_normal = -plane_normal  # Flip normal after position calculation
-    c = contact_auto_tangent(pos_contact, plane_normal, dist)
+    c = ContactPoint(pos=pos_contact, normal=plane_normal, tangent=make_tangent(plane_normal), dist=dist)
 
   # Corner collision
   else:
@@ -1022,7 +1015,7 @@ def _sphere_box(
     contact_dist = dist - sphere_size
 
   contact_pos = box_pos + box_rot @ pos
-  c = contact_auto_tangent(contact_pos, contact_normal, contact_dist)
+  c = ContactPoint(pos=contact_pos, normal=contact_normal, tangent=make_tangent(contact_normal), dist=contact_dist)
 
   return c, True
 
