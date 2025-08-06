@@ -16,7 +16,7 @@
 import warp as wp
 
 from .collision_hfield import hfield_triangle_prism
-from .collision_primitive_core import *
+from . import collision_primitive_core as core
 from .math import upper_trid_index
 from .types import MJ_MINMU
 from .types import MJ_MINVAL
@@ -142,7 +142,7 @@ def _geom(
 
 
 @wp.func
-def _write_contact_ext(
+def _write_contact_solver_params(
   # Data in:
   nconmax_in: int,
   # In:
@@ -166,6 +166,11 @@ def _write_contact_ext(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
+  """Write solver parameters for an existing contact at a given index.
+  
+  Used to populate contact solver metadata (friction, solver refs, geom info)
+  for contacts that have already been detected and added to the contact arrays.
+  """
   cid = contact_index
   if cid < nconmax_in:
     contact_geom_out[cid] = geoms_in
@@ -212,6 +217,12 @@ def write_contact(
   contact_geom_out: wp.array(dtype=wp.vec2i),
   contact_worldid_out: wp.array(dtype=int),
 ):
+  """Atomically write a contact to the contact arrays if it's active.
+  
+  Checks if the contact is active (distance < margin) and if so, atomically
+  increments the contact counter and writes all contact data and solver parameters.
+  Use this when detecting new contacts during collision detection.
+  """
   active = (dist_in - margin_in) < 0
   if active:
     cid = wp.atomic_add(ncon_out, 0, 1)
@@ -232,7 +243,7 @@ def write_contact(
 
 
 @wp.func
-def plane_sphere_wrapper(
+def _plane_sphere_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -248,7 +259,7 @@ def plane_sphere_wrapper(
 ):
   """Calculates one contact between a plane and a sphere."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
-  return plane_sphere(
+  return core.plane_sphere(
     plane_normal,
     plane.pos,
     sphere.pos,
@@ -264,7 +275,7 @@ def plane_sphere_wrapper(
 
 
 @wp.func
-def sphere_sphere_wrapper(
+def _sphere_sphere_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -279,7 +290,7 @@ def sphere_sphere_wrapper(
   contact_tangent_out: wp.array(dtype=wp.vec3),
 ):
   """Calculates one contact between two spheres."""
-  return sphere_sphere(
+  return core.sphere_sphere(
     sphere1.pos,
     sphere1.size[0],
     sphere2.pos,
@@ -295,7 +306,7 @@ def sphere_sphere_wrapper(
 
 
 @wp.func
-def sphere_capsule_wrapper(
+def _sphere_capsule_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -311,7 +322,7 @@ def sphere_capsule_wrapper(
 ):
   """Calculates one contact between a sphere and a capsule."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  return sphere_capsule(
+  return core.sphere_capsule(
     sphere.pos,
     sphere.size[0],
     sphere.rot,
@@ -331,7 +342,7 @@ def sphere_capsule_wrapper(
 
 
 @wp.func
-def capsule_capsule_wrapper(
+def _capsule_capsule_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -348,7 +359,7 @@ def capsule_capsule_wrapper(
   """Calculates one contact between two capsules."""
   cap1_axis = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
   cap2_axis = wp.vec3(cap2.rot[0, 2], cap2.rot[1, 2], cap2.rot[2, 2])
-  return capsule_capsule(
+  return core.capsule_capsule(
     cap1.pos,
     cap1_axis,
     cap1.size[0],
@@ -368,7 +379,7 @@ def capsule_capsule_wrapper(
 
 
 @wp.func
-def plane_capsule_wrapper(
+def _plane_capsule_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -385,7 +396,7 @@ def plane_capsule_wrapper(
   """Calculates two contacts between a capsule and a plane."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  return plane_capsule(
+  return core.plane_capsule(
     plane_normal,
     plane.pos,
     cap.pos,
@@ -403,7 +414,7 @@ def plane_capsule_wrapper(
 
 
 @wp.func
-def plane_ellipsoid_wrapper(
+def _plane_ellipsoid_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -419,7 +430,7 @@ def plane_ellipsoid_wrapper(
 ):
   """Calculates one contact between a plane and an ellipsoid."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
-  return plane_ellipsoid(
+  return core.plane_ellipsoid(
     plane_normal,
     plane.pos,
     ellipsoid.pos,
@@ -436,7 +447,7 @@ def plane_ellipsoid_wrapper(
 
 
 @wp.func
-def plane_box_wrapper(
+def _plane_box_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -452,7 +463,7 @@ def plane_box_wrapper(
 ):
   """Calculates contacts between a plane and a box."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
-  return plane_box(
+  return core.plane_box(
     plane_normal,
     plane.pos,
     box.pos,
@@ -469,7 +480,7 @@ def plane_box_wrapper(
 
 
 @wp.func
-def plane_convex_wrapper(
+def _plane_convex_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -485,7 +496,7 @@ def plane_convex_wrapper(
 ):
   """Calculates contacts between a plane and a convex object."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
-  return plane_convex(
+  return core.plane_convex(
     plane_normal,
     plane.pos,
     convex.pos,
@@ -506,7 +517,7 @@ def plane_convex_wrapper(
 
 
 @wp.func
-def sphere_cylinder_wrapper(
+def _sphere_cylinder_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -522,7 +533,7 @@ def sphere_cylinder_wrapper(
 ):
   """Calculates one contact between a sphere and a cylinder."""
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
-  return sphere_cylinder(
+  return core.sphere_cylinder(
     sphere.pos,
     sphere.size[0],
     sphere.rot,
@@ -542,7 +553,7 @@ def sphere_cylinder_wrapper(
 
 
 @wp.func
-def plane_cylinder_wrapper(
+def _plane_cylinder_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -559,7 +570,7 @@ def plane_cylinder_wrapper(
   """Calculates contacts between a cylinder and a plane."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
-  return plane_cylinder(
+  return core.plane_cylinder(
     plane_normal,
     plane.pos,
     cylinder.pos,
@@ -657,7 +668,7 @@ def contact_params(
 
 
 @wp.func
-def sphere_box_wrapper(
+def _sphere_box_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -672,7 +683,7 @@ def sphere_box_wrapper(
   contact_tangent_out: wp.array(dtype=wp.vec3),
 ):
   """Calculates one contact between a sphere and a box."""
-  return sphere_box(
+  return core.sphere_box(
     sphere.pos,
     sphere.size[0],
     box.pos,
@@ -689,7 +700,7 @@ def sphere_box_wrapper(
 
 
 @wp.func
-def capsule_box_wrapper(
+def _capsule_box_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -705,7 +716,7 @@ def capsule_box_wrapper(
 ):
   """Calculates contacts between a capsule and a box."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
-  return capsule_box(
+  return core.capsule_box(
     cap.pos,
     cap_axis,
     cap.size[0],
@@ -724,7 +735,7 @@ def capsule_box_wrapper(
 
 
 @wp.func
-def box_box_wrapper(
+def _box_box_wrapper(
   # Data in:
   nconmax_in: int,
   # In:
@@ -739,7 +750,7 @@ def box_box_wrapper(
   contact_tangent_out: wp.array(dtype=wp.vec3),
 ):
   """Calculates contacts between two boxes."""
-  return box_box(
+  return core.box_box(
     box1.pos,
     box1.rot,
     box1.size,
@@ -757,19 +768,19 @@ def box_box_wrapper(
 
 
 _PRIMITIVE_COLLISIONS = {
-  (GeomType.PLANE.value, GeomType.SPHERE.value): plane_sphere_wrapper,
-  (GeomType.PLANE.value, GeomType.CAPSULE.value): plane_capsule_wrapper,
-  (GeomType.PLANE.value, GeomType.ELLIPSOID.value): plane_ellipsoid_wrapper,
-  (GeomType.PLANE.value, GeomType.CYLINDER.value): plane_cylinder_wrapper,
-  (GeomType.PLANE.value, GeomType.BOX.value): plane_box_wrapper,
-  (GeomType.PLANE.value, GeomType.MESH.value): plane_convex_wrapper,
-  (GeomType.SPHERE.value, GeomType.SPHERE.value): sphere_sphere_wrapper,
-  (GeomType.SPHERE.value, GeomType.CAPSULE.value): sphere_capsule_wrapper,
-  (GeomType.SPHERE.value, GeomType.CYLINDER.value): sphere_cylinder_wrapper,
-  (GeomType.SPHERE.value, GeomType.BOX.value): sphere_box_wrapper,
-  (GeomType.CAPSULE.value, GeomType.CAPSULE.value): capsule_capsule_wrapper,
-  (GeomType.CAPSULE.value, GeomType.BOX.value): capsule_box_wrapper,
-  (GeomType.BOX.value, GeomType.BOX.value): box_box_wrapper,
+  (GeomType.PLANE.value, GeomType.SPHERE.value): _plane_sphere_wrapper,
+  (GeomType.PLANE.value, GeomType.CAPSULE.value): _plane_capsule_wrapper,
+  (GeomType.PLANE.value, GeomType.ELLIPSOID.value): _plane_ellipsoid_wrapper,
+  (GeomType.PLANE.value, GeomType.CYLINDER.value): _plane_cylinder_wrapper,
+  (GeomType.PLANE.value, GeomType.BOX.value): _plane_box_wrapper,
+  (GeomType.PLANE.value, GeomType.MESH.value): _plane_convex_wrapper,
+  (GeomType.SPHERE.value, GeomType.SPHERE.value): _sphere_sphere_wrapper,
+  (GeomType.SPHERE.value, GeomType.CAPSULE.value): _sphere_capsule_wrapper,
+  (GeomType.SPHERE.value, GeomType.CYLINDER.value): _sphere_cylinder_wrapper,
+  (GeomType.SPHERE.value, GeomType.BOX.value): _sphere_box_wrapper,
+  (GeomType.CAPSULE.value, GeomType.CAPSULE.value): _capsule_capsule_wrapper,
+  (GeomType.CAPSULE.value, GeomType.BOX.value): _capsule_box_wrapper,
+  (GeomType.BOX.value, GeomType.BOX.value): _box_box_wrapper,
 }
 
 
@@ -978,10 +989,10 @@ def _primitive_narrowphase_builder(m: Model):
           contact_tangent_out,
         )
 
-    # Write contact metadata for all contacts in the range
+    # Write contact solver parameters for all contacts in the range
     if start >= 0:
       for i in range(start, end):
-        _write_contact_ext(
+        _write_contact_solver_params(
           nconmax_in,
           i,
           margin,
