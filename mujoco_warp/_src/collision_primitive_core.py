@@ -87,7 +87,7 @@ class ContactPoint:
 
 
 @wp.func
-def pack_contact(pos: wp.vec3, normal: wp.vec3, tangent: wp.vec3, dist: float) -> ContactPoint:
+def contact(pos: wp.vec3, normal: wp.vec3, tangent: wp.vec3, dist: float) -> ContactPoint:
   """Creates a ContactPoint from position, normal, tangent, and distance."""
   return ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=dist)
 
@@ -414,7 +414,7 @@ def plane_convex(
       dist = contact_data_dist[i]
       _write_contact(
         contact_index + i,
-        pack_contact(pos, plane_normal, tangent, dist),
+        contact(pos, plane_normal, tangent, dist),
         max_contacts,
         dist_out,
         pos_out,
@@ -467,11 +467,11 @@ def plane_sphere(
   if (dist - margin) >= 0:
     return 0, 0
 
-  contact = contact_auto_tangent(pos, plane_normal, dist)
+  c = contact_auto_tangent(pos, plane_normal, dist)
 
   # Reserve one contact slot
   contact_index = wp.atomic_add(contact_counter_out, 0, 1)
-  _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
+  _write_contact(contact_index, c, max_contacts, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
 
 
@@ -516,7 +516,7 @@ def sphere_sphere(
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
   """
-  contact = _sphere_sphere(
+  c = _sphere_sphere(
     sphere1_center,
     sphere1_radius,
     sphere2_center,
@@ -524,12 +524,12 @@ def sphere_sphere(
   )
 
   # Check if contact is active (within margin)
-  if (contact.dist - margin) >= 0:
+  if (c.dist - margin) >= 0:
     return 0, 0
 
   # Reserve one contact slot
   contact_index = wp.atomic_add(contact_counter_out, 0, 1)
-  _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
+  _write_contact(contact_index, c, max_contacts, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
 
 
@@ -627,7 +627,7 @@ def sphere_capsule(
   pt = closest_segment_point(cap_center - segment, cap_center + segment, sphere_center)
 
   # Treat as sphere-sphere collision between sphere and closest point
-  contact = _sphere_sphere_ext(
+  c = _sphere_sphere_ext(
     sphere_center,
     sphere_radius,
     pt,
@@ -637,12 +637,12 @@ def sphere_capsule(
   )
 
   # Check if contact is active (within margin)
-  if (contact.dist - margin) >= 0:
+  if (c.dist - margin) >= 0:
     return 0, 0
 
   # Reserve one contact slot
   contact_index = wp.atomic_add(contact_counter_out, 0, 1)
-  _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
+  _write_contact(contact_index, c, max_contacts, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
 
 
@@ -722,12 +722,12 @@ def plane_capsule(
   contact_count = 0
 
   if active1:
-    contact1 = pack_contact(pos1, n, b, dist1)
+    contact1 = contact(pos1, n, b, dist1)
     _write_contact(contact_index + contact_count, contact1, max_contacts, dist_out, pos_out, normal_out, tangent_out)
     contact_count += 1
 
   if active2:
-    contact2 = pack_contact(pos2, n, b, dist2)
+    contact2 = contact(pos2, n, b, dist2)
     _write_contact(contact_index + contact_count, contact2, max_contacts, dist_out, pos_out, normal_out, tangent_out)
     contact_count += 1
 
@@ -780,11 +780,11 @@ def plane_ellipsoid(
 
   contact_pos = pos - plane_normal * dist * 0.5
 
-  contact = contact_auto_tangent(contact_pos, plane_normal, dist)
+  c = contact_auto_tangent(contact_pos, plane_normal, dist)
 
   # Reserve one contact slot
   contact_index = wp.atomic_add(contact_counter_out, 0, 1)
-  _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
+  _write_contact(contact_index, c, max_contacts, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
 
 
@@ -840,7 +840,7 @@ def capsule_capsule(
     cap2_center + seg2,
   )
 
-  contact = _sphere_sphere(
+  c = _sphere_sphere(
     pt1,
     cap1_radius,
     pt2,
@@ -848,12 +848,12 @@ def capsule_capsule(
   )
 
   # Check if contact is active (within margin)
-  if (contact.dist - margin) >= 0:
+  if (c.dist - margin) >= 0:
     return 0, 0
 
   # Reserve one contact slot
   contact_index = wp.atomic_add(contact_counter_out, 0, 1)
-  _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
+  _write_contact(contact_index, c, max_contacts, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
 
 
@@ -918,12 +918,12 @@ def sphere_cylinder(
     else:
       collide_cap = False
 
-  contact = ContactPoint()
+  c = ContactPoint()
 
   # Side collision
   if collide_side:
     pos_target = cylinder_center + a_proj
-    contact = _sphere_sphere_ext(
+    c = _sphere_sphere_ext(
       sphere_center,
       sphere_radius,
       pos_target,
@@ -945,7 +945,7 @@ def sphere_cylinder(
 
     dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere_center, sphere_radius)
     plane_normal = -plane_normal  # Flip normal after position calculation
-    contact = contact_auto_tangent(pos_contact, plane_normal, dist)
+    c = contact_auto_tangent(pos_contact, plane_normal, dist)
 
   # Corner collision
   else:
@@ -955,7 +955,7 @@ def sphere_cylinder(
     cap_offset = cylinder_axis * (wp.sign(x) * cylinder_half_height)
     pos_corner = cylinder_center + cap_offset + p_proj
 
-    contact = _sphere_sphere_ext(
+    c = _sphere_sphere_ext(
       sphere_center,
       sphere_radius,
       pos_corner,
@@ -965,12 +965,12 @@ def sphere_cylinder(
     )
 
   # Check if contact is active (within margin)
-  if (contact.dist - margin) >= 0:
+  if (c.dist - margin) >= 0:
     return 0, 0
 
   # Reserve one contact slot
   contact_index = wp.atomic_add(contact_counter_out, 0, 1)
-  _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
+  _write_contact(contact_index, c, max_contacts, dist_out, pos_out, normal_out, tangent_out)
   return contact_index, contact_index + 1
 
 
@@ -1015,9 +1015,9 @@ def _sphere_box(
     contact_dist = dist - sphere_size
 
   contact_pos = box_pos + box_rot @ pos
-  contact = contact_auto_tangent(contact_pos, contact_normal, contact_dist)
+  c = contact_auto_tangent(contact_pos, contact_normal, contact_dist)
 
-  return contact, True
+  return c, True
 
 
 @wp.func
@@ -1056,7 +1056,7 @@ def sphere_box(
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
   """
-  contact, found = _sphere_box(
+  c, found = _sphere_box(
     sphere_center,
     sphere_radius,
     box_center,
@@ -1068,7 +1068,7 @@ def sphere_box(
   if found:
     # Reserve one contact slot
     contact_index = wp.atomic_add(contact_counter_out, 0, 1)
-    _write_contact(contact_index, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
+    _write_contact(contact_index, c, max_contacts, dist_out, pos_out, normal_out, tangent_out)
     return contact_index, contact_index + 1
 
   return 0, 0
@@ -1538,8 +1538,8 @@ def plane_box(
     for i in range(num_contacts):
       contact_pos = wp.vec3(valid_contacts[i, 0], valid_contacts[i, 1], valid_contacts[i, 2])
       cdist = valid_contacts_dist[i]
-      contact = pack_contact(contact_pos, plane_normal, tangent, cdist)
-      _write_contact(contact_index + i, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
+      c = contact(contact_pos, plane_normal, tangent, cdist)
+      _write_contact(contact_index + i, c, max_contacts, dist_out, pos_out, normal_out, tangent_out)
 
     return contact_index, contact_index + num_contacts
 
@@ -2001,8 +2001,8 @@ def box_box(
     for i in range(n):
       points[i, 2] += hz
       pos = rw @ points[i] + pw
-      contact = pack_contact(pos, normal, tangent, depth[i])
-      _write_contact(contact_index + i, contact, max_contacts, dist_out, pos_out, normal_out, tangent_out)
+      c = contact(pos, normal, tangent, depth[i])
+      _write_contact(contact_index + i, c, max_contacts, dist_out, pos_out, normal_out, tangent_out)
 
     return contact_index, contact_index + n
 
@@ -2129,22 +2129,22 @@ def plane_cylinder(
   contact_count = 0
 
   if active1:
-    contact1 = pack_contact(pos1, n, b, dist1)
+    contact1 = contact(pos1, n, b, dist1)
     _write_contact(contact_index + contact_count, contact1, max_contacts, dist_out, pos_out, normal_out, tangent_out)
     contact_count += 1
 
   if active2:
-    contact2 = pack_contact(pos2, n, b, dist2)
+    contact2 = contact(pos2, n, b, dist2)
     _write_contact(contact_index + contact_count, contact2, max_contacts, dist_out, pos_out, normal_out, tangent_out)
     contact_count += 1
 
   if active3:
-    contact3 = pack_contact(pos3, n, b, dist3)
+    contact3 = contact(pos3, n, b, dist3)
     _write_contact(contact_index + contact_count, contact3, max_contacts, dist_out, pos_out, normal_out, tangent_out)
     contact_count += 1
 
   if active4:
-    contact4 = pack_contact(pos4, n, b, dist3)
+    contact4 = contact(pos4, n, b, dist3)
     _write_contact(contact_index + contact_count, contact4, max_contacts, dist_out, pos_out, normal_out, tangent_out)
     contact_count += 1
 
