@@ -93,14 +93,14 @@ def pack_contact(pos: wp.vec3, normal: wp.vec3, tangent: wp.vec3, dist: float) -
 
 
 @wp.func
-def pack_contact_auto_tangent(pos: wp.vec3, normal: wp.vec3, dist: float) -> ContactPoint:
+def contact_auto_tangent(pos: wp.vec3, normal: wp.vec3, dist: float) -> ContactPoint:
   """Creates a ContactPoint with automatically generated tangent from normal."""
   tangent = make_tangent(normal)
   return ContactPoint(pos=pos, normal=normal, tangent=tangent, dist=dist)
 
 
 @wp.func
-def extract_frame(c: ContactPoint) -> wp.mat33:
+def frame(c: ContactPoint) -> wp.mat33:
   """Extracts a coordinate frame matrix from a contact point."""
   normal = c.normal
   tangent = c.tangent
@@ -155,22 +155,22 @@ def plane_convex(
   """Calculates contacts between a plane and a convex object.
 
   Args:
-    plane_normal: Normal vector of the plane.
-    plane_pos: A point on the plane.
-    convex_pos: Position of the convex object.
-    convex_rot: Rotation matrix of the convex object.
-    convex_vert: An array of vertices for the convex object.
-    convex_vertadr: Starting address of the convex object's vertices in `convex_vert`.
-    convex_vertnum: Number of vertices for the convex object.
-    convex_graph: Graph representation of the convex object for adjacency information.
-    convex_graphadr: Starting address of the convex object's graph in `convex_graph`.
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    contact_counter_out: Output array for contact count.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
+    plane_normal (wp.vec3): Normal vector of the plane.
+    plane_pos (wp.vec3): A point on the plane.
+    convex_pos (wp.vec3): Position of the convex object.
+    convex_rot (wp.mat33): Rotation matrix of the convex object.
+    convex_vert (wp.array): An array of vertices for the convex object.
+    convex_vertadr (int): Starting address of the convex object's vertices in `convex_vert`.
+    convex_vertnum (int): Number of vertices for the convex object.
+    convex_graph (wp.array): Graph representation of the convex object for adjacency information.
+    convex_graphadr (int): Starting address of the convex object's graph in `convex_graph`.
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    contact_counter_out (wp.array): Output array for contact count.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -446,17 +446,17 @@ def plane_sphere(
   """Calculates one contact between a plane and a sphere.
 
   Args:
-    plane_normal: Normal vector of the plane.
-    plane_pos: A point on the plane.
-    sphere_center: Center of the sphere.
-    sphere_radius: Radius of the sphere.
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
-    contact_counter_out: Output array for contact count.
+    plane_normal (wp.vec3): Normal vector of the plane.
+    plane_pos (wp.vec3): A point on the plane.
+    sphere_center (wp.vec3): Center of the sphere.
+    sphere_radius (float): Radius of the sphere.
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
+    contact_counter_out (wp.array): Output array for contact count.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -467,7 +467,7 @@ def plane_sphere(
   if (dist - margin) >= 0:
     return 0, 0
 
-  contact = pack_contact_auto_tangent(pos, plane_normal, dist)
+  contact = contact_auto_tangent(pos, plane_normal, dist)
 
   # Reserve one contact slot
   contact_index = wp.atomic_add(contact_counter_out, 0, 1)
@@ -501,17 +501,17 @@ def sphere_sphere(
   """Calculates one contact between two spheres.
 
   Args:
-    sphere1_center: Center of the first sphere.
-    sphere1_radius: Radius of the first sphere.
-    sphere2_center: Center of the second sphere.
-    sphere2_radius: Radius of the second sphere.
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    contact_counter_out: Output array for contact count.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
+    sphere1_center (wp.vec3): Center of the first sphere.
+    sphere1_radius (float): Radius of the first sphere.
+    sphere2_center (wp.vec3): Center of the second sphere.
+    sphere2_radius (float): Radius of the second sphere.
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    contact_counter_out (wp.array): Output array for contact count.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -550,7 +550,7 @@ def _sphere_sphere(
   dist = dist - (radius1 + radius2)
   pos = pos1 + n * (radius1 + 0.5 * dist)
 
-  return pack_contact_auto_tangent(pos, n, dist)
+  return contact_auto_tangent(pos, n, dist)
 
 
 @wp.func
@@ -576,7 +576,7 @@ def _sphere_sphere_ext(
   dist = dist - (radius1 + radius2)
   pos = pos1 + n * (radius1 + 0.5 * dist)
 
-  return pack_contact_auto_tangent(pos, n, dist)
+  return contact_auto_tangent(pos, n, dist)
 
 
 @wp.func
@@ -602,21 +602,21 @@ def sphere_capsule(
   """Calculates one contact between a sphere and a capsule.
 
   Args:
-    sphere_center: Center of the sphere.
-    sphere_radius: Radius of the sphere.
-    sphere_rot: Rotation matrix of the sphere (used for contact normal calculation).
-    cap_center: Center of the capsule.
-    cap_axis: Axis of the capsule.
-    cap_radius: Radius of the capsule.
-    cap_half_length: Half-length of the capsule's cylindrical body.
-    cap_rot: Rotation matrix of the capsule (used for contact normal calculation).
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    contact_counter_out: Output array for contact count.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
+    sphere_center (wp.vec3): Center of the sphere.
+    sphere_radius (float): Radius of the sphere.
+    sphere_rot (wp.mat33): Rotation matrix of the sphere (used for contact normal calculation).
+    cap_center (wp.vec3): Center of the capsule.
+    cap_axis (wp.vec3): Axis of the capsule.
+    cap_radius (float): Radius of the capsule.
+    cap_half_length (float): Half-length of the capsule's cylindrical body.
+    cap_rot (wp.mat33): Rotation matrix of the capsule (used for contact normal calculation).
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    contact_counter_out (wp.array): Output array for contact count.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -670,19 +670,19 @@ def plane_capsule(
   The contact normal is aligned with the plane normal.
 
   Args:
-    plane_normal: Normal vector of the plane.
-    plane_pos: A point on the plane.
-    cap_center: Center of the capsule.
-    cap_axis: Axis of the capsule.
-    cap_radius: Radius of the capsule.
-    cap_half_length: Half-length of the capsule's cylindrical body.
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    contact_counter_out: Output array for contact count.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
+    plane_normal (wp.vec3): Normal vector of the plane.
+    plane_pos (wp.vec3): A point on the plane.
+    cap_center (wp.vec3): Center of the capsule.
+    cap_axis (wp.vec3): Axis of the capsule.
+    cap_radius (float): Radius of the capsule.
+    cap_half_length (float): Half-length of the capsule's cylindrical body.
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    contact_counter_out (wp.array): Output array for contact count.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -754,18 +754,18 @@ def plane_ellipsoid(
   """Calculates one contact between a plane and an ellipsoid.
 
   Args:
-    plane_normal: Normal vector of the plane.
-    plane_pos: A point on the plane.
-    ellipsoid_center: Center of the ellipsoid.
-    ellipsoid_rot: Rotation matrix of the ellipsoid.
-    ellipsoid_radii: Radii of the ellipsoid along its axes.
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    contact_counter_out: Output array for contact count.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
+    plane_normal (wp.vec3): Normal vector of the plane.
+    plane_pos (wp.vec3): A point on the plane.
+    ellipsoid_center (wp.vec3): Center of the ellipsoid.
+    ellipsoid_rot (wp.mat33): Rotation matrix of the ellipsoid.
+    ellipsoid_radii (wp.vec3): Radii of the ellipsoid along its axes.
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    contact_counter_out (wp.array): Output array for contact count.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -780,7 +780,7 @@ def plane_ellipsoid(
 
   contact_pos = pos - plane_normal * dist * 0.5
 
-  contact = pack_contact_auto_tangent(contact_pos, plane_normal, dist)
+  contact = contact_auto_tangent(contact_pos, plane_normal, dist)
 
   # Reserve one contact slot
   contact_index = wp.atomic_add(contact_counter_out, 0, 1)
@@ -811,21 +811,21 @@ def capsule_capsule(
   """Calculates one contact between two capsules.
 
   Args:
-    cap1_center: Center of the first capsule.
-    cap1_axis: Axis of the first capsule.
-    cap1_radius: Radius of the first capsule.
-    cap1_half_length: Half-length of the first capsule's cylindrical body.
-    cap2_center: Center of the second capsule.
-    cap2_axis: Axis of the second capsule.
-    cap2_radius: Radius of the second capsule.
-    cap2_half_length: Half-length of the second capsule's cylindrical body.
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    contact_counter_out: Output array for contact count.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
+    cap1_center (wp.vec3): Center of the first capsule.
+    cap1_axis (wp.vec3): Axis of the first capsule.
+    cap1_radius (float): Radius of the first capsule.
+    cap1_half_length (float): Half-length of the first capsule's cylindrical body.
+    cap2_center (wp.vec3): Center of the second capsule.
+    cap2_axis (wp.vec3): Axis of the second capsule.
+    cap2_radius (float): Radius of the second capsule.
+    cap2_half_length (float): Half-length of the second capsule's cylindrical body.
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    contact_counter_out (wp.array): Output array for contact count.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -880,21 +880,21 @@ def sphere_cylinder(
   """Calculates one contact between a sphere and a cylinder.
 
   Args:
-    sphere_center: Center of the sphere.
-    sphere_radius: Radius of the sphere.
-    sphere_rot: Rotation matrix of the sphere (used for contact normal calculation).
-    cylinder_center: Center of the cylinder.
-    cylinder_axis: Axis of the cylinder.
-    cylinder_radius: Radius of the cylinder.
-    cylinder_half_height: Half-height of the cylinder.
-    cylinder_rot: Rotation matrix of the cylinder (used for contact normal calculation).
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    contact_counter_out: Output array for contact count.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
+    sphere_center (wp.vec3): Center of the sphere.
+    sphere_radius (float): Radius of the sphere.
+    sphere_rot (wp.mat33): Rotation matrix of the sphere (used for contact normal calculation).
+    cylinder_center (wp.vec3): Center of the cylinder.
+    cylinder_axis (wp.vec3): Axis of the cylinder.
+    cylinder_radius (float): Radius of the cylinder.
+    cylinder_half_height (float): Half-height of the cylinder.
+    cylinder_rot (wp.mat33): Rotation matrix of the cylinder (used for contact normal calculation).
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    contact_counter_out (wp.array): Output array for contact count.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -945,7 +945,7 @@ def sphere_cylinder(
 
     dist, pos_contact = _plane_sphere(plane_normal, pos_cap, sphere_center, sphere_radius)
     plane_normal = -plane_normal  # Flip normal after position calculation
-    contact = pack_contact_auto_tangent(pos_contact, plane_normal, dist)
+    contact = contact_auto_tangent(pos_contact, plane_normal, dist)
 
   # Corner collision
   else:
@@ -1015,7 +1015,7 @@ def _sphere_box(
     contact_dist = dist - sphere_size
 
   contact_pos = box_pos + box_rot @ pos
-  contact = pack_contact_auto_tangent(contact_pos, contact_normal, contact_dist)
+  contact = contact_auto_tangent(contact_pos, contact_normal, contact_dist)
 
   return contact, True
 
@@ -1040,18 +1040,18 @@ def sphere_box(
   """Calculates one contact between a sphere and a box.
 
   Args:
-    sphere_center: Center of the sphere.
-    sphere_radius: Radius of the sphere.
-    box_center: Center of the box.
-    box_rot: Rotation matrix of the box.
-    box_half_sizes: Half-sizes of the box.
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    contact_counter_out: Output array for contact count.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
+    sphere_center (wp.vec3): Center of the sphere.
+    sphere_radius (float): Radius of the sphere.
+    box_center (wp.vec3): Center of the box.
+    box_rot (wp.mat33): Rotation matrix of the box.
+    box_half_sizes (wp.vec3): Half-sizes of the box.
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    contact_counter_out (wp.array): Output array for contact count.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -1096,20 +1096,20 @@ def capsule_box(
   """Calculates contacts between a capsule and a box.
 
   Args:
-    cap_center: Center of the capsule.
-    cap_axis: Axis of the capsule.
-    cap_radius: Radius of the capsule.
-    cap_half_length: Half-length of the capsule's cylindrical body.
-    box_center: Center of the box.
-    box_rot: Rotation matrix of the box.
-    box_half_sizes: Half-sizes of the box.
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    contact_counter_out: Output array for contact count.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
+    cap_center (wp.vec3): Center of the capsule.
+    cap_axis (wp.vec3): Axis of the capsule.
+    cap_radius (float): Radius of the capsule.
+    cap_half_length (float): Half-length of the capsule's cylindrical body.
+    box_center (wp.vec3): Center of the box.
+    box_rot (wp.mat33): Rotation matrix of the box.
+    box_half_sizes (wp.vec3): Half-sizes of the box.
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    contact_counter_out (wp.array): Output array for contact count.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -1475,18 +1475,18 @@ def plane_box(
   Can generate up to 4 contact points for the penetrating corners.
 
   Args:
-    plane_normal: Normal vector of the plane.
-    plane_pos: A point on the plane.
-    box_center: Center of the box.
-    box_rot: Rotation matrix of the box.
-    box_half_sizes: Half-sizes of the box.
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    contact_counter_out: Output array for contact count.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
+    plane_normal (wp.vec3): Normal vector of the plane.
+    plane_pos (wp.vec3): A point on the plane.
+    box_center (wp.vec3): Center of the box.
+    box_rot (wp.mat33): Rotation matrix of the box.
+    box_half_sizes (wp.vec3): Half-sizes of the box.
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    contact_counter_out (wp.array): Output array for contact count.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -1567,19 +1567,19 @@ def box_box(
   """Calculates contacts between two boxes.
 
   Args:
-    box1_center: Center of the first box.
-    box1_rot: Rotation matrix of the first box.
-    box1_half_sizes: Half-sizes of the first box.
-    box2_center: Center of the second box.
-    box2_rot: Rotation matrix of the second box.
-    box2_half_sizes: Half-sizes of the second box.
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    contact_counter_out: Output array for contact count.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
+    box1_center (wp.vec3): Center of the first box.
+    box1_rot (wp.mat33): Rotation matrix of the first box.
+    box1_half_sizes (wp.vec3): Half-sizes of the first box.
+    box2_center (wp.vec3): Center of the second box.
+    box2_rot (wp.mat33): Rotation matrix of the second box.
+    box2_half_sizes (wp.vec3): Half-sizes of the second box.
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    contact_counter_out (wp.array): Output array for contact count.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
@@ -2030,19 +2030,19 @@ def plane_cylinder(
   """Calculates contacts between a cylinder and a plane.
 
   Args:
-    plane_normal: Normal vector of the plane.
-    plane_pos: A point on the plane.
-    cylinder_center: Center of the cylinder.
-    cylinder_axis: Axis of the cylinder.
-    cylinder_radius: Radius of the cylinder.
-    cylinder_half_height: Half-height of the cylinder.
-    margin: Collision margin.
-    max_contacts: Maximum number of contacts.
-    contact_counter_out: Output array for contact count.
-    dist_out: Output array for contact distances.
-    pos_out: Output array for contact positions.
-    normal_out: Output array for contact normals.
-    tangent_out: Output array for contact tangents.
+    plane_normal (wp.vec3): Normal vector of the plane.
+    plane_pos (wp.vec3): A point on the plane.
+    cylinder_center (wp.vec3): Center of the cylinder.
+    cylinder_axis (wp.vec3): Axis of the cylinder.
+    cylinder_radius (float): Radius of the cylinder.
+    cylinder_half_height (float): Half-height of the cylinder.
+    margin (float): Collision margin.
+    max_contacts (int): Maximum number of contacts.
+    contact_counter_out (wp.array): Output array for contact count.
+    dist_out (wp.array): Output array for contact distances.
+    pos_out (wp.array): Output array for contact positions.
+    normal_out (wp.array): Output array for contact normals.
+    tangent_out (wp.array): Output array for contact tangents.
 
   Returns:
       tuple(int, int): (first contact id inclusive, last contact id exclusive)
