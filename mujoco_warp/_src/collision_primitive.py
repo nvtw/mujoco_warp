@@ -15,8 +15,8 @@
 
 import warp as wp
 
-from .collision_hfield import hfield_triangle_prism
 from . import collision_primitive_core as core
+from .collision_hfield import hfield_triangle_prism
 from .math import upper_trid_index
 from .types import MJ_MINMU
 from .types import MJ_MINVAL

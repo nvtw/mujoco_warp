@@ -492,7 +492,6 @@ class CollisionTest(parameterized.TestCase):
       result = False
       test_dist = d.contact.dist.numpy()[i]
       test_pos = d.contact.pos.numpy()[i, :]
-      # Reconstruct frame from normal and tangent
       test_normal = d.contact.normal.numpy()[i, :]
       test_frame = test_normal[0:3]
       check_dist = np.allclose(actual_dist, test_dist, rtol=5e-2, atol=1.0e-1)
