@@ -13,6 +13,8 @@
 # limitations under the License.
 # ==============================================================================
 
+from typing import Tuple
+
 import warp as wp
 
 from . import collision_primitive_core as core
@@ -256,7 +258,7 @@ def _plane_sphere_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates one contact between a plane and a sphere."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   return core.plane_sphere(
@@ -288,7 +290,7 @@ def _sphere_sphere_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates one contact between two spheres."""
   return core.sphere_sphere(
     sphere1.pos,
@@ -319,7 +321,7 @@ def _sphere_capsule_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates one contact between a sphere and a capsule."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
   return core.sphere_capsule(
@@ -355,7 +357,7 @@ def _capsule_capsule_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates one contact between two capsules."""
   cap1_axis = wp.vec3(cap1.rot[0, 2], cap1.rot[1, 2], cap1.rot[2, 2])
   cap2_axis = wp.vec3(cap2.rot[0, 2], cap2.rot[1, 2], cap2.rot[2, 2])
@@ -392,7 +394,7 @@ def _plane_capsule_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates two contacts between a capsule and a plane."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
@@ -427,7 +429,7 @@ def _plane_ellipsoid_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates one contact between a plane and an ellipsoid."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   return core.plane_ellipsoid(
@@ -460,7 +462,7 @@ def _plane_box_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates contacts between a plane and a box."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   return core.plane_box(
@@ -493,7 +495,7 @@ def _plane_convex_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates contacts between a plane and a convex object."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   return core.plane_convex(
@@ -530,7 +532,7 @@ def _sphere_cylinder_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates one contact between a sphere and a cylinder."""
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
   return core.sphere_cylinder(
@@ -566,7 +568,7 @@ def _plane_cylinder_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates contacts between a cylinder and a plane."""
   plane_normal = wp.vec3(plane.rot[0, 2], plane.rot[1, 2], plane.rot[2, 2])
   cylinder_axis = wp.vec3(cylinder.rot[0, 2], cylinder.rot[1, 2], cylinder.rot[2, 2])
@@ -681,7 +683,7 @@ def _sphere_box_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates one contact between a sphere and a box."""
   return core.sphere_box(
     sphere.pos,
@@ -713,7 +715,7 @@ def _capsule_box_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates contacts between a capsule and a box."""
   cap_axis = wp.vec3(cap.rot[0, 2], cap.rot[1, 2], cap.rot[2, 2])
   return core.capsule_box(
@@ -748,7 +750,7 @@ def _box_box_wrapper(
   contact_pos_out: wp.array(dtype=wp.vec3),
   contact_normal_out: wp.array(dtype=wp.vec3),
   contact_tangent_out: wp.array(dtype=wp.vec3),
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
   """Calculates contacts between two boxes."""
   return core.box_box(
     box1.pos,
