@@ -828,7 +828,8 @@ def put_model(mjm: mujoco.MjModel) -> types.Model:
         for i in range(mjm.nsensor)
         if mjm.sensor_type[i] == mujoco.mjtSensor.mjSENS_TACTILE
         for j in range(mjm.mesh_vertnum[mjm.sensor_objid[i]])
-      ]
+      ],
+      dtype=int,
     ),
     taxel_sensorid=wp.array(
       [
@@ -880,10 +881,14 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
 
   if mujoco.mj_isSparse(mjm):
     qM = wp.zeros((nworld, 1, mjm.nM), dtype=float)
-    qLD = wp.zeros((nworld, 1, mjm.nM), dtype=float)
+    qLD = wp.zeros((nworld, 1, mjm.nC), dtype=float)
+    qM_integration = wp.zeros((nworld, 1, mjm.nM), dtype=float)
+    qLD_integration = wp.zeros((nworld, 1, mjm.nM), dtype=float)
   else:
     qM = wp.zeros((nworld, mjm.nv, mjm.nv), dtype=float)
     qLD = wp.zeros((nworld, mjm.nv, mjm.nv), dtype=float)
+    qM_integration = wp.zeros((nworld, mjm.nv, mjm.nv), dtype=float)
+    qLD_integration = wp.zeros((nworld, mjm.nv, mjm.nv), dtype=float)
 
   nsensorcontact = np.sum(mjm.sensor_type == mujoco.mjtSensor.mjSENS_CONTACT)
   nrangefinder = sum(mjm.sensor_type == mujoco.mjtSensor.mjSENS_RANGEFINDER)
@@ -1009,7 +1014,7 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
       gauss=wp.zeros((nworld,), dtype=float),
       cost=wp.zeros((nworld,), dtype=float),
       prev_cost=wp.zeros((nworld,), dtype=float),
-      active=wp.zeros((nworld, njmax), dtype=bool),
+      state=wp.zeros((nworld, njmax), dtype=int),
       gtol=wp.zeros((nworld,), dtype=float),
       mv=wp.zeros((nworld, mjm.nv), dtype=float),
       jv=wp.zeros((nworld, njmax), dtype=float),
@@ -1035,12 +1040,6 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
       mid=wp.zeros((nworld,), dtype=wp.vec3),
       mid_alpha=wp.zeros((nworld,), dtype=float),
       cost_candidate=wp.zeros((nworld, mjm.opt.ls_iterations), dtype=float),
-      # elliptic cone
-      u=wp.zeros((nconmax,), dtype=types.vec6),
-      uu=wp.zeros((nconmax,), dtype=float),
-      uv=wp.zeros((nconmax,), dtype=float),
-      vv=wp.zeros((nconmax,), dtype=float),
-      condim=wp.zeros((nworld, njmax), dtype=int),
     ),
     # RK4
     qpos_t0=wp.zeros((nworld, mjm.nq), dtype=float),
@@ -1053,8 +1052,8 @@ def make_data(mjm: mujoco.MjModel, nworld: int = 1, nconmax: int = -1, njmax: in
     qfrc_integration=wp.zeros((nworld, mjm.nv), dtype=float),
     qacc_integration=wp.zeros((nworld, mjm.nv), dtype=float),
     act_vel_integration=wp.zeros((nworld, mjm.nu), dtype=float),
-    qM_integration=wp.zeros((nworld, mjm.nv, mjm.nv), dtype=float),
-    qLD_integration=wp.zeros((nworld, mjm.nv, mjm.nv), dtype=float),
+    qM_integration=qM_integration,
+    qLD_integration=qLD_integration,
     qLDiagInv_integration=wp.zeros((nworld, mjm.nv), dtype=float),
     # sweep-and-prune broadphase
     sap_projection_lower=wp.zeros((nworld, mjm.ngeom, 2), dtype=float),
@@ -1395,7 +1394,7 @@ def put_data(
       gauss=wp.empty(shape=(nworld,), dtype=float),
       cost=wp.empty(shape=(nworld,), dtype=float),
       prev_cost=wp.empty(shape=(nworld,), dtype=float),
-      active=wp.empty(shape=(nworld, njmax), dtype=bool),
+      state=wp.empty(shape=(nworld, njmax), dtype=int),
       gtol=wp.empty(shape=(nworld,), dtype=float),
       mv=wp.empty(shape=(nworld, mjm.nv), dtype=float),
       jv=wp.empty(shape=(nworld, njmax), dtype=float),
@@ -1420,12 +1419,6 @@ def put_data(
       mid=wp.empty(shape=(nworld,), dtype=wp.vec3),
       mid_alpha=wp.empty(shape=(nworld,), dtype=float),
       cost_candidate=wp.empty(shape=(nworld, mjm.opt.ls_iterations), dtype=float),
-      # TODO(team): skip allocation if not elliptic
-      u=wp.empty((nconmax,), dtype=types.vec6),
-      uu=wp.empty((nconmax,), dtype=float),
-      uv=wp.empty((nconmax,), dtype=float),
-      vv=wp.empty((nconmax,), dtype=float),
-      condim=wp.empty((nworld, njmax), dtype=int),
     ),
     # TODO(team): skip allocation if integrator != RK4
     qpos_t0=wp.empty((nworld, mjm.nq), dtype=float),
