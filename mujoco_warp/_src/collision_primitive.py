@@ -19,6 +19,9 @@ import warp as wp
 
 from . import collision_primitive_core as core
 from .collision_hfield import hfield_triangle_prism
+from .math import make_frame
+from .math import normalize_with_norm
+from .math import safe_div
 from .math import upper_trid_index
 from .types import MJ_MINMU
 from .types import MJ_MINVAL
@@ -635,7 +638,7 @@ def contact_params(
     solmix1 = geom_solmix[worldid, g1]
     solmix2 = geom_solmix[worldid, g2]
 
-    mix = solmix1 / (solmix1 + solmix2)
+    mix = safe_div(solmix1, solmix1 + solmix2)
     mix = wp.where((solmix1 < MJ_MINVAL) and (solmix2 < MJ_MINVAL), 0.5, mix)
     mix = wp.where((solmix1 < MJ_MINVAL) and (solmix2 >= MJ_MINVAL), 0.0, mix)
     mix = wp.where((solmix1 >= MJ_MINVAL) and (solmix2 < MJ_MINVAL), 1.0, mix)
