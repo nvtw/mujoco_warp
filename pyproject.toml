@@ -31,6 +31,7 @@ dependencies = [
     "mujoco>=3.3.6.dev802089588",
     "numpy",
     "warp-lang>=1.9.0.dev20250825",
+	"newton @ git+https://github.com/newton-physics/newton@main",
 ]
 
 [[tool.uv.index]]

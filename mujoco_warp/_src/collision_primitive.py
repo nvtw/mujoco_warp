@@ -16,20 +16,20 @@
 from typing import Tuple
 
 import warp as wp
+from newton.geometry import collision_box_box as box_box
+from newton.geometry import collision_capsule_box as capsule_box
+from newton.geometry import collision_capsule_capsule as capsule_capsule
+from newton.geometry import collision_plane_box as plane_box
+from newton.geometry import collision_plane_capsule as plane_capsule
+from newton.geometry import collision_plane_cylinder as plane_cylinder
+from newton.geometry import collision_plane_ellipsoid as plane_ellipsoid
+from newton.geometry import collision_plane_sphere as plane_sphere
+from newton.geometry import collision_sphere_box as sphere_box
+from newton.geometry import collision_sphere_capsule as sphere_capsule
+from newton.geometry import collision_sphere_cylinder as sphere_cylinder
+from newton.geometry import collision_sphere_sphere as sphere_sphere
 
 from .collision_hfield import hfield_triangle_prism
-from .collision_primitive_core import box_box
-from .collision_primitive_core import capsule_box
-from .collision_primitive_core import capsule_capsule
-from .collision_primitive_core import plane_box
-from .collision_primitive_core import plane_capsule
-from .collision_primitive_core import plane_cylinder
-from .collision_primitive_core import plane_ellipsoid
-from .collision_primitive_core import plane_sphere
-from .collision_primitive_core import sphere_box
-from .collision_primitive_core import sphere_capsule
-from .collision_primitive_core import sphere_cylinder
-from .collision_primitive_core import sphere_sphere
 from .math import make_frame
 from .math import safe_div
 from .math import upper_trid_index
