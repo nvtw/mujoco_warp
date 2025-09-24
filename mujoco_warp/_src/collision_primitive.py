@@ -1442,7 +1442,6 @@ _primitive_collisions_types = []
 _primitive_collisions_func = []
 
 
-@cache_kernel
 def _create_narrowphase_kernel():
   @nested_kernel(module="unique", enable_backward=False)
   def _primitive_narrowphase(
