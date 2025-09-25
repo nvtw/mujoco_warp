@@ -570,8 +570,10 @@ def _create_actuator_velocity_kernel(NV: int):
 
 # TODO(team): sparse actuator_moment version
 def _actuator_velocity(m: Model, d: Data):
+  NV = m.nv
+
   wp.launch_tiled(
-    _create_actuator_velocity_kernel(m.nv),
+    _create_actuator_velocity_kernel(NV),
     dim=(d.nworld, m.nu),
     inputs=[
       d.qvel,
