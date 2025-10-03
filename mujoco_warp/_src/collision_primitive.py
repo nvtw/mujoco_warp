@@ -28,6 +28,18 @@ from newton.geometry import collide_sphere_cylinder as sphere_cylinder
 from newton.geometry import collide_sphere_sphere as sphere_sphere
 
 from .collision_hfield import hfield_triangle_prism
+from .collision_primitive_core import box_box
+from .collision_primitive_core import capsule_box
+from .collision_primitive_core import capsule_capsule
+from .collision_primitive_core import plane_box
+from .collision_primitive_core import plane_capsule
+from .collision_primitive_core import plane_cylinder
+from .collision_primitive_core import plane_ellipsoid
+from .collision_primitive_core import plane_sphere
+from .collision_primitive_core import sphere_box
+from .collision_primitive_core import sphere_capsule
+from .collision_primitive_core import sphere_cylinder
+from .collision_primitive_core import sphere_sphere
 from .math import make_frame
 from .math import safe_div
 from .math import upper_trid_index
@@ -37,6 +49,7 @@ from .types import Data
 from .types import GeomType
 from .types import Model
 from .types import vec5
+from .warp_util import cache_kernel
 from .warp_util import event_scope
 from .warp_util import kernel as nested_kernel
 
@@ -47,13 +60,17 @@ _HUGE_VAL = 1e6
 _mat43f = wp.types.matrix((4, 3), wp.float32)
 
 
+mat63 = wp.types.matrix(shape=(6, 3), dtype=float)
+
+
 @wp.struct
 class Geom:
   pos: wp.vec3
   rot: wp.mat33
   normal: wp.vec3
   size: wp.vec3
-  hfprism: wp.mat33
+  margin: float
+  hfprism: mat63
   vertadr: int
   vertnum: int
   vert: wp.array(dtype=wp.vec3)
@@ -72,24 +89,19 @@ class Geom:
 
 
 @wp.func
-def _geom(
+def geom(
   # kernel_analyzer: off
   # Model:
   geom_type: int,
   geom_dataid: int,
   geom_size: wp.vec3,
-  hfield_adr: int,
-  hfield_nrow: int,
-  hfield_ncol: int,
-  hfield_size: wp.vec4,
-  hfield_data: wp.array(dtype=float),
-  mesh_vertadr: int,
-  mesh_vertnum: int,
+  mesh_vertadr: wp.array(dtype=int),
+  mesh_vertnum: wp.array(dtype=int),
   mesh_vert: wp.array(dtype=wp.vec3),
-  mesh_graphadr: int,
+  mesh_graphadr: wp.array(dtype=int),
   mesh_graph: wp.array(dtype=int),
-  mesh_polynum: int,
-  mesh_polyadr: int,
+  mesh_polynum: wp.array(dtype=int),
+  mesh_polyadr: wp.array(dtype=int),
   mesh_polynormal: wp.array(dtype=wp.vec3),
   mesh_polyvertadr: wp.array(dtype=int),
   mesh_polyvertnum: wp.array(dtype=int),
@@ -100,8 +112,6 @@ def _geom(
   # Data in:
   geom_xpos_in: wp.vec3,
   geom_xmat_in: wp.mat33,
-  # In:
-  hftri_index: int,
   # kernel_analyzer: on
 ) -> Geom:
   geom = Geom()
@@ -110,21 +120,20 @@ def _geom(
   geom.size = geom_size
   geom.normal = wp.vec3(geom_xmat_in[0, 2], geom_xmat_in[1, 2], geom_xmat_in[2, 2])  # plane
 
-  # If geom is MESH, get mesh verts
-  if geom_dataid >= 0 and geom_type == int(GeomType.MESH.value):
-    geom.vertadr = mesh_vertadr
-    geom.vertnum = mesh_vertnum
-    geom.graphadr = mesh_graphadr
-    geom.mesh_polynum = mesh_polynum
-    geom.mesh_polyadr = mesh_polyadr
-  else:
-    geom.vertadr = -1
-    geom.vertnum = -1
-    geom.graphadr = -1
-    geom.mesh_polynum = -1
-    geom.mesh_polyadr = -1
+  if geom_type == GeomType.MESH:
+    if geom_dataid >= 0:
+      geom.vertadr = mesh_vertadr[geom_dataid]
+      geom.vertnum = mesh_vertnum[geom_dataid]
+      geom.graphadr = mesh_graphadr[geom_dataid]
+      geom.mesh_polynum = mesh_polynum[geom_dataid]
+      geom.mesh_polyadr = mesh_polyadr[geom_dataid]
+    else:
+      geom.vertadr = -1
+      geom.vertnum = -1
+      geom.graphadr = -1
+      geom.mesh_polynum = -1
+      geom.mesh_polyadr = -1
 
-  if geom_type == int(GeomType.MESH.value):
     geom.vert = mesh_vert
     geom.graph = mesh_graph
     geom.mesh_polynormal = mesh_polynormal
@@ -135,13 +144,9 @@ def _geom(
     geom.mesh_polymapnum = mesh_polymapnum
     geom.mesh_polymap = mesh_polymap
 
-  # If geom is HFIELD triangle, compute triangle prism verts
-  if geom_type == int(GeomType.HFIELD.value):
-    geom.hfprism = hfield_triangle_prism(
-      geom_dataid, hfield_adr, hfield_nrow, hfield_ncol, hfield_size, hfield_data, hftri_index
-    )
-
   geom.index = -1
+  geom.margin = 0.0
+
   return geom
 
 
@@ -176,56 +181,60 @@ def plane_convex(
 
   # exhaustive search over all vertices
   if convex.graphadr == -1 or convex.vertnum < 10:
-    # Find support points
+    # find first support point (a)
     max_support = wp.float32(-_HUGE_VAL)
+    a = wp.vec3()
     for i in range(convex.vertnum):
-      support = wp.dot(plane_pos_local - convex.vert[convex.vertadr + i], n)
-      max_support = wp.max(support, max_support)
-
-    threshold = wp.max(0.0, max_support - 1e-3)
-    # Find point a (first support point)
-    a_dist = wp.float32(-_HUGE_VAL)
-    for i in range(convex.vertnum):
-      support = wp.dot(plane_pos_local - convex.vert[convex.vertadr + i], n)
-      dist = wp.where(support > threshold, support, -_HUGE_VAL)
-      if dist > a_dist:
+      vert = convex.vert[convex.vertadr + i]
+      support = wp.dot(plane_pos_local - vert, n)
+      if support > max_support:
+        max_support = support
         indices[0] = i
-        a_dist = dist
-    a = convex.vert[convex.vertadr + indices[0]]
+        a = vert
 
-    # Find point b (furthest from a)
+    if max_support < 0:
+      return contact_dist, contact_pos, plane_normal
+
+    threshold = max_support - 1e-3
+
+    # find point (b) furthest from a
     b_dist = wp.float32(-_HUGE_VAL)
+    b = wp.vec3()
     for i in range(convex.vertnum):
-      support = wp.dot(plane_pos_local - convex.vert[convex.vertadr + i], n)
+      vert = convex.vert[convex.vertadr + i]
+      support = wp.dot(plane_pos_local - vert, n)
       dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
-      dist = wp.length_sq(a - convex.vert[convex.vertadr + i]) + dist_mask
+      dist = wp.length_sq(a - vert) + dist_mask
       if dist > b_dist:
         indices[1] = i
         b_dist = dist
-    b = convex.vert[convex.vertadr + indices[1]]
+        b = vert
 
-    # Find point c (furthest along axis orthogonal to a-b)
+    # find point (c) furthest along axis orthogonal to a-b
     ab = wp.cross(n, a - b)
     c_dist = wp.float32(-_HUGE_VAL)
+    c = wp.vec3()
     for i in range(convex.vertnum):
-      support = wp.dot(plane_pos_local - convex.vert[convex.vertadr + i], n)
+      vert = convex.vert[convex.vertadr + i]
+      support = wp.dot(plane_pos_local - vert, n)
       dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
-      ap = a - convex.vert[convex.vertadr + i]
+      ap = a - vert
       dist = wp.abs(wp.dot(ap, ab)) + dist_mask
       if dist > c_dist:
         indices[2] = i
         c_dist = dist
-    c = convex.vert[convex.vertadr + indices[2]]
+        c = vert
 
-    # Find point d (furthest from other triangle edges)
+    # find point (d) furthest from other triangle edges
     ac = wp.cross(n, a - c)
     bc = wp.cross(n, b - c)
     d_dist = wp.float32(-_HUGE_VAL)
     for i in range(convex.vertnum):
-      support = wp.dot(plane_pos_local - convex.vert[convex.vertadr + i], n)
+      vert = convex.vert[convex.vertadr + i]
+      support = wp.dot(plane_pos_local - vert, n)
       dist_mask = wp.where(support > threshold, 0.0, -_HUGE_VAL)
-      ap = a - convex.vert[convex.vertadr + i]
-      bp = b - convex.vert[convex.vertadr + i]
+      ap = a - vert
+      bp = b - vert
       dist_ap = wp.abs(wp.dot(ap, ac)) + dist_mask
       dist_bp = wp.abs(wp.dot(bp, bc)) + dist_mask
       if dist_ap + dist_bp > d_dist:
@@ -1415,19 +1424,19 @@ def box_box_wrapper(
 
 
 _PRIMITIVE_COLLISIONS = {
-  (GeomType.PLANE.value, GeomType.SPHERE.value): plane_sphere_wrapper,
-  (GeomType.PLANE.value, GeomType.CAPSULE.value): plane_capsule_wrapper,
-  (GeomType.PLANE.value, GeomType.ELLIPSOID.value): plane_ellipsoid_wrapper,
-  (GeomType.PLANE.value, GeomType.CYLINDER.value): plane_cylinder_wrapper,
-  (GeomType.PLANE.value, GeomType.BOX.value): plane_box_wrapper,
-  (GeomType.PLANE.value, GeomType.MESH.value): plane_convex_wrapper,
-  (GeomType.SPHERE.value, GeomType.SPHERE.value): sphere_sphere_wrapper,
-  (GeomType.SPHERE.value, GeomType.CAPSULE.value): sphere_capsule_wrapper,
-  (GeomType.SPHERE.value, GeomType.CYLINDER.value): sphere_cylinder_wrapper,
-  (GeomType.SPHERE.value, GeomType.BOX.value): sphere_box_wrapper,
-  (GeomType.CAPSULE.value, GeomType.CAPSULE.value): capsule_capsule_wrapper,
-  (GeomType.CAPSULE.value, GeomType.BOX.value): capsule_box_wrapper,
-  (GeomType.BOX.value, GeomType.BOX.value): box_box_wrapper,
+  (GeomType.PLANE, GeomType.SPHERE): plane_sphere_wrapper,
+  (GeomType.PLANE, GeomType.CAPSULE): plane_capsule_wrapper,
+  (GeomType.PLANE, GeomType.ELLIPSOID): plane_ellipsoid_wrapper,
+  (GeomType.PLANE, GeomType.CYLINDER): plane_cylinder_wrapper,
+  (GeomType.PLANE, GeomType.BOX): plane_box_wrapper,
+  (GeomType.PLANE, GeomType.MESH): plane_convex_wrapper,
+  (GeomType.SPHERE, GeomType.SPHERE): sphere_sphere_wrapper,
+  (GeomType.SPHERE, GeomType.CAPSULE): sphere_capsule_wrapper,
+  (GeomType.SPHERE, GeomType.CYLINDER): sphere_cylinder_wrapper,
+  (GeomType.SPHERE, GeomType.BOX): sphere_box_wrapper,
+  (GeomType.CAPSULE, GeomType.CAPSULE): capsule_capsule_wrapper,
+  (GeomType.CAPSULE, GeomType.BOX): capsule_box_wrapper,
+  (GeomType.BOX, GeomType.BOX): box_box_wrapper,
 }
 
 
@@ -1435,7 +1444,7 @@ _PRIMITIVE_COLLISIONS = {
 def _check_primitive_collisions():
   prev_idx = -1
   for types in _PRIMITIVE_COLLISIONS.keys():
-    idx = upper_trid_index(len(GeomType), types[0], types[1])
+    idx = upper_trid_index(len(GeomType), types[0].value, types[1].value)
     if types[1] < types[0] or idx <= prev_idx:
       return False
     prev_idx = idx
@@ -1444,18 +1453,17 @@ def _check_primitive_collisions():
 
 assert _check_primitive_collisions(), "_PRIMITIVE_COLLISIONS is in invalid order"
 
-_primitive_collisions_types = []
-_primitive_collisions_func = []
 
+@cache_kernel
+def _create_narrowphase_kernel(primitive_collisions_types, primitive_collisions_func):
+  # AD: no unique here:
+  # * we expect this generator to be called only once per model, so no repeated compilation
+  # * module="unique" is generating problems because it uses the function name as the key
+  #   that in turn will cause multiple kernels to be generated with the same name
+  #   this is mostly problematic in cases like the UTs where we don't clear the kernel cache
+  #   between different tests.
 
-def _primitive_narrowphase_builder(m: Model):
-  for types, func in _PRIMITIVE_COLLISIONS.items():
-    idx = upper_trid_index(len(GeomType), types[0], types[1])
-    if m.geom_pair_type_count[idx] and types not in _primitive_collisions_types:
-      _primitive_collisions_types.append(types)
-      _primitive_collisions_func.append(func)
-
-  @nested_kernel(module="unique", enable_backward=False)
+  @nested_kernel(enable_backward=False)
   def _primitive_narrowphase(
     # Model:
     geom_type: wp.array(dtype=int),
@@ -1500,7 +1508,6 @@ def _primitive_narrowphase_builder(m: Model):
     geom_xpos_in: wp.array2d(dtype=wp.vec3),
     geom_xmat_in: wp.array2d(dtype=wp.mat33),
     collision_pair_in: wp.array(dtype=wp.vec2i),
-    collision_hftri_index_in: wp.array(dtype=int),
     collision_pairid_in: wp.array(dtype=int),
     collision_worldid_in: wp.array(dtype=int),
     ncollision_in: wp.array(dtype=int),
@@ -1554,25 +1561,18 @@ def _primitive_narrowphase_builder(m: Model):
       worldid,
     )
 
-    hftri_index = collision_hftri_index_in[tid]
-
     geom1_dataid = geom_dataid[g1]
-    geom1 = _geom(
+    geom1 = geom(
       type1,
       geom1_dataid,
       geom_size[worldid, g1],
-      hfield_adr[geom1_dataid],
-      hfield_nrow[geom1_dataid],
-      hfield_ncol[geom1_dataid],
-      hfield_size[geom1_dataid],
-      hfield_data,
-      mesh_vertadr[geom1_dataid],
-      mesh_vertnum[geom1_dataid],
+      mesh_vertadr,
+      mesh_vertnum,
       mesh_vert,
-      mesh_graphadr[geom1_dataid],
+      mesh_graphadr,
       mesh_graph,
-      mesh_polynum[geom1_dataid],
-      mesh_polyadr[geom1_dataid],
+      mesh_polynum,
+      mesh_polyadr,
       mesh_polynormal,
       mesh_polyvertadr,
       mesh_polyvertnum,
@@ -1582,26 +1582,20 @@ def _primitive_narrowphase_builder(m: Model):
       mesh_polymap,
       geom_xpos_in[worldid, g1],
       geom_xmat_in[worldid, g1],
-      hftri_index,
     )
 
     geom2_dataid = geom_dataid[g2]
-    geom2 = _geom(
+    geom2 = geom(
       type2,
       geom2_dataid,
       geom_size[worldid, g2],
-      hfield_adr[geom2_dataid],
-      hfield_nrow[geom2_dataid],
-      hfield_ncol[geom2_dataid],
-      hfield_size[geom2_dataid],
-      hfield_data,
-      mesh_vertadr[geom2_dataid],
-      mesh_vertnum[geom2_dataid],
+      mesh_vertadr,
+      mesh_vertnum,
       mesh_vert,
-      mesh_graphadr[geom2_dataid],
+      mesh_graphadr,
       mesh_graph,
-      mesh_polynum[geom2_dataid],
-      mesh_polyadr[geom2_dataid],
+      mesh_polynum,
+      mesh_polyadr,
       mesh_polynormal,
       mesh_polyvertadr,
       mesh_polyvertnum,
@@ -1611,15 +1605,14 @@ def _primitive_narrowphase_builder(m: Model):
       mesh_polymap,
       geom_xpos_in[worldid, g2],
       geom_xmat_in[worldid, g2],
-      hftri_index,
     )
 
-    for i in range(wp.static(len(_primitive_collisions_func))):
-      collision_type1 = wp.static(_primitive_collisions_types[i][0])
-      collision_type2 = wp.static(_primitive_collisions_types[i][1])
+    for i in range(wp.static(len(primitive_collisions_func))):
+      collision_type1 = wp.static(primitive_collisions_types[i][0])
+      collision_type2 = wp.static(primitive_collisions_types[i][1])
 
       if collision_type1 == type1 and collision_type2 == type2:
-        wp.static(_primitive_collisions_func[i])(
+        wp.static(primitive_collisions_func[i])(
           nconmax_in,
           geom1,
           geom2,
@@ -1647,6 +1640,19 @@ def _primitive_narrowphase_builder(m: Model):
         )
 
   return _primitive_narrowphase
+
+
+def _primitive_narrowphase_builder(m: Model):
+  _primitive_collisions_types = []
+  _primitive_collisions_func = []
+
+  for types, func in _PRIMITIVE_COLLISIONS.items():
+    idx = upper_trid_index(len(GeomType), types[0].value, types[1].value)
+    if m.geom_pair_type_count[idx] and types not in _primitive_collisions_types:
+      _primitive_collisions_types.append(types)
+      _primitive_collisions_func.append(func)
+
+  return _create_narrowphase_kernel(_primitive_collisions_types, _primitive_collisions_func)
 
 
 @event_scope
@@ -1712,7 +1718,6 @@ def primitive_narrowphase(m: Model, d: Data):
       d.geom_xpos,
       d.geom_xmat,
       d.collision_pair,
-      d.collision_hftri_index,
       d.collision_pairid,
       d.collision_worldid,
       d.ncollision,
