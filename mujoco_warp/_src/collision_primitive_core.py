@@ -589,7 +589,7 @@ def box_box(
   box2_pos: wp.vec3,
   box2_rot: wp.mat33,
   box2_size: wp.vec3,
-  margin: float = 0.0,
+  margin: float = 0.0, # kernel_analyzer: off
 ) -> Tuple[vec8f, mat83f, mat83f]:
   """Core contact geometry calculation for box-box collision.
 
