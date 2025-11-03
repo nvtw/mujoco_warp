@@ -548,10 +548,14 @@ class CollisionTest(parameterized.TestCase):
         test_frame = d.contact.frame.numpy()[j].flatten()
 
         # For box-box collisions, check if the distance matches when accounting
-        # for MuJoCo's bug (it reports half the correct penetration depth)
+        # for MuJoCo's bug (it reports half the correct penetration depth for face-face contacts)
+        # Note: Edge-edge collisions don't have this bug, so we check both possibilities
         if is_box_box and actual_dist < 0:
-          # MuJoCo reports half depth, so multiply by 2 to compare with correct depth
-          check_dist = np.allclose(actual_dist * 2.0, test_dist, rtol=5e-2, atol=1.0e-2)
+          # Check if values match directly (e.g., edge-edge collisions)
+          check_dist_direct = np.allclose(actual_dist, test_dist, rtol=5e-2, atol=1.0e-2)
+          # Check if MuJoCo's half depth (multiplied by 2) matches (face-face collisions)
+          check_dist_corrected = np.allclose(actual_dist * 2.0, test_dist, rtol=5e-2, atol=1.0e-2)
+          check_dist = check_dist_direct or check_dist_corrected
         else:
           check_dist = np.allclose(actual_dist, test_dist, rtol=5e-2, atol=1.0e-2)
 
