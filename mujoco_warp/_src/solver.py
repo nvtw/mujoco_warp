@@ -2870,10 +2870,10 @@ def _JTDAJ_sparse(
         colindj = efc_J_colind_in[worldid, 0, sparseidj]
 
       h = Ji * Jj * efc_D
-      wp.atomic_add(h_out[worldid, colindi], colindj, h)
-
-      if i != j:
-        wp.atomic_add(h_out[worldid, colindj], colindi, h)
+      # Store in lower triangle only: ensure row >= col
+      row = wp.max(colindi, colindj)
+      col = wp.min(colindi, colindj)
+      wp.atomic_add(h_out[worldid, row], col, h)
 
 
 def _update_gradient(m: types.Model, d: types.Data, ctx: SolverContext):
